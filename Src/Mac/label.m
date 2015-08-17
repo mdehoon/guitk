@@ -39,8 +39,8 @@ Label_init(Label *self, PyObject *args, PyObject *kwds)
 
     rect.origin.x = 10;
     rect.origin.y = 10;
-    rect.size.width = 200;
-    rect.size.height = 17;
+    rect.size.width = 100;
+    rect.size.height = 100;
 
     NSApp = [NSApplication sharedApplication];
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
@@ -63,6 +63,7 @@ Label_init(Label *self, PyObject *args, PyObject *kwds)
     font = [NSFont systemFontOfSize: fontsize];
     [textField setFont: font];
     [s release];
+    [textField sizeToFit];
 
     [pool release];
 
@@ -118,11 +119,102 @@ Label_set_position(Label* self, PyObject *args)
     return Py_None;
 }
 
+static PyObject*
+Label_get_size(Label* self, PyObject *args)
+{
+    float width;
+    float height;
+    NSRect frame;
+    NSTextField* label = self->label;
+    if (!label) {
+        PyErr_SetString(PyExc_RuntimeError, "label has not been initialized");
+        return NULL;
+    }
+    frame = [label frame];
+    width = frame.size.width;
+    height = frame.size.height;
+    return Py_BuildValue("ff", width, height);
+}
+
+static PyObject*
+Label_pack(Label* self, PyObject *args)
+{
+    int i;
+    double values[4];
+    NSPoint origin;
+    NSPoint corner;
+    NSPoint position;
+    NSRect frame;
+    NSSize size;
+    PyObject* item;
+    PyObject* cavity;
+    NSTextField* label = self->label;
+    if (!label) {
+        PyErr_SetString(PyExc_RuntimeError, "label has not been initialized");
+        return NULL;
+    }
+    if(!PyArg_ParseTuple(args, "O", &cavity))
+        return NULL;
+    if(!PyList_Check(cavity)) {
+        PyErr_SetString(PyExc_RuntimeError, "cavity argument should be a list");
+        return NULL;
+    }
+    if(PyList_GET_SIZE(cavity)!=4) {
+        PyErr_SetString(PyExc_RuntimeError, "cavity argument should be a list of four elements");
+        return NULL;
+    }
+    for (i = 0; i < 4; i++) {
+        item = PyList_GET_ITEM(cavity, i);
+        values[i] = PyFloat_AsDouble(item);
+        if (values[i] < 0 && PyErr_Occurred()) {
+            PyErr_SetString(PyExc_RuntimeError, "cavity argument should be a list of four numbers");
+            return NULL;
+        }
+    }
+
+    origin.x = values[0];
+    origin.y = values[1];
+    corner.x = values[2];
+    corner.y = values[3];
+    frame = [label frame];
+    size = frame.size;
+    position.y = origin.y;
+    position.x = 0.5 * (origin.x + corner.x - size.width);
+    origin.y += size.height;
+
+    [label setFrameOrigin: position];
+
+    values[0] = origin.x;
+    values[1] = origin.y;
+    values[2] = corner.x;
+    values[3] = corner.y;
+    for (i = 0; i < 4; i++) {
+        item = PyFloat_FromDouble(values[i]);
+        if (!item) return NULL;
+        if (PyList_SetItem(cavity, i, item)==-1) {
+            Py_DECREF(item);
+            return NULL;
+        }
+    }
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static PyMethodDef Label_methods[] = {
     {"set_position",
      (PyCFunction)Label_set_position,
      METH_VARARGS,
      "Moves the label to the new position."
+    },
+    {"get_size",
+     (PyCFunction)Label_get_size,
+     METH_NOARGS,
+     "Returns the size of the label."
+    },
+    {"pack",
+     (PyCFunction)Label_pack,
+     METH_VARARGS,
+     "Pack the label into the available cavity."
     },
     {NULL}  /* Sentinel */
 };

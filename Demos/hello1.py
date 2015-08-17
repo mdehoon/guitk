@@ -1,7 +1,8 @@
-import _guitk
+import guitk
 
-window = _guitk.Window(300,100, 'Hello')
-label = _guitk.Label("Hello, world!")
+window = guitk.Window(300,100, 'Hello')
+label = guitk._guitk.Label("Hello, world!")
 window.add(label)
+window.pack()
 window.show()
 

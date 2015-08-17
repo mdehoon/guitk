@@ -12,6 +12,28 @@
 #endif
 #endif
 
+
+@interface View : NSView <NSWindowDelegate>
+{
+}
+- (BOOL)isFlipped;
+- (BOOL)autoresizesSubviews;
+@end
+
+@implementation View
+- (BOOL)isFlipped
+{
+    return YES;
+}
+
+- (BOOL)autoresizesSubviews;
+{
+    return NO;
+}
+@end
+
+
+
 typedef struct {
     PyObject_HEAD
     NSWindow* window;
@@ -31,6 +53,7 @@ Window_init(Window *self, PyObject *args, PyObject *kwds)
 {
     NSRect rect;
     NSWindow* window;
+    View* view;
     const char* title = "";
     int width = 100;
     int height = 100;
@@ -58,6 +81,9 @@ Window_init(Window *self, PyObject *args, PyObject *kwds)
                                          encoding: NSASCIIStringEncoding]];
 
     [window setAcceptsMouseMovedEvents: YES];
+    view = [[View alloc] initWithFrame: rect];
+    [window setContentView: view];
+
     self->window = window;
 
     [pool release];
@@ -172,7 +198,7 @@ static PyObject*
 Window_add(Window* self, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
-    NSView* view;
+    View* view;
     Label* label;
 
     NSWindow* window = self->window;
@@ -191,12 +217,31 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
         return NULL;
     }
     label = (Label*)object;
+    Py_INCREF(label);
 
     [view addSubview: label->label];
 
     Py_INCREF(Py_None);
     return Py_None;
 }
+
+static PyObject*
+Window_get_size(Window* self, PyObject *args)
+{
+    float width;
+    float height;
+    NSRect frame;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    frame = [[window contentView] frame];
+    width = frame.size.width;
+    height = frame.size.height;
+    return Py_BuildValue("ff", width, height);
+}
+
 
 static PyMethodDef Window_methods[] = {
     {"show",
@@ -223,6 +268,11 @@ static PyMethodDef Window_methods[] = {
      (PyCFunction)Window_add,
      METH_VARARGS,
      "Adds a control to the window."
+    },
+    {"get_size",
+     (PyCFunction)Window_get_size,
+     METH_NOARGS,
+     "Returns the size of the window."
     },
     {NULL}  /* Sentinel */
 };

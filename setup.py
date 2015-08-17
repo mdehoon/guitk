@@ -11,7 +11,7 @@ sources = ["Src/Mac/_guitk.m",
            "Src/Mac/label.m",
           ]
 
-extension = Extension("_guitk",
+extension = Extension("guitk._guitk",
                       sources,
                       include_dirs=['Src'],
                       )
@@ -19,5 +19,7 @@ extension = Extension("_guitk",
 extension.extra_link_args.extend(['-framework', 'Cocoa'])
 
 setup(
+      packages = ['guitk'],
+      package_dir = {'': 'Lib'},
       ext_modules=[extension],
       )
