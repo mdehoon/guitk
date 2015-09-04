@@ -1,5 +1,6 @@
 #include <Cocoa/Cocoa.h>
 #include "label.h"
+#include "packed.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -11,69 +12,266 @@
 #endif
 #endif
 
-static PyObject*
-Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    Label *self = (Label*)type->tp_alloc(type, 0);
-    if (!self) return NULL;
-    self->label = NULL;
-    return (PyObject*)self;
-}
+#define FILLX     1
+#define FILLY     2
+#define EXPAND    4
+#define NORTH     8
+#define EAST     16
+#define SOUTH    32
+#define WEST     64
+#define TOP     128
+#define BOTTOM  256
+#define LEFT    512
+#define RIGHT  1024
 
-static int
-Label_init(Label *self, PyObject *args, PyObject *kwds)
+
+
+@implementation Label
+- (Label*)initWithObject:(PyLabel*)obj
 {
     NSRect rect;
-    NSTextField *textField;
-    const char* text = "";
     CGFloat fontsize;
-    NSControlSize size;
-    NSFont* font;
-    NSCell* cell;
-
-    if(!PyArg_ParseTuple(args, "|s", &text)) return -1;
-
-    NSString* s = [[NSString alloc]
-                         initWithCString: text
-                                encoding: NSUTF8StringEncoding];
-
+    NSControlSize size = 12;
     rect.origin.x = 10;
     rect.origin.y = 10;
     rect.size.width = 100;
     rect.size.height = 100;
-
-    NSApp = [NSApplication sharedApplication];
-    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-
-    textField = [[NSTextField alloc] initWithFrame: rect];
-    [textField setStringValue:s];
-    [textField setBezeled:NO];
-    [textField setDrawsBackground:NO];
-    [textField setEditable:NO];
-    [textField setSelectable:NO];
-    [textField setAutoresizingMask: NSViewMinXMargin
-                                  | NSViewWidthSizable
-                                  | NSViewMaxXMargin
-                                  | NSViewMinYMargin
-                                  | NSViewHeightSizable
-                                  | NSViewMaxYMargin];
-    cell = [textField cell];
-    size = [cell controlSize];
+    self = [super initWithFrame: rect];
+    [self setAutoresizingMask: NSViewMinXMargin
+                             | NSViewWidthSizable
+                             | NSViewMaxXMargin
+                             | NSViewMinYMargin
+                             | NSViewHeightSizable
+                             | NSViewMaxYMargin];
     fontsize = [NSFont systemFontSizeForControlSize: size];
+    fontsize = 50;
     font = [NSFont systemFontOfSize: fontsize];
-    [textField setFont: font];
-    [s release];
-    [textField sizeToFit];
+    object = obj;
+    return self;
+}
 
-    [pool release];
+- (void)setString:(const char*)s
+{
+    text = [[NSString alloc] initWithCString: s encoding: NSUTF8StringEncoding];
+}
 
-    self->label = textField;
+- (void)drawRect:(NSRect)rect
+{
+    static int counter = 0;
+    if (counter==0) [[NSColor greenColor] setFill];
+    else if (counter==1) [[NSColor blueColor] setFill];
+    counter++;
+    if (counter==2) counter = 0;
+    NSRectFill(rect);
+    CTLineRef line;
+    CFAttributedStringRef string = NULL;
+    CFDictionaryRef attributes = NULL;
+    CFStringRef keys[1];
+    CFTypeRef values[1];
+    CGContextRef cr;
+    NSGraphicsContext* gc;
+    gc = [NSGraphicsContext currentContext];
+/* Before 10.10:
+    cr = (CGContextRef) [gc graphicsPort];
+*/
+    cr = [gc CGContext];
+    keys[0] = kCTFontAttributeName;
+    values[0] = font;
+    attributes = CFDictionaryCreate(kCFAllocatorDefault,
+                                    (const void**)&keys,
+                                    (const void**)&values,
+                                    1,
+                                    &kCFTypeDictionaryKeyCallBacks,
+                                    &kCFTypeDictionaryValueCallBacks);
+    if (!attributes) return;
+    string = CFAttributedStringCreate(kCFAllocatorDefault,
+                                      text,
+                                      attributes);
+    CFRelease(attributes);
+    if (!string) return;
+    line = CTLineCreateWithAttributedString(string);
+    CFRelease(string);
+    CGContextSetTextPosition(cr, position.x, position.y);
+    CTLineDraw(line, cr);
+    CFRelease(line);
+}
+
+- (CGRect)textbounds
+{
+    char data[8];
+    CGRect rect;
+    CGPoint point;
+    CFStringRef keys[1];
+    CFTypeRef values[1];
+    CTLineRef line = NULL;
+    CGContextRef cr = NULL;
+    CFAttributedStringRef string = NULL;
+    CFDictionaryRef attributes = NULL;
+    CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceGray();
+    if (colorspace) {
+        cr = CGBitmapContextCreate(data,
+                                   1,
+                                   1,
+                                   8,
+                                   1,
+                                   colorspace,
+                                   0);
+        CGColorSpaceRelease(colorspace);
+    }
+    if (cr) {
+        keys[0] = kCTFontAttributeName;
+        values[0] = font;
+        attributes = CFDictionaryCreate(kCFAllocatorDefault,
+                                        (const void**)&keys,
+                                        (const void**)&values,
+                                        1,
+                                        &kCFTypeDictionaryKeyCallBacks,
+                                        &kCFTypeDictionaryValueCallBacks);
+    }
+    if (attributes) {
+        string = CFAttributedStringCreate(kCFAllocatorDefault,
+                                          text,
+                                          attributes);
+        CFRelease(attributes);
+    }
+    if (string) {
+       line = CTLineCreateWithAttributedString(string);
+       CFRelease(string);
+    }
+    if (line) {
+        point = CGContextGetTextPosition(cr);
+        rect = CTLineGetImageBounds(line, cr);
+        CFRelease(line);
+        CTLineGetTypographicBounds(line, NULL, &rect.origin.y, NULL);
+        rect.origin.x = point.x - rect.origin.x; /* bearing */
+    }
+    CGContextRelease(cr);
+    return rect;
+}
+
+- (BOOL)pack:(NSRect*)cavity
+{
+    static int counter = 0;
+    float coordinates[4];
+    float padx = 20;
+    float pady = 20;
+    float ipadx = 80;
+    float ipady = 30;
+    CGRect rect = [self textbounds];
+    CGSize size = rect.size;
+    CGFloat bearing = rect.origin.x;
+    CGFloat descent = rect.origin.y;
+    NSRect frame;
+    int flags = 0;
+    flags |= TOP;
+    flags |= EAST;
+/*
+    if (counter==0) flags |= TOP;
+    else if (counter==1) flags |= LEFT;
+    if (counter==2) counter = 0;
+*/
+    counter++;
+    if (counter==2) { flags |= FILLX; counter = 0;}
+    printf("drawing %s with flags %d\n", [text cString], flags);
+    coordinates[0] = cavity->origin.x;
+    coordinates[1] = cavity->origin.y;
+    coordinates[2] = cavity->origin.x + cavity->size.width;
+    coordinates[3] = cavity->origin.y + cavity->size.height;
+    if ((flags & TOP) || (flags & BOTTOM)) {
+        rect.origin.x = cavity->origin.x;
+        if (flags & FILLX) {
+            rect.origin.x += padx;
+            rect.size.width = cavity->size.width - 2 * padx;
+        }
+        else {
+            rect.origin.x += 0.5 * (cavity->size.width - rect.size.width) - ipadx;
+            rect.size.width += 2 * ipadx;
+        }
+        rect.size.height += pady + ipady;
+        cavity->size.height -= rect.size.height;
+        if (cavity->size.height < 0) {
+            rect.size.height += cavity->size.height;
+            cavity->size.height = 0;
+        }
+        if (flags & TOP) {
+            rect.origin.y = cavity->origin.y;
+            cavity->origin.y += rect.size.height;
+        } else { /* BOTTOM */
+            rect.origin.y = cavity->origin.y + cavity->size.height;
+        }
+    }
+    if ((flags & LEFT) || (flags & RIGHT)) {
+        rect.origin.x = cavity->origin.y;
+        if (flags & FILLY) {
+            rect.origin.y += pady;
+            rect.size.height = cavity->size.height - 2 * padx;
+        }
+        else {
+            rect.origin.y += 0.5 * (cavity->size.height - rect.size.height) - ipady;
+            rect.size.height += 2 * ipady;
+        }
+        cavity->size.width -= rect.size.width;
+        if (cavity->size.width < 0) {
+            rect.size.width += cavity->size.width;
+            cavity->size.width = 0;
+        }
+        rect.origin.y = cavity->origin.y;
+        if (flags & LEFT) {
+            rect.origin.x = cavity->origin.x;
+            cavity->origin.x += rect.size.width;
+        } else { /* RIGHT */
+            rect.origin.x = cavity->origin.x + cavity->size.width;
+        }
+    }
+    switch (flags & (NORTH | SOUTH)) {
+        case NORTH: position.y = rect.size.height - size.height; break;
+        case SOUTH: position.y = 0; break;
+        default   : position.y = 0.5 * (rect.size.height - size.height); break;
+    }
+    position.y += descent;
+    switch (flags & (WEST | EAST)) {
+        case WEST: position.x = ipadx; break;
+        case EAST: position.x = rect.size.width - size.width - ipadx; break;
+        default  : position.x = 0.5 * (rect.size.width - size.width); break;
+    }
+    position.x += bearing;
+    frame.origin.x = rect.origin.x;
+    frame.origin.y = rect.origin.y;
+    frame.size.width = rect.size.width;
+    frame.size.height = rect.size.height;
+    [self setFrameOrigin: frame.origin];
+    [self setFrameSize: frame.size];
+    return true;
+}
+@end
+
+static PyObject*
+Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    PyLabel *self = (PyLabel*)type->tp_alloc(type, 0);
+    if (!self) return NULL;
+    self->label = NULL;
+    self->layout = NULL;
+    return (PyObject*)self;
+}
+
+static int
+Label_init(PyLabel *self, PyObject *args, PyObject *kwds)
+{
+    Label *label;
+    const char* text = "";
+
+    if(!PyArg_ParseTuple(args, "|s", &text)) return -1;
+
+    label = [[Label alloc] initWithObject: self];
+    [label setString: text];
+    self->label = label;
 
     return 0;
 }
 
 static PyObject*
-Label_repr(Label* self)
+Label_repr(PyLabel* self)
 {
 #if PY3K
     return PyUnicode_FromFormat("Label object %p wrapping NSTextField %p",
@@ -85,7 +283,7 @@ Label_repr(Label* self)
 }
 
 static void
-Label_dealloc(Label* self)
+Label_dealloc(PyLabel* self)
 {
     NSTextField* label = self->label;
     if (label)
@@ -98,7 +296,7 @@ Label_dealloc(Label* self)
 }
 
 static PyObject*
-Label_set_position(Label* self, PyObject *args)
+Label_set_position(PyLabel* self, PyObject *args)
 {
     float x;
     float y;
@@ -120,7 +318,7 @@ Label_set_position(Label* self, PyObject *args)
 }
 
 static PyObject*
-Label_get_size(Label* self, PyObject *args)
+Label_get_size(PyLabel* self, PyObject *args)
 {
     float width;
     float height;
@@ -137,7 +335,7 @@ Label_get_size(Label* self, PyObject *args)
 }
 
 static PyObject*
-Label_pack(Label* self, PyObject *args)
+Label_pack(PyLabel* self, PyObject *args)
 {
     int i;
     double values[4];
@@ -153,6 +351,7 @@ Label_pack(Label* self, PyObject *args)
         PyErr_SetString(PyExc_RuntimeError, "label has not been initialized");
         return NULL;
     }
+/*
     if(!PyArg_ParseTuple(args, "O", &cavity))
         return NULL;
     if(!PyList_Check(cavity)) {
@@ -196,6 +395,7 @@ Label_pack(Label* self, PyObject *args)
             return NULL;
         }
     }
+*/
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -219,13 +419,17 @@ static PyMethodDef Label_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+static PyGetSetDef Label_getseters[] = {
+    {NULL}  /* Sentinel */
+};
+
 static char Label_doc[] =
 "A Label object wraps a Cocoa NSTextField object.\n";
 
 PyTypeObject LabelType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Label",             /* tp_name */
-    sizeof(Label),              /* tp_basicsize */
+    sizeof(PyLabel),            /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)Label_dealloc,  /* tp_dealloc */
     0,                          /* tp_print */
@@ -252,7 +456,7 @@ PyTypeObject LabelType = {
     0,                          /* tp_iternext */
     Label_methods,              /* tp_methods */
     0,                          /* tp_members */
-    0,                          /* tp_getset */
+    Label_getseters,            /* tp_getset */
     0,                          /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */

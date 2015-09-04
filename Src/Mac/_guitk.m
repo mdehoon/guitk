@@ -8,6 +8,7 @@
 #include "events.h"
 #include "window.h"
 #include "label.h"
+#include "../Generic/packed.h"
 
 #define PYOSINPUTHOOK_REPETITIVE 1 /* Remove this once Python is fixed */
 
@@ -600,6 +601,12 @@ void init_guitk(void)
     Py_INCREF(&LabelType);
     if (PyModule_AddObject(module, "Label", (PyObject*) &LabelType) < -1)
         goto error;
+    if (PyType_Ready(&PackedType) < 0)
+        goto error;
+    Py_INCREF(&PackedType);
+    if (PyModule_AddObject(module, "Packed", (PyObject*) &PackedType) < -1)
+        goto error;
+
 
     WindowServerConnectionManager* connectionManager = [WindowServerConnectionManager sharedManager];
     NSWorkspace* workspace = [NSWorkspace sharedWorkspace];

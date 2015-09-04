@@ -9,11 +9,12 @@ import numpy
 sources = ["Src/Mac/_guitk.m",
            "Src/Mac/window.m",
            "Src/Mac/label.m",
+           "Src/Generic/packed.c",
           ]
 
 extension = Extension("guitk._guitk",
                       sources,
-                      include_dirs=['Src'],
+                      include_dirs=['Src','Src/Generic'],
                       )
 
 extension.extra_link_args.extend(['-framework', 'Cocoa'])

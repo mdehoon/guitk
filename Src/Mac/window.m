@@ -116,6 +116,24 @@ Window_dealloc(Window* self)
 }
 
 static PyObject*
+Window_pack(Window* self)
+{
+    id object;
+    NSView* view = [self->window contentView];
+    NSRect cavity = [view frame];
+    printf("Starting cavity = %f, %f; %f, %f\n", cavity.origin.x, cavity.origin.y, cavity.size.width, cavity.size.height);
+    NSArray* subviews = [view subviews];
+    NSEnumerator *enumerator = [subviews objectEnumerator];
+    while (object = [enumerator nextObject]) {
+        Label* label = (Label*)object;
+        if ([label pack: &cavity]==false) return NULL;
+        printf("cavity = %f, %f; %f, %f\n", cavity.origin.x, cavity.origin.y, cavity.size.width, cavity.size.height);
+    }
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject*
 Window_show(Window* self)
 {
     NSWindow* window = self->window;
@@ -199,7 +217,7 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
     View* view;
-    Label* label;
+    PyLabel* label;
 
     NSWindow* window = self->window;
     if(!window) {
@@ -216,7 +234,7 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
         PyErr_SetString(PyExc_TypeError, "windows can only add labels");
         return NULL;
     }
-    label = (Label*)object;
+    label = (PyLabel*)object;
     Py_INCREF(label);
 
     [view addSubview: label->label];
@@ -248,6 +266,11 @@ static PyMethodDef Window_methods[] = {
      (PyCFunction)Window_show,
      METH_NOARGS,
      "Shows the window."
+    },
+    {"pack",
+     (PyCFunction)Window_pack,
+     METH_NOARGS,
+     "Uses the layout manager to position each widget in the window."
     },
     {"destroy",
      (PyCFunction)Window_destroy,
