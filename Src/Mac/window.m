@@ -1,6 +1,7 @@
 #include <Cocoa/Cocoa.h>
 #include "window.h"
 #include "label.h"
+#include "button.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -217,7 +218,6 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
     View* view;
-    PyLabel* label;
 
     NSWindow* window = self->window;
     if(!window) {
@@ -229,15 +229,19 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
     if(!PyArg_ParseTuple(args, "O", &object))
         return NULL;
 
-    if (!PyObject_IsInstance(object, (PyObject*) &LabelType))
-    {
-        PyErr_SetString(PyExc_TypeError, "windows can only add labels");
+    if (PyObject_IsInstance(object, (PyObject*) &LabelType)) {
+        PyLabel* label = (PyLabel*)object;
+        Py_INCREF(label);
+        [view addSubview: label->label];
+    } else
+    if (PyObject_IsInstance(object, (PyObject*) &ButtonType)) {
+        PyButton* button = (PyButton*)object;
+        Py_INCREF(button);
+        [view addSubview: button->button];
+    } else {
+        PyErr_SetString(PyExc_TypeError, "windows can only add labels or buttons");
         return NULL;
     }
-    label = (PyLabel*)object;
-    Py_INCREF(label);
-
-    [view addSubview: label->label];
 
     Py_INCREF(Py_None);
     return Py_None;

@@ -8,6 +8,7 @@
 #include "events.h"
 #include "window.h"
 #include "label.h"
+#include "button.h"
 #include "../Generic/packed.h"
 
 #define PYOSINPUTHOOK_REPETITIVE 1 /* Remove this once Python is fixed */
@@ -598,8 +599,13 @@ void init_guitk(void)
         goto error;
     if (PyType_Ready(&LabelType) < 0)
         goto error;
+    if (PyType_Ready(&ButtonType) < 0)
+        goto error;
     Py_INCREF(&LabelType);
+    Py_INCREF(&ButtonType);
     if (PyModule_AddObject(module, "Label", (PyObject*) &LabelType) < -1)
+        goto error;
+    if (PyModule_AddObject(module, "Button", (PyObject*) &ButtonType) < -1)
         goto error;
     if (PyType_Ready(&PackedType) < 0)
         goto error;
