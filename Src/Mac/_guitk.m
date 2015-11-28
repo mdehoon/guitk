@@ -9,6 +9,7 @@
 #include "window.h"
 #include "label.h"
 #include "button.h"
+#include "grid.h"
 #include "../Generic/packed.h"
 
 #define PYOSINPUTHOOK_REPETITIVE 1 /* Remove this once Python is fixed */
@@ -597,12 +598,22 @@ void init_guitk(void)
 
     if (initialize_window(module) < 0)
         goto error;
+    if (PyType_Ready(&GridType) < 0)
+        goto error;
+    if (PyType_Ready(&GridItemType) < 0)
+        goto error;
     if (PyType_Ready(&LabelType) < 0)
         goto error;
     if (PyType_Ready(&ButtonType) < 0)
         goto error;
+    Py_INCREF(&GridType);
+    Py_INCREF(&GridItemType);
     Py_INCREF(&LabelType);
     Py_INCREF(&ButtonType);
+    if (PyModule_AddObject(module, "Grid", (PyObject*) &GridType) < -1)
+        goto error;
+    if (PyModule_AddObject(module, "GridItem", (PyObject*) &GridItemType) < -1)
+        goto error;
     if (PyModule_AddObject(module, "Label", (PyObject*) &LabelType) < -1)
         goto error;
     if (PyModule_AddObject(module, "Button", (PyObject*) &ButtonType) < -1)
