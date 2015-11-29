@@ -9,7 +9,7 @@
 #include "window.h"
 #include "label.h"
 #include "button.h"
-#include "grid.h"
+#include "widgets.h"
 #include "../Generic/packed.h"
 
 #define PYOSINPUTHOOK_REPETITIVE 1 /* Remove this once Python is fixed */
@@ -624,6 +624,7 @@ void init_guitk(void)
     if (PyModule_AddObject(module, "Packed", (PyObject*) &PackedType) < -1)
         goto error;
 
+    initialize_widgets();
 
     WindowServerConnectionManager* connectionManager = [WindowServerConnectionManager sharedManager];
     NSWorkspace* workspace = [NSWorkspace sharedWorkspace];

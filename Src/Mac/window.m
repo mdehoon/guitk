@@ -1,5 +1,6 @@
 #include <Cocoa/Cocoa.h>
 #include "window.h"
+#include "widgets.h"
 #include "label.h"
 #include "button.h"
 
@@ -214,6 +215,41 @@ Window_get_window_title(Window* self)
 }
 
 static PyObject*
+Window_put(Window* self, PyObject *args, PyObject *kwds)
+{
+    PyObject* object;
+    PyObject* item;
+    PyObject* items;
+    Py_ssize_t i;
+    Py_ssize_t n;
+    View* view;
+
+    NSWindow* window = self->window;
+    if(!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+
+    view = [window contentView];
+    if(!PyArg_ParseTuple(args, "O", &object))
+        return NULL;
+    if (!PyMapping_Check(object)) {
+        PyErr_SetString(PyExc_RuntimeError, "argument is not a layout manager");
+        return NULL;
+    }
+    items = PyMapping_Values(object);
+    n = PyMapping_Length(object);
+    for (i = 0; i < n; i++) {
+        item = PyList_GET_ITEM(items, i);
+        if (!PyObject_IsInstance(item, widgets)) break;
+        printf("Item %d OK\n", i);
+    }
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject*
 Window_add(Window* self, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
@@ -290,6 +326,11 @@ static PyMethodDef Window_methods[] = {
      (PyCFunction)Window_get_window_title,
      METH_NOARGS,
      "Returns the title of the window."
+    },
+    {"put",
+     (PyCFunction)Window_put,
+     METH_VARARGS,
+     "Sets the layout manager."
     },
     {"add",
      (PyCFunction)Window_add,

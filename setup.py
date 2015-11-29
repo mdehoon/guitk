@@ -8,6 +8,7 @@ import numpy
 
 sources = ["Src/Mac/_guitk.m",
            "Src/Mac/window.m",
+           "Src/Mac/widgets.m",
            "Src/Mac/grid.m",
            "Src/Mac/label.m",
            "Src/Mac/button.m",

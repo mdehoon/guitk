@@ -1,5 +1,5 @@
 #include <Cocoa/Cocoa.h>
-#include "grid.h"
+#include "widgets.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -13,10 +13,12 @@
 
 typedef struct {
     PyObject_HEAD
+    PyObject* object;
 } GridItem;
 
 typedef struct {
     PyObject_HEAD
+    NSView* view;
     long dimensions[2];
     GridItem** items;
 } Grid;
@@ -27,7 +29,9 @@ GridItem_put(GridItem* self, PyObject *args, PyObject *kwds)
     PyObject* object;
     if(!PyArg_ParseTuple(args, "O", &object))
         return NULL;
-    printf("In put\n");
+    Py_XDECREF(self->object);
+    Py_INCREF(object);
+    self->object = object;
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -55,9 +59,19 @@ static char GridItem_doc[] =
 "GridItem object.\n";
 
 static void
-GridItem_dealloc(Grid* self)
+GridItem_dealloc(GridItem* self)
 {
+    Py_XDECREF(self->object);
     Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+static PyObject*
+GridItem_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    GridItem *self = (GridItem*)type->tp_alloc(type, 0);
+    if (!self) return NULL;
+    self->object = NULL;
+    return (PyObject*)self;
 }
 
 PyTypeObject GridItemType = {
@@ -98,7 +112,7 @@ PyTypeObject GridItemType = {
     0,                          /* tp_dictoffset */
     0,                          /* tp_init */
     0,                          /* tp_alloc */
-    0,                          /* tp_new */
+    GridItem_new,               /* tp_new */
 };
 
 static PyObject*
@@ -121,7 +135,7 @@ Grid_init(Grid *self, PyObject *args, PyObject *kwds)
     self->items = malloc(sizeof(GridItem*)*n);
     if (!self->items) {
         PyErr_SetString(PyExc_MemoryError, "could not create grid");
-        return NULL;
+        return -1;
     }
     for (i = 0; i < n; i++) {
         item = (GridItem*) GridItemType.tp_alloc(&GridItemType, 0);
@@ -132,7 +146,7 @@ Grid_init(Grid *self, PyObject *args, PyObject *kwds)
         PyErr_SetString(PyExc_MemoryError, "could not create grid item");
         for ( ; i >= 0; i--) Py_DECREF(self->items[i]);
         free(self->items);
-        return NULL;
+        return -1;
     }
     self->dimensions[0] = nx;
     self->dimensions[1] = ny;
@@ -155,12 +169,50 @@ Grid_dealloc(Grid* self)
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+static PyObject*
+Grid_values(Grid* self)
+{
+    PyObject* list;
+    PyObject* item;
+    long i;
+    long n = self->dimensions[0] * self->dimensions[1];
+    list = PyList_New(n);
+    if (!list) return NULL;
+    for (i = 0; i < n; i++) {
+        item = (PyObject*)(self->items[i]);
+        if (PyList_SetItem(list, i, item)==-1) break;
+    }
+    if (i < n) {
+        /* break encountered */
+        Py_DECREF(list);
+        return NULL;
+    }
+    for (i = 0; i < n; i++) {
+        item = (PyObject*)(self->items[i]);
+        Py_INCREF(item);
+    }
+    return list;
+}
+
 static PyMethodDef Grid_methods[] = {
+    {"values",
+     (PyCFunction)Grid_values,
+     METH_NOARGS,
+     "Returns a list of items put in the grid."
+    },
     {NULL}  /* Sentinel */
 };
 
+static Py_ssize_t
+Grid_length(Grid* self)
+{
+    long int nx = self->dimensions[0];
+    long int ny = self->dimensions[1];
+    return nx * ny;
+}
+
 static PyObject*
-Grid_getitem(Grid* self, PyObject* key)
+Grid_get_item(Grid* self, PyObject* key)
 {   long int ix, iy;
     long int nx, ny;
     long int index;
@@ -191,9 +243,9 @@ Grid_getitem(Grid* self, PyObject* key)
 }
 
 static PyMappingMethods Grid_mapping = {
-        NULL,                     /* mp_length */
-        (binaryfunc)Grid_getitem, /* mp_subscript */
-        NULL,                     /* mp_ass_subscript */
+        (lenfunc)Grid_length,  /* mp_length */
+        (binaryfunc)Grid_get_item, /* mp_subscript */
+        NULL,                      /* mp_ass_subscript */
 };
 
 static char Grid_doc[] =
