@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <pthread.h>
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
 #define EVENTS_MODULE
@@ -23,6 +24,9 @@
 #define PY3K 0
 #endif
 #endif
+
+static pthread_once_t key_once = PTHREAD_ONCE_INIT;
+static pthread_key_t notifier_key;
 
 typedef struct {
     PyObject_HEAD
@@ -335,18 +339,28 @@ static void _sigint_handler(int sig)
     PyOS_sighandler_t py_sigint_handler;
     BOOL _interrupted;
 }
-- (instancetype)init;
++ (Notifier*)getThreadSpecificNotifier;
 - (void)setSigintHandler:(PyOS_sighandler_t)handler;
-- (void)resetSigintHandler;
+- (BOOL)resetSigintHandler;
 - (void)handleMachMessage:(void *)machMessage;
 - (void)dataAvailable:(NSNotification*)notification;
-- (BOOL)interrupted;
 @end
 
 @implementation Notifier
-- (instancetype)init {
-    _interrupted = NO;
-    return self;
++ (Notifier*)getThreadSpecificNotifier
+{
+    Notifier* notifier = pthread_getspecific(notifier_key);
+    if (!notifier)
+    {
+        int error;
+        notifier = [[Notifier alloc] init];
+        error = pthread_setspecific(notifier_key, notifier);
+        if (error) {
+            errno = error;
+            return nil;
+        }
+    }
+    return notifier;
 }
 
 - (void)setSigintHandler:(PyOS_sighandler_t)handler {
@@ -354,12 +368,14 @@ static void _sigint_handler(int sig)
     [receivePort setDelegate: self];
     [receivePort scheduleInRunLoop: runloop forMode: NSDefaultRunLoopMode];
     py_sigint_handler = PyOS_setsig(SIGINT, handler);
+    _interrupted = NO;
 }
 
-- (void)resetSigintHandler {
+- (BOOL)resetSigintHandler {
     PyOS_setsig(SIGINT, py_sigint_handler);
     NSRunLoop* runloop = [NSRunLoop currentRunLoop];
     [receivePort removeFromRunLoop: runloop forMode: NSDefaultRunLoopMode];
+    return _interrupted;
 }
 
 - (void)handleMachMessage:(void *)machMessage
@@ -406,21 +422,17 @@ static void _sigint_handler(int sig)
     [NSApp stop:self];
     [NSApp postEvent: event atStart: NO];
 }
-
-- (BOOL)interrupted
-{
-    return _interrupted;
-}
 @end
 
 static int wait_for_stdin(void)
 {
-    int result = +1;
+    BOOL interrupted;
     NSNotificationCenter* notificationCenter;
     Notifier* notifier;
     NSFileHandle* stdin_handle;
     notificationCenter = [NSNotificationCenter defaultCenter];
-    notifier = [[Notifier alloc] init];
+    notifier = [Notifier getThreadSpecificNotifier];
+    if (!notifier) return -1;
     stdin_handle = [NSFileHandle fileHandleWithStandardInput];
     [notificationCenter addObserver: notifier
                            selector: @selector(dataAvailable:)
@@ -429,16 +441,15 @@ static int wait_for_stdin(void)
     [stdin_handle waitForDataInBackgroundAndNotify];
     [notifier setSigintHandler:_sigint_handler];
     [NSApp run];
-    [notifier resetSigintHandler];
+    interrupted = [notifier resetSigintHandler];
     [notificationCenter removeObserver: notifier];
-    if ([notifier interrupted]) {
+    [stdin_handle release];
+    if (interrupted) {
         errno = EINTR;
         raise(SIGINT);
-        result = -1;
+        return -1;
     }
-    [notifier release];
-    [stdin_handle release];
-    return result;
+    return +1;
 }
 
 static struct PyMethodDef methods[] = {
@@ -469,6 +480,17 @@ static struct PyMethodDef methods[] = {
     },
    {NULL,          NULL, 0, NULL} /* sentinel */
 };
+
+void delete_notifier(void* value)
+{
+    Notifier* notifier = value;
+    [notifier release];
+}
+
+static void create_notifier_key(void)
+{
+   pthread_key_create(&notifier_key, delete_notifier);
+}
 
 #if PY3K
 static void freeevents(void* module)
@@ -548,6 +570,8 @@ void init_guitk(void)
     rawReceivePort = [receivePort machPort];
 
     PyOS_InputHook = wait_for_stdin;
+
+    pthread_once(&key_once, create_notifier_key);
 #if PY3K
     return module;
 #endif
