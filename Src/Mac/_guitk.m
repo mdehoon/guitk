@@ -24,13 +24,6 @@
 #endif
 #endif
 
-@interface WindowServerConnectionManager : NSObject
-{
-}
-+ (WindowServerConnectionManager*)sharedManager;
-- (void)launch:(NSNotification*)notification;
-@end
-
 typedef struct {
     PyObject_HEAD
     CFRunLoopTimerRef timer;
@@ -317,211 +310,136 @@ PyEvents_WaitForEvent(PyObject* unused, PyObject* args)
     return PyInt_FromLong(result);
 }
 
-static void
-_stdin_callback(CFReadStreamRef stream, CFStreamEventType eventType, void* info)
-{
-    CFRunLoopRef runloop = info;
-    CFRunLoopStop(runloop);
-}
-
-static int sigint_fd = -1;
+static NSMachPort *receivePort = nil;
+static mach_port_t rawReceivePort = 0;
 
 static void _sigint_handler(int sig)
 {
-    const char c = 'i';
-    write(sigint_fd, &c, 1);
+    mach_msg_return_t retCode = 0;
+    mach_msg_empty_send_t msg = {{0}};
+    msg.header.msgh_id = sig;
+    msg.header.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, MACH_MSGH_BITS_ZERO);
+    msg.header.msgh_size = sizeof(mach_msg_empty_send_t);
+    msg.header.msgh_remote_port = rawReceivePort;
+    msg.header.msgh_local_port = MACH_PORT_NULL;
+    retCode = mach_msg_send(&msg.header);
+    if (retCode != 0)
+    {
+        NSLog(@"mach_msg_send failed in sigint handler");
+    }
 }
 
-static void _sigint_callback(CFSocketRef s,
-                             CFSocketCallBackType type,
-                             CFDataRef address,
-                             const void * data,
-                             void *info)
+@interface Notifier : NSObject <NSMachPortDelegate>
+
 {
-    char c;
-    int* interrupted = info;
-    CFSocketNativeHandle handle = CFSocketGetNative(s);
-    CFRunLoopRef runloop = CFRunLoopGetCurrent();
-    read(handle, &c, 1);
-    *interrupted = 1;
-    CFRunLoopStop(runloop);
+    PyOS_sighandler_t py_sigint_handler;
+    BOOL _interrupted;
+}
+- (instancetype)init;
+- (void)setSigintHandler:(PyOS_sighandler_t)handler;
+- (void)resetSigintHandler;
+- (void)handleMachMessage:(void *)machMessage;
+- (void)dataAvailable:(NSNotification*)notification;
+- (BOOL)interrupted;
+@end
+
+@implementation Notifier
+- (instancetype)init {
+    _interrupted = NO;
+    return self;
 }
 
-static CGEventRef _eventtap_callback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon)
-{
-    CFRunLoopRef runloop = refcon;
-    CFRunLoopStop(runloop);
-    return event;
+- (void)setSigintHandler:(PyOS_sighandler_t)handler {
+    NSRunLoop* runloop = [NSRunLoop currentRunLoop];
+    [receivePort setDelegate: self];
+    [receivePort scheduleInRunLoop: runloop forMode: NSDefaultRunLoopMode];
+    py_sigint_handler = PyOS_setsig(SIGINT, handler);
 }
+
+- (void)resetSigintHandler {
+    PyOS_setsig(SIGINT, py_sigint_handler);
+    NSRunLoop* runloop = [NSRunLoop currentRunLoop];
+    [receivePort removeFromRunLoop: runloop forMode: NSDefaultRunLoopMode];
+}
+
+- (void)handleMachMessage:(void *)machMessage
+{
+    static NSEvent* event = nil;
+    mach_msg_header_t* header = machMessage;
+    if (header->msgh_id != SIGINT) {
+        NSLog(@"Mach message ID is %d (expected SIGINT)", header->msgh_id);
+    }
+    if (!event) {
+        event = [NSEvent otherEventWithType: NSApplicationDefined
+                                   location: NSZeroPoint
+                              modifierFlags: 0
+                                  timestamp: 0
+                               windowNumber: 0
+                                    context: nil
+                                    subtype: 0
+                                      data1: 0
+                                      data2: 0
+                ];
+        [event retain];
+    }
+    [NSApp stop:self];
+    [NSApp postEvent: event atStart: NO];
+    _interrupted = YES;
+}
+
+- (void) dataAvailable: (NSNotification*)notification
+{
+    static NSEvent* event = nil;
+    if (!event) {
+        event = [NSEvent otherEventWithType: NSApplicationDefined
+                                   location: NSZeroPoint
+                              modifierFlags: 0
+                                  timestamp: 0
+                               windowNumber: 0
+                                    context: nil
+                                    subtype: 0
+                                      data1: 0
+                                      data2: 0
+                ];
+        [event retain];
+    }
+    [NSApp stop:self];
+    [NSApp postEvent: event atStart: NO];
+}
+
+- (BOOL)interrupted
+{
+    return _interrupted;
+}
+@end
 
 static int wait_for_stdin(void)
 {
-    int interrupted = 0;
-    const UInt8 buffer[] = "/dev/fd/0";
-    const CFIndex n = (CFIndex)strlen((char*)buffer);
-    CFRunLoopRef runloop = CFRunLoopGetCurrent();
-    CFURLRef url = CFURLCreateFromFileSystemRepresentation(kCFAllocatorDefault,
-                                                           buffer,
-                                                           n,
-                                                           false);
-    CFReadStreamRef stream = CFReadStreamCreateWithFile(kCFAllocatorDefault,
-                                                        url);
-    CFRelease(url);
-
-    CFReadStreamOpen(stream);
-#ifdef PYOSINPUTHOOK_REPETITIVE
-    if (!CFReadStreamHasBytesAvailable(stream))
-    /* This is possible because of how PyOS_InputHook is called from Python */
-    {
-#endif
-        int error;
-        int channel[2];
-        CFSocketRef sigint_socket = NULL;
-        PyOS_sighandler_t py_sigint_handler = NULL;
-        CFStreamClientContext clientContext = {0, NULL, NULL, NULL, NULL};
-        clientContext.info = runloop;
-        CFReadStreamSetClient(stream,
-                              kCFStreamEventHasBytesAvailable,
-                              _stdin_callback,
-                              &clientContext);
-        CFReadStreamScheduleWithRunLoop(stream, runloop, kCFRunLoopDefaultMode);
-        error = socketpair(AF_UNIX, SOCK_STREAM, 0, channel);
-        if (error==0)
-        {
-            CFSocketContext context;
-            context.version = 0;
-            context.info = &interrupted;
-            context.retain = NULL;
-            context.release = NULL;
-            context.copyDescription = NULL;
-            fcntl(channel[0], F_SETFL, O_WRONLY | O_NONBLOCK);
-            sigint_socket = CFSocketCreateWithNative(
-                kCFAllocatorDefault,
-                channel[1],
-                kCFSocketReadCallBack,
-                _sigint_callback,
-                &context);
-            if (sigint_socket)
-            {
-                CFRunLoopSourceRef source;
-                source = CFSocketCreateRunLoopSource(kCFAllocatorDefault,
-                                                     sigint_socket,
-                                                     0);
-                CFRelease(sigint_socket);
-                if (source)
-                {
-                    CFRunLoopAddSource(runloop, source, kCFRunLoopDefaultMode);
-                    CFRelease(source);
-                    sigint_fd = channel[0];
-                    py_sigint_handler = PyOS_setsig(SIGINT, _sigint_handler);
-                }
-            }
-        }
-
-        NSEvent* event;
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        while (true) {
-            while (true) {
-                event = [NSApp nextEventMatchingMask: NSAnyEventMask
-                                           untilDate: [NSDate distantPast]
-                                              inMode: NSDefaultRunLoopMode
-                                             dequeue: YES];
-                if (!event) break;
-                [NSApp sendEvent: event];
-            }
-            CFRunLoopRun();
-            if (interrupted || CFReadStreamHasBytesAvailable(stream)) break;
-        }
-        [pool release];
-        if (py_sigint_handler) PyOS_setsig(SIGINT, py_sigint_handler);
-        CFReadStreamUnscheduleFromRunLoop(stream,
-                                          runloop,
-                                          kCFRunLoopCommonModes);
-        if (sigint_socket) CFSocketInvalidate(sigint_socket);
-        if (error==0) {
-            close(channel[0]);
-            close(channel[1]);
-        }
-#ifdef PYOSINPUTHOOK_REPETITIVE
-    }
-#endif
-    CFReadStreamClose(stream);
-    CFRelease(stream);
-    if (interrupted) {
+    int result = +1;
+    NSNotificationCenter* notificationCenter;
+    Notifier* notifier;
+    NSFileHandle* stdin_handle;
+    notificationCenter = [NSNotificationCenter defaultCenter];
+    notifier = [[Notifier alloc] init];
+    stdin_handle = [NSFileHandle fileHandleWithStandardInput];
+    [notificationCenter addObserver: notifier
+                           selector: @selector(dataAvailable:)
+                               name: NSFileHandleDataAvailableNotification
+                             object: stdin_handle];
+    [stdin_handle waitForDataInBackgroundAndNotify];
+    [notifier setSigintHandler:_sigint_handler];
+    [NSApp run];
+    [notifier resetSigintHandler];
+    [notificationCenter removeObserver: notifier];
+    if ([notifier interrupted]) {
         errno = EINTR;
         raise(SIGINT);
-        return -1;
+        result = -1;
     }
-    return 1;
+    [notifier release];
+    [stdin_handle release];
+    return result;
 }
-
-@implementation WindowServerConnectionManager
-static WindowServerConnectionManager *sharedWindowServerConnectionManager = nil;
-
-+ (WindowServerConnectionManager *)sharedManager
-{
-    if (sharedWindowServerConnectionManager == nil)
-    {
-        sharedWindowServerConnectionManager = [[super allocWithZone:NULL] init];
-    }
-    return sharedWindowServerConnectionManager;
-}
-
-+ (id)allocWithZone:(NSZone *)zone
-{
-    return [[self sharedManager] retain];
-}
-
-+ (id)copyWithZone:(NSZone *)zone
-{
-    return self;
-}
-
-+ (id)retain
-{
-    return self;
-}
-
-- (NSUInteger)retainCount
-{
-    return NSUIntegerMax;  //denotes an object that cannot be released
-}
-
-- (oneway void)release
-{
-    // Don't release a singleton object
-}
-
-- (id)autorelease
-{
-    return self;
-}
-
-- (void)launch:(NSNotification*)notification
-{
-    CFRunLoopRef runloop;
-    CFMachPortRef port;
-    CFRunLoopSourceRef source;
-    NSDictionary* dictionary = [notification userInfo];
-    NSNumber* psnLow = [dictionary valueForKey: @"NSApplicationProcessSerialNumberLow"];
-    NSNumber* psnHigh = [dictionary valueForKey: @"NSApplicationProcessSerialNumberHigh"];
-    ProcessSerialNumber psn;
-    psn.highLongOfPSN = [psnHigh intValue];
-    psn.lowLongOfPSN = [psnLow intValue];
-    runloop = CFRunLoopGetCurrent();
-    port = CGEventTapCreateForPSN(&psn,
-                                  kCGHeadInsertEventTap,
-                                  kCGEventTapOptionListenOnly,
-                                  kCGEventMaskForAllEvents,
-                                  &_eventtap_callback,
-                                  runloop);
-    source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault,
-                                           port,
-                                           0);
-    CFRunLoopAddSource(runloop, source, kCFRunLoopDefaultMode);
-    CFRelease(port);
-}
-@end
 
 static struct PyMethodDef methods[] = {
     {"add_timer",
@@ -626,13 +544,8 @@ void init_guitk(void)
 
     initialize_widgets();
 
-    WindowServerConnectionManager* connectionManager = [WindowServerConnectionManager sharedManager];
-    NSWorkspace* workspace = [NSWorkspace sharedWorkspace];
-    NSNotificationCenter* notificationCenter = [workspace notificationCenter];
-    [notificationCenter addObserver: connectionManager
-                           selector: @selector(launch:)
-                               name: NSWorkspaceDidLaunchApplicationNotification
-                             object: nil];
+    receivePort = [[NSMachPort alloc] init];
+    rawReceivePort = [receivePort machPort];
 
     PyOS_InputHook = wait_for_stdin;
 #if PY3K
