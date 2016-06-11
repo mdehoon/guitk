@@ -28,9 +28,12 @@
 static pthread_once_t key_once = PTHREAD_ONCE_INIT;
 static pthread_key_t notifier_key;
 
+static NSMachPort *receivePort = nil;
+static mach_port_t rawReceivePort = 0;
+
 typedef struct {
     PyObject_HEAD
-    CFRunLoopTimerRef timer;
+    NSTimer* timer;
     PyObject* callback;
 } TimerObject;
 
@@ -58,8 +61,82 @@ static PyTypeObject TimerType = {
     "Timer object",            /*tp_doc */
 };
 
-static void timer_callback(CFRunLoopTimerRef timer, void* info)
+@interface Notifier : NSObject <NSMachPortDelegate>
 {
+    PyOS_sighandler_t py_sigint_handler;
+    BOOL _interrupted;
+    NSEvent* event;
+}
++ (Notifier*)getThreadSpecificNotifier;
+- (void)setSigintHandler:(PyOS_sighandler_t)handler;
+- (BOOL)resetSigintHandler;
+- (void)handleMachMessage:(void *)machMessage;
+- (void)dataAvailable:(NSNotification*)notification;
+- (void)timerFireMethod:(NSTimer *)timer;
+- (void)stopEventLoop;
+@end
+
+@implementation Notifier
++ (Notifier*)getThreadSpecificNotifier
+{
+    Notifier* notifier = pthread_getspecific(notifier_key);
+    if (!notifier)
+    {
+        int error;
+        notifier = [[Notifier alloc] init];
+        error = pthread_setspecific(notifier_key, notifier);
+        if (error) {
+            errno = error;
+            return nil;
+        }
+        notifier->event = [NSEvent otherEventWithType: NSApplicationDefined
+                                             location: NSZeroPoint
+                                        modifierFlags: 0
+                                            timestamp: 0
+                                         windowNumber: 0
+                                              context: nil
+                                              subtype: 0
+                                                data1: 0
+                                                data2: 0
+                          ];
+    }
+    return notifier;
+}
+
+- (void)setSigintHandler:(PyOS_sighandler_t)handler {
+    NSRunLoop* runloop = [NSRunLoop currentRunLoop];
+    [receivePort setDelegate: self];
+    [receivePort scheduleInRunLoop: runloop forMode: NSDefaultRunLoopMode];
+    py_sigint_handler = PyOS_setsig(SIGINT, handler);
+    _interrupted = NO;
+}
+
+- (BOOL)resetSigintHandler {
+    PyOS_setsig(SIGINT, py_sigint_handler);
+    NSRunLoop* runloop = [NSRunLoop currentRunLoop];
+    [receivePort removeFromRunLoop: runloop forMode: NSDefaultRunLoopMode];
+    return _interrupted;
+}
+
+- (void)handleMachMessage:(void *)machMessage
+{
+    mach_msg_header_t* header = machMessage;
+    if (header->msgh_id != SIGINT) {
+        NSLog(@"Mach message ID is %d (expected SIGINT)", header->msgh_id);
+    }
+    _interrupted = YES;
+    [self stopEventLoop];
+}
+
+- (void) dataAvailable: (NSNotification*)notification
+{
+    [self stopEventLoop];
+}
+
+- (void)timerFireMethod:(NSTimer *)timer
+{
+    NSValue* value = [timer userInfo];
+    TimerObject* object = [value pointerValue];
     PyGILState_STATE gstate;
     PyObject* exception_type;
     PyObject* exception_value;
@@ -67,12 +144,10 @@ static void timer_callback(CFRunLoopTimerRef timer, void* info)
     PyObject* callback;
     PyObject* arguments;
     PyObject* result = NULL;
-    TimerObject* object = (TimerObject*)info;
     if (object->timer != timer) {
         /* this is not supposed to happen */
         return;
     }
-    object->timer = NULL;
     callback = object->callback;
     gstate = PyGILState_Ensure();
     PyErr_Fetch(&exception_type, &exception_value, &exception_traceback);
@@ -89,45 +164,49 @@ static void timer_callback(CFRunLoopTimerRef timer, void* info)
     Py_DECREF((PyObject*)object);
 }
 
+- (void)stopEventLoop
+{
+    [NSApp stop:self];
+    [NSApp postEvent: event atStart: NO];
+}
+
+- (void)dealloc {
+    [event release];
+    [super dealloc];
+}
+@end
+
 static PyObject*
 PyEvents_AddTimer(PyObject* unused, PyObject* args)
 {
     TimerObject* object;
-    CFRunLoopTimerRef timer;
-    CFTimeInterval interval;
-    CFAbsoluteTime fireDate;
-    CFRunLoopTimerContext context;
-    CFRunLoopRef runloop;
+    NSTimeInterval interval;
     unsigned long timeout;
     PyObject* callback;
+    Notifier* notifier;
+    NSValue* value;
+    NSTimer* timer;
     if (!PyArg_ParseTuple(args, "kO", &timeout, &callback)) return NULL;
     if (!PyCallable_Check(callback)) {
         PyErr_SetString(PyExc_TypeError, "Callback should be callable");
         return NULL;
     }
-    runloop = CFRunLoopGetCurrent();
-    if (!runloop) {
-        PyErr_SetString(PyExc_RuntimeError, "Failed to obtain run loop");
+    interval = timeout / 1000.0;
+    notifier = [Notifier getThreadSpecificNotifier];
+    if (!notifier) {
+        PyErr_SetString(PyExc_SystemError, "Failed to obtain notifier");
         return NULL;
     }
     object = (TimerObject*)PyType_GenericNew(&TimerType, NULL, NULL);
     Py_INCREF((PyObject*)object);
     Py_INCREF(callback);
-    interval = timeout / 1000.0;
-    fireDate = CFAbsoluteTimeGetCurrent() + interval;
-    context.version = 0;
-    context.retain = 0;
-    context.release = 0;
-    context.copyDescription = 0;
-    context.info = object;
-    timer = CFRunLoopTimerCreate(kCFAllocatorDefault,
-                                 fireDate,
-                                 0,
-                                 0,
-                                 0,
-                                 timer_callback,
-                                 &context);
-    CFRunLoopAddTimer(runloop, timer, kCFRunLoopDefaultMode);
+    value = [NSValue valueWithPointer: object];
+    timer = [NSTimer scheduledTimerWithTimeInterval: interval
+                                             target: notifier
+                                           selector: @selector(timerFireMethod:)
+                                           userInfo: value
+                                            repeats: NO];
+    [value release];
     object->timer = timer;
     object->callback = callback;
     return (PyObject*)object;
@@ -138,8 +217,7 @@ PyEvents_RemoveTimer(PyObject* unused, PyObject* argument)
 {
     TimerObject* object;
     PyObject* callback;
-    CFRunLoopRef runloop;
-    CFRunLoopTimerRef timer;
+    NSTimer* timer;
     if (!PyObject_TypeCheck(argument, &TimerType)) {
         PyErr_SetString(PyExc_TypeError, "argument is not a timer");
         return NULL;
@@ -147,9 +225,8 @@ PyEvents_RemoveTimer(PyObject* unused, PyObject* argument)
     object = (TimerObject*)argument;
     timer = object->timer;
     callback = object->callback;
-    runloop = CFRunLoopGetCurrent();
     if (timer) {
-        CFRunLoopRemoveTimer(runloop, timer, kCFRunLoopDefaultMode);
+        [timer invalidate];
         object->timer = NULL;
     }
     Py_DECREF(callback);
@@ -314,9 +391,6 @@ PyEvents_WaitForEvent(PyObject* unused, PyObject* args)
     return PyInt_FromLong(result);
 }
 
-static NSMachPort *receivePort = nil;
-static mach_port_t rawReceivePort = 0;
-
 static void _sigint_handler(int sig)
 {
     mach_msg_return_t retCode = 0;
@@ -332,97 +406,6 @@ static void _sigint_handler(int sig)
         NSLog(@"mach_msg_send failed in sigint handler");
     }
 }
-
-@interface Notifier : NSObject <NSMachPortDelegate>
-
-{
-    PyOS_sighandler_t py_sigint_handler;
-    BOOL _interrupted;
-}
-+ (Notifier*)getThreadSpecificNotifier;
-- (void)setSigintHandler:(PyOS_sighandler_t)handler;
-- (BOOL)resetSigintHandler;
-- (void)handleMachMessage:(void *)machMessage;
-- (void)dataAvailable:(NSNotification*)notification;
-@end
-
-@implementation Notifier
-+ (Notifier*)getThreadSpecificNotifier
-{
-    Notifier* notifier = pthread_getspecific(notifier_key);
-    if (!notifier)
-    {
-        int error;
-        notifier = [[Notifier alloc] init];
-        error = pthread_setspecific(notifier_key, notifier);
-        if (error) {
-            errno = error;
-            return nil;
-        }
-    }
-    return notifier;
-}
-
-- (void)setSigintHandler:(PyOS_sighandler_t)handler {
-    NSRunLoop* runloop = [NSRunLoop currentRunLoop];
-    [receivePort setDelegate: self];
-    [receivePort scheduleInRunLoop: runloop forMode: NSDefaultRunLoopMode];
-    py_sigint_handler = PyOS_setsig(SIGINT, handler);
-    _interrupted = NO;
-}
-
-- (BOOL)resetSigintHandler {
-    PyOS_setsig(SIGINT, py_sigint_handler);
-    NSRunLoop* runloop = [NSRunLoop currentRunLoop];
-    [receivePort removeFromRunLoop: runloop forMode: NSDefaultRunLoopMode];
-    return _interrupted;
-}
-
-- (void)handleMachMessage:(void *)machMessage
-{
-    static NSEvent* event = nil;
-    mach_msg_header_t* header = machMessage;
-    if (header->msgh_id != SIGINT) {
-        NSLog(@"Mach message ID is %d (expected SIGINT)", header->msgh_id);
-    }
-    if (!event) {
-        event = [NSEvent otherEventWithType: NSApplicationDefined
-                                   location: NSZeroPoint
-                              modifierFlags: 0
-                                  timestamp: 0
-                               windowNumber: 0
-                                    context: nil
-                                    subtype: 0
-                                      data1: 0
-                                      data2: 0
-                ];
-        [event retain];
-    }
-    [NSApp stop:self];
-    [NSApp postEvent: event atStart: NO];
-    _interrupted = YES;
-}
-
-- (void) dataAvailable: (NSNotification*)notification
-{
-    static NSEvent* event = nil;
-    if (!event) {
-        event = [NSEvent otherEventWithType: NSApplicationDefined
-                                   location: NSZeroPoint
-                              modifierFlags: 0
-                                  timestamp: 0
-                               windowNumber: 0
-                                    context: nil
-                                    subtype: 0
-                                      data1: 0
-                                      data2: 0
-                ];
-        [event retain];
-    }
-    [NSApp stop:self];
-    [NSApp postEvent: event atStart: NO];
-}
-@end
 
 static int wait_for_stdin(void)
 {
@@ -496,6 +479,8 @@ static void create_notifier_key(void)
 static void freeevents(void* module)
 {
     PyOS_InputHook = NULL;
+    [receivePort release];
+    pthread_key_delete(create_notifier_key);
 }
 
 static struct PyModuleDef moduledef = {
