@@ -12,10 +12,9 @@ sources = ["Src/Mac/_guitk.m",
            "Src/Mac/grid.m",
            "Src/Mac/label.m",
            "Src/Mac/button.m",
-           "Src/Generic/packed.c",
           ]
 
-extension = Extension("guitk._guitk",
+extension = Extension("guitk.events",
                       sources,
                       include_dirs=['Src','Src/Generic'],
                       )

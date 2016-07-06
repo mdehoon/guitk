@@ -118,24 +118,6 @@ Window_dealloc(Window* self)
 }
 
 static PyObject*
-Window_pack(Window* self)
-{
-    id object;
-    NSView* view = [self->window contentView];
-    NSRect cavity = [view frame];
-    printf("Starting cavity = %f, %f; %f, %f\n", cavity.origin.x, cavity.origin.y, cavity.size.width, cavity.size.height);
-    NSArray* subviews = [view subviews];
-    NSEnumerator *enumerator = [subviews objectEnumerator];
-    while (object = [enumerator nextObject]) {
-        Label* label = (Label*)object;
-        if ([label pack: &cavity]==false) return NULL;
-        printf("cavity = %f, %f; %f, %f\n", cavity.origin.x, cavity.origin.y, cavity.size.width, cavity.size.height);
-    }
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-static PyObject*
 Window_show(Window* self)
 {
     NSWindow* window = self->window;
@@ -166,52 +148,49 @@ Window_destroy(Window* self)
 }
 
 static PyObject*
-Window_set_window_title(Window* self, PyObject *args, PyObject *kwds)
+Window_iconify(Window* self)
 {
-    char* title;
-    if(!PyArg_ParseTuple(args, "es", "UTF-8", &title))
-        return NULL;
-
     NSWindow* window = self->window;
-    if(window)
+    if(!window)
     {
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        NSString* s = [[NSString alloc] initWithCString: title
-                                               encoding: NSUTF8StringEncoding];
-        [window setTitle: s];
-        [s release];
-        [pool release];
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
     }
-    PyMem_Free(title);
+    [window miniaturize: NSApp];
     Py_INCREF(Py_None);
     return Py_None;
 }
 
 static PyObject*
-Window_get_window_title(Window* self)
+Window_deiconify(Window* self)
 {
     NSWindow* window = self->window;
-    PyObject* result = NULL;
-    if(window)
+    if(!window)
     {
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        NSString* title = [window title];
-        if (title) {
-            const char* cTitle = [title UTF8String];
-#if PY3K || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION >= 6)
-            result = PyUnicode_FromString(cTitle);
-#else
-            result = PyString_FromString(cTitle);
-#endif
-        }
-        [pool release];
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
     }
-    if (result) {
-        return result;
-    } else {
-        Py_INCREF(Py_None);
-        return Py_None;
+    [window deminiaturize: NSApp];
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject*
+Window_maximize(Window* self)
+{
+    NSWindow* window = self->window;
+    NSSize size = [window maxSize];
+    printf("maxsize = %f, %f\n", size.width, size.height);
+    size.width = 1000;
+    size.height = 100;
+    if(!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
     }
+    [window setContentSize: size];
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 static PyObject*
@@ -242,7 +221,7 @@ Window_put(Window* self, PyObject *args, PyObject *kwds)
     for (i = 0; i < n; i++) {
         item = PyList_GET_ITEM(items, i);
         if (!PyObject_IsInstance(item, widgets)) break;
-        printf("Item %d OK\n", i);
+        printf("Item %ld OK\n", i);
     }
 
     Py_INCREF(Py_None);
@@ -300,32 +279,31 @@ Window_get_size(Window* self, PyObject *args)
     return Py_BuildValue("ff", width, height);
 }
 
-
 static PyMethodDef Window_methods[] = {
     {"show",
      (PyCFunction)Window_show,
      METH_NOARGS,
      "Shows the window."
     },
-    {"pack",
-     (PyCFunction)Window_pack,
-     METH_NOARGS,
-     "Uses the layout manager to position each widget in the window."
-    },
     {"destroy",
      (PyCFunction)Window_destroy,
      METH_NOARGS,
      "Closes the window."
     },
-    {"set_window_title",
-     (PyCFunction)Window_set_window_title,
-     METH_VARARGS,
-     "Sets the title of the window."
-    },
-    {"get_window_title",
-     (PyCFunction)Window_get_window_title,
+    {"iconify",
+     (PyCFunction)Window_iconify,
      METH_NOARGS,
-     "Returns the title of the window."
+     "Attempts to iconify the window."
+    },
+    {"deiconify",
+     (PyCFunction)Window_deiconify,
+     METH_NOARGS,
+     "Attempts to deiconify the window."
+    },
+    {"maximize",
+     (PyCFunction)Window_maximize,
+     METH_NOARGS,
+     "Attempts to maximize the window."
     },
     {"put",
      (PyCFunction)Window_put,
@@ -342,6 +320,108 @@ static PyMethodDef Window_methods[] = {
      METH_NOARGS,
      "Returns the size of the window."
     },
+    {NULL}  /* Sentinel */
+};
+
+static PyObject* Window_get_title(Window* self, void* closure)
+{
+    NSWindow* window = self->window;
+    PyObject* result = NULL;
+    if(window)
+    {
+        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+        NSString* title = [window title];
+        if (title) {
+            const char* cTitle = [title UTF8String];
+#if PY3K || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION >= 6)
+            result = PyUnicode_FromString(cTitle);
+#else
+            result = PyString_FromString(cTitle);
+#endif
+        }
+        [pool release];
+    }
+    if (result) {
+        return result;
+    } else {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+}
+
+static int
+Window_set_title(Window* self, PyObject* value, void* closure)
+{
+    char* title;
+    title = PyString_AsString(value);
+    if (!title) return -1;
+
+    NSWindow* window = self->window;
+    if(window)
+    {
+        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+        NSString* s = [[NSString alloc] initWithCString: title
+                                               encoding: NSUTF8StringEncoding];
+        [window setTitle: s];
+        [s release];
+        [pool release];
+    }
+    return 0;
+}
+
+static char Window_title__doc__[] = "window title";
+
+static PyObject* Window_get_resizable(Window* self, void* closure)
+{
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    if (window.styleMask & NSResizableWindowMask) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static int
+Window_set_resizable(Window* self, PyObject* value, void* closure)
+{
+    int flag;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    flag = PyObject_IsTrue(value);
+    switch (flag) {
+        case 1: window.styleMask |= NSResizableWindowMask; break;
+        case 0: window.styleMask &= ~NSResizableWindowMask; break;
+        case -1: return -1;
+    }
+    return 0;
+}
+
+static char Window_resizable__doc__[] = "specifies whether the window can be resized by the user";
+
+static PyObject* Window_get_iconified(Window* self, void* closure)
+{
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    if ([window isMiniaturized]) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static char Window_iconified__doc__[] = "True if the window is iconified; False otherwise";
+
+static PyGetSetDef Window_getset[] = {
+    {"title", (getter)Window_get_title, (setter)Window_set_title, Window_title__doc__, NULL},
+    {"resizable", (getter)Window_get_resizable, (setter)Window_set_resizable, Window_resizable__doc__, NULL},
+    {"iconified", (getter)Window_get_iconified, (setter)NULL, Window_iconified__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
@@ -378,7 +458,7 @@ static PyTypeObject WindowType = {
     0,                          /* tp_iternext */
     Window_methods,             /* tp_methods */
     0,                          /* tp_members */
-    0,                          /* tp_getset */
+    Window_getset,              /* tp_getset */
     0,                          /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */

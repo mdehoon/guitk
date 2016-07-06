@@ -1,6 +1,5 @@
 #include <Cocoa/Cocoa.h>
 #include "label.h"
-#include "packed.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1

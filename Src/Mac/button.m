@@ -1,6 +1,5 @@
 #include <Cocoa/Cocoa.h>
 #include "button.h"
-#include "packed.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -172,12 +171,6 @@ Button_init(PyButton *self, PyObject *args, PyObject *kwds)
     button = [[Button alloc] initWithObject: self];
     [button setString: text];
     self->button = button;
-
-    layout = PackedType.tp_alloc(&PackedType, 0);
-    arguments = Py_BuildValue("(O)", self);
-    if (PackedType.tp_init(layout, arguments, NULL) < 0) return -1;
-    Py_DECREF(arguments);
-    if (PyObject_SetAttrString(self, "layout", layout) < 0) return -1;
 
     return 0;
 }
