@@ -674,7 +674,7 @@ PyEvents_CreateNotifier(PyObject* unused, PyObject* args, PyObject* kwds)
 
 static void _stop(void)
 {
-    if (NSApp.running) {
+    if ([NSApp isRunning]) {
         NSEvent* event;
         event = [NSEvent otherEventWithType: NSApplicationDefined
                                    location: NSZeroPoint
