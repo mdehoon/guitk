@@ -404,6 +404,142 @@ Window_set_resizable(Window* self, PyObject* value, void* closure)
 
 static char Window_resizable__doc__[] = "specifies whether the window can be resized by the user";
 
+static PyObject* Window_get_min_width(Window* self, void* closure)
+{
+    long width;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    width = (int) window.minSize.width;
+    return PyInt_FromLong(width);
+}
+
+static int
+Window_set_min_width(Window* self, PyObject* value, void* closure)
+{
+    long width;
+    NSSize size;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    width = PyInt_AsLong(value);
+    if (PyErr_Occurred()) return -1;
+    size = window.minSize;
+    size.width = width;
+    window.minSize = size;
+    return 0;
+}
+
+static char Window_min_width__doc__[] = "the minimum width to which the window can be resized by the user";
+
+static PyObject* Window_get_max_width(Window* self, void* closure)
+{
+    long width;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    width = (int) window.maxSize.width;
+    return PyInt_FromLong(width);
+}
+
+static int
+Window_set_max_width(Window* self, PyObject* value, void* closure)
+{
+    long width;
+    NSSize size;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    width = PyInt_AsLong(value);
+    if (PyErr_Occurred()) return -1;
+    size = window.maxSize;
+    size.width = width;
+    window.maxSize = size;
+    return 0;
+}
+
+static char Window_max_width__doc__[] = "the maximum width to which the window can be resized by the user";
+
+static PyObject* Window_get_min_height(Window* self, void* closure)
+{
+    long height;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    height = (int) window.minSize.height;
+    return PyInt_FromLong(height);
+}
+
+static int
+Window_set_min_height(Window* self, PyObject* value, void* closure)
+{
+    long height;
+    NSSize size;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    height = PyInt_AsLong(value);
+    if (PyErr_Occurred()) return -1;
+    size = window.minSize;
+    size.height = height;
+    window.minSize = size;
+    return 0;
+}
+
+static char Window_min_height__doc__[] = "the minimum height to which the window can be resized by the user";
+
+static PyObject* Window_get_max_height(Window* self, void* closure)
+{
+    long height;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    height = (int) window.maxSize.height;
+    return PyInt_FromLong(height);
+}
+
+static int
+Window_set_max_height(Window* self, PyObject* value, void* closure)
+{
+    long height;
+    NSSize size;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    height = PyInt_AsLong(value);
+    if (PyErr_Occurred()) return -1;
+    size = window.maxSize;
+    size.height = height;
+    window.maxSize = size;
+    return 0;
+}
+
+static char Window_max_height__doc__[] = "the maximum height to which the window can be resized by the user";
+
 static PyObject* Window_get_iconified(Window* self, void* closure)
 {
     NSWindow* window = self->window;
@@ -421,6 +557,10 @@ static char Window_iconified__doc__[] = "True if the window is iconified; False 
 static PyGetSetDef Window_getset[] = {
     {"title", (getter)Window_get_title, (setter)Window_set_title, Window_title__doc__, NULL},
     {"resizable", (getter)Window_get_resizable, (setter)Window_set_resizable, Window_resizable__doc__, NULL},
+    {"min_width", (getter)Window_get_min_width, (setter)Window_set_min_width, Window_min_width__doc__, NULL},
+    {"max_width", (getter)Window_get_max_width, (setter)Window_set_max_width, Window_max_width__doc__, NULL},
+    {"min_height", (getter)Window_get_min_height, (setter)Window_set_min_height, Window_min_height__doc__, NULL},
+    {"max_height", (getter)Window_get_max_height, (setter)Window_set_max_height, Window_max_height__doc__, NULL},
     {"iconified", (getter)Window_get_iconified, (setter)NULL, Window_iconified__doc__, NULL},
     {NULL}  /* Sentinel */
 };
