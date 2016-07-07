@@ -133,7 +133,7 @@ Window_show(Window* self)
 }
 
 static PyObject*
-Window_destroy(Window* self)
+Window_close(Window* self)
 {
     NSWindow* window = self->window;
     if(window)
@@ -179,16 +179,12 @@ static PyObject*
 Window_maximize(Window* self)
 {
     NSWindow* window = self->window;
-    NSSize size = [window maxSize];
-    printf("maxsize = %f, %f\n", size.width, size.height);
-    size.width = 1000;
-    size.height = 100;
     if(!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    [window setContentSize: size];
+    if (![window isZoomed]) [window zoom: NSApp];
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -285,8 +281,8 @@ static PyMethodDef Window_methods[] = {
      METH_NOARGS,
      "Shows the window."
     },
-    {"destroy",
-     (PyCFunction)Window_destroy,
+    {"close",
+     (PyCFunction)Window_close,
      METH_NOARGS,
      "Closes the window."
     },
