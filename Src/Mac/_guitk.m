@@ -882,6 +882,7 @@ void initevents(void)
     TimerType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&TimerType) < 0)
         goto error;
+    NotifierType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&NotifierType) < 0)
         goto error;
     if (PyType_Ready(&GridType) < 0)
