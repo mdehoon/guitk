@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <Python.h>
-#define EVENTS_MODULE
 #include "events.h"
 
 #if PY_MAJOR_VERSION >= 3
