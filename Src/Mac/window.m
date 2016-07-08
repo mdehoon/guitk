@@ -141,7 +141,6 @@ Window_close(Window* self)
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
         [window close];
         [pool release];
-        self->window = NULL;
     }
     Py_INCREF(Py_None);
     return Py_None;
@@ -258,23 +257,6 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
     return Py_None;
 }
 
-static PyObject*
-Window_get_size(Window* self, PyObject *args)
-{
-    float width;
-    float height;
-    NSRect frame;
-    NSWindow* window = self->window;
-    if (!window) {
-        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
-        return NULL;
-    }
-    frame = [[window contentView] frame];
-    width = frame.size.width;
-    height = frame.size.height;
-    return Py_BuildValue("ff", width, height);
-}
-
 static PyMethodDef Window_methods[] = {
     {"show",
      (PyCFunction)Window_show,
@@ -310,11 +292,6 @@ static PyMethodDef Window_methods[] = {
      (PyCFunction)Window_add,
      METH_VARARGS,
      "Adds a control to the window."
-    },
-    {"get_size",
-     (PyCFunction)Window_get_size,
-     METH_NOARGS,
-     "Returns the size of the window."
     },
     {NULL}  /* Sentinel */
 };
@@ -366,6 +343,122 @@ Window_set_title(Window* self, PyObject* value, void* closure)
 }
 
 static char Window_title__doc__[] = "window title";
+
+static PyObject* Window_get_width(Window* self, void* closure)
+{
+    long width;
+    NSWindow* window = self->window;
+    NSRect frame;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    frame = [[window contentView] frame];
+    width = round(frame.size.width);
+    return PyInt_FromLong(width);
+}
+
+static int Window_set_width(Window* self, PyObject* value, void* closure)
+{
+    double width;
+    NSRect frame;
+    NSSize size;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    width = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    frame = [[window contentView] frame];
+    size = frame.size;
+    size.width = width;
+    [window setContentSize: size];
+    return 0;
+}
+
+static char Window_width__doc__[] = "width of window content";
+
+static PyObject* Window_get_height(Window* self, void* closure)
+{
+    long height;
+    NSRect frame;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    frame = [[window contentView] frame];
+    height = round(frame.size.height);
+    return PyInt_FromLong(height);
+}
+
+static int Window_set_height(Window* self, PyObject* value, void* closure)
+{
+    int height;
+    NSRect frame;
+    NSSize size;
+    NSPoint point;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    frame = [window frame];
+    size = frame.size;
+    point = frame.origin;
+    point.y += size.height;
+    height = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    size.height = height;
+    [window setContentSize: size];
+    [window setFrameTopLeftPoint: point];
+    return 0;
+}
+
+static char Window_height__doc__[] = "height of window content";
+
+static PyObject* Window_get_size(Window* self, void* closure)
+{
+    int width;
+    int height;
+    NSRect frame;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    frame = [[window contentView] frame];
+    width = round(frame.size.width);
+    height = round(frame.size.height);
+    return Py_BuildValue("ii", width, height);
+}
+
+static int Window_set_size(Window* self, PyObject* value, void* closure)
+{
+    int width;
+    int height;
+    NSRect frame;
+    NSSize size;
+    NSPoint point;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    frame = [window frame];
+    size = frame.size;
+    point = frame.origin;
+    point.y += size.height;
+    if(!PyArg_ParseTuple(value, "ii", &width, &height)) return -1;
+    size.width = width;
+    size.height = height;
+    [window setContentSize: size];
+    [window setFrameTopLeftPoint: point];
+    return 0;
+}
+
+static char Window_size__doc__[] = "window content size";
 
 static PyObject* Window_get_resizable(Window* self, void* closure)
 {
@@ -552,6 +645,9 @@ static char Window_iconified__doc__[] = "True if the window is iconified; False 
 
 static PyGetSetDef Window_getset[] = {
     {"title", (getter)Window_get_title, (setter)Window_set_title, Window_title__doc__, NULL},
+    {"width", (getter)Window_get_width, (setter)Window_set_width, Window_width__doc__, NULL},
+    {"height", (getter)Window_get_height, (setter)Window_set_height, Window_height__doc__, NULL},
+    {"size", (getter)Window_get_size, (setter)Window_set_size, Window_size__doc__, NULL},
     {"resizable", (getter)Window_get_resizable, (setter)Window_set_resizable, Window_resizable__doc__, NULL},
     {"min_width", (getter)Window_get_min_width, (setter)Window_set_min_width, Window_min_width__doc__, NULL},
     {"max_width", (getter)Window_get_max_width, (setter)Window_set_max_width, Window_max_width__doc__, NULL},
