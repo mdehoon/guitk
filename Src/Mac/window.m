@@ -706,3 +706,11 @@ int initialize_window(PyObject* module) {
     Py_INCREF(&WindowType);
     return PyModule_AddObject(module, "Window", (PyObject*) &WindowType);
 }
+
+/*
+static const char *const WmAttributeNames[] = {
+    "-alpha", "-fullscreen", "-modified", "-notify",
+    "-titlepath", "-topmost", "-transparent",
+    NULL
+};
+*/
