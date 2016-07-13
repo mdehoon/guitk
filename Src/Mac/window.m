@@ -60,7 +60,7 @@ Window_init(Window *self, PyObject *args, PyObject *kwds)
     int width = 100;
     int height = 100;
 
-    if(!PyArg_ParseTuple(args, "|iis", &width, &height, &title)) return -1;
+    if (!PyArg_ParseTuple(args, "|iis", &width, &height, &title)) return -1;
 
     rect.origin.x = 100;
     rect.origin.y = 350;
@@ -121,7 +121,7 @@ static PyObject*
 Window_show(Window* self)
 {
     NSWindow* window = self->window;
-    if(window)
+    if (window)
     {
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
         [window makeKeyAndOrderFront: nil];
@@ -136,7 +136,7 @@ static PyObject*
 Window_close(Window* self)
 {
     NSWindow* window = self->window;
-    if(window)
+    if (window)
     {
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
         [window close];
@@ -150,7 +150,7 @@ static PyObject*
 Window_iconify(Window* self)
 {
     NSWindow* window = self->window;
-    if(!window)
+    if (!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
@@ -164,7 +164,7 @@ static PyObject*
 Window_deiconify(Window* self)
 {
     NSWindow* window = self->window;
-    if(!window)
+    if (!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
@@ -178,7 +178,7 @@ static PyObject*
 Window_maximize(Window* self)
 {
     NSWindow* window = self->window;
-    if(!window)
+    if (!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
@@ -199,13 +199,13 @@ Window_put(Window* self, PyObject *args, PyObject *kwds)
     View* view;
 
     NSWindow* window = self->window;
-    if(!window) {
+    if (!window) {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
 
     view = [window contentView];
-    if(!PyArg_ParseTuple(args, "O", &object))
+    if (!PyArg_ParseTuple(args, "O", &object))
         return NULL;
     if (!PyMapping_Check(object)) {
         PyErr_SetString(PyExc_RuntimeError, "argument is not a layout manager");
@@ -230,13 +230,13 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
     View* view;
 
     NSWindow* window = self->window;
-    if(!window) {
+    if (!window) {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
 
     view = [window contentView];
-    if(!PyArg_ParseTuple(args, "O", &object))
+    if (!PyArg_ParseTuple(args, "O", &object))
         return NULL;
 
     if (PyObject_IsInstance(object, (PyObject*) &LabelType)) {
@@ -300,7 +300,7 @@ static PyObject* Window_get_title(Window* self, void* closure)
 {
     NSWindow* window = self->window;
     PyObject* result = NULL;
-    if(window)
+    if (window)
     {
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
         NSString* title = [window title];
@@ -330,7 +330,7 @@ Window_set_title(Window* self, PyObject* value, void* closure)
     if (!title) return -1;
 
     NSWindow* window = self->window;
-    if(window)
+    if (window)
     {
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
         NSString* s = [[NSString alloc] initWithCString: title
@@ -450,7 +450,7 @@ static int Window_set_size(Window* self, PyObject* value, void* closure)
     size = frame.size;
     point = frame.origin;
     point.y += size.height;
-    if(!PyArg_ParseTuple(value, "ii", &width, &height)) return -1;
+    if (!PyArg_ParseTuple(value, "ii", &width, &height)) return -1;
     size.width = width;
     size.height = height;
     [window setContentSize: size];
@@ -629,6 +629,39 @@ Window_set_max_height(Window* self, PyObject* value, void* closure)
 
 static char Window_max_height__doc__[] = "the maximum height to which the window can be resized by the user";
 
+static PyObject* Window_get_alpha(Window* self, void* closure)
+{
+    double alpha;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    alpha = [window alphaValue];
+    return PyFloat_FromDouble(alpha);
+}
+
+static int
+Window_set_alpha(Window* self, PyObject* value, void* closure)
+{
+    double alpha;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    alpha = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    if (alpha < 0.0) alpha = 0.0;
+    else if (alpha > 1.0) alpha = 1.0;
+    [window setAlphaValue: alpha];
+    return 0;
+}
+
+static char Window_alpha__doc__[] = "alpha transparency level of the window, ranging from 0.0 (fully transparent) to 1.0 (opaque); values outside this range will be clipped.";
+
 static PyObject* Window_get_iconified(Window* self, void* closure)
 {
     NSWindow* window = self->window;
@@ -653,6 +686,7 @@ static PyGetSetDef Window_getset[] = {
     {"max_width", (getter)Window_get_max_width, (setter)Window_set_max_width, Window_max_width__doc__, NULL},
     {"min_height", (getter)Window_get_min_height, (setter)Window_set_min_height, Window_min_height__doc__, NULL},
     {"max_height", (getter)Window_get_max_height, (setter)Window_set_max_height, Window_max_height__doc__, NULL},
+    {"alpha", (getter)Window_get_alpha, (setter)Window_set_alpha, Window_alpha__doc__, NULL},
     {"iconified", (getter)Window_get_iconified, (setter)NULL, Window_iconified__doc__, NULL},
     {NULL}  /* Sentinel */
 };
@@ -709,7 +743,7 @@ int initialize_window(PyObject* module) {
 
 /*
 static const char *const WmAttributeNames[] = {
-    "-alpha", "-fullscreen", "-modified", "-notify",
+    "-fullscreen", "-modified", "-notify",
     "-titlepath", "-topmost", "-transparent",
     NULL
 };
