@@ -660,7 +660,7 @@ Window_set_alpha(Window* self, PyObject* value, void* closure)
     return 0;
 }
 
-static char Window_alpha__doc__[] = "alpha transparency level of the window, ranging from 0.0 (fully transparent) to 1.0 (opaque); values outside this range will be clipped.";
+static char Window_alpha__doc__[] = "alpha transparency level of the window, ranging from 0.0 (fully transparent) to 1.0 (opaque); values outside this range will be clipped. If not supported, the alpha value remains at 1.0.";
 
 static PyObject* Window_get_iconified(Window* self, void* closure)
 {
@@ -742,9 +742,7 @@ int initialize_window(PyObject* module) {
 }
 
 /*
-static const char *const WmAttributeNames[] = {
-    "-fullscreen", "-modified", "-notify",
-    "-titlepath", "-topmost", "-transparent",
-    NULL
-};
+    "-fullscreen"
+    "-topmost"
+    "-zoomed"
 */
