@@ -17,9 +17,12 @@
 
 @interface View : NSView <NSWindowDelegate>
 {
+    BOOL _fullscreen;
 }
 - (BOOL)isFlipped;
 - (BOOL)autoresizesSubviews;
+- (void)windowDidEnterFullScreen:(NSNotification*)notification;
+- (void)windowDidExitFullScreen:(NSNotification*)notification;
 @end
 
 @implementation View
@@ -28,13 +31,26 @@
     return YES;
 }
 
-- (BOOL)autoresizesSubviews;
+- (BOOL)autoresizesSubviews
 {
     return NO;
 }
+
+- (BOOL)fullscreen
+{
+    return _fullscreen;
+}
+
+- (void)windowDidEnterFullScreen:(NSNotification*)notification
+{
+    _fullscreen = YES;
+}
+
+- (void)windowDidExitFullScreen:(NSNotification*)notification
+{
+    _fullscreen = NO;
+}
 @end
-
-
 
 typedef struct {
     PyObject_HEAD
@@ -85,6 +101,7 @@ Window_init(Window *self, PyObject *args, PyObject *kwds)
     [window setAcceptsMouseMovedEvents: YES];
     view = [[View alloc] initWithFrame: rect];
     [window setContentView: view];
+    [window setDelegate: view];
 
     self->window = window;
 
@@ -629,6 +646,66 @@ Window_set_max_height(Window* self, PyObject* value, void* closure)
 
 static char Window_max_height__doc__[] = "the maximum height to which the window can be resized by the user";
 
+static PyObject* Window_get_fullscreen(Window* self, void* closure)
+{
+    View* view;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    view = [window contentView];
+    if ([view fullscreen]) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static int
+Window_set_fullscreen(Window* self, PyObject* value, void* closure)
+{
+    BOOL fullscreen;
+    View* view;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    view = [window contentView];
+    fullscreen = [view fullscreen];
+    if (value==Py_False) {
+        if (fullscreen) {
+            [window toggleFullScreen: NSApp];
+        }
+    }
+    else if (value==Py_True) {
+        if (!fullscreen) {
+            [window toggleFullScreen: NSApp];
+        }
+    }
+    else {
+        PyErr_SetString(PyExc_RuntimeError, "fullscreen should be True or False");
+        return -1;
+    }
+    return 0;
+}
+
+static char Window_fullscreen__doc__[] = "specify if the window is in full-screen mode";
+
+static PyObject* Window_get_iconified(Window* self, void* closure)
+{
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    if ([window isMiniaturized]) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static char Window_iconified__doc__[] = "True if the window is iconified; False otherwise";
+
 static PyObject* Window_get_alpha(Window* self, void* closure)
 {
     double alpha;
@@ -662,20 +739,6 @@ Window_set_alpha(Window* self, PyObject* value, void* closure)
 
 static char Window_alpha__doc__[] = "alpha transparency level of the window, ranging from 0.0 (fully transparent) to 1.0 (opaque); values outside this range will be clipped. If not supported, the alpha value remains at 1.0.";
 
-static PyObject* Window_get_iconified(Window* self, void* closure)
-{
-    NSWindow* window = self->window;
-    if (!window)
-    {
-        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
-        return NULL;
-    }
-    if ([window isMiniaturized]) Py_RETURN_TRUE;
-    Py_RETURN_FALSE;
-}
-
-static char Window_iconified__doc__[] = "True if the window is iconified; False otherwise";
-
 static PyGetSetDef Window_getset[] = {
     {"title", (getter)Window_get_title, (setter)Window_set_title, Window_title__doc__, NULL},
     {"width", (getter)Window_get_width, (setter)Window_set_width, Window_width__doc__, NULL},
@@ -686,8 +749,9 @@ static PyGetSetDef Window_getset[] = {
     {"max_width", (getter)Window_get_max_width, (setter)Window_set_max_width, Window_max_width__doc__, NULL},
     {"min_height", (getter)Window_get_min_height, (setter)Window_set_min_height, Window_min_height__doc__, NULL},
     {"max_height", (getter)Window_get_max_height, (setter)Window_set_max_height, Window_max_height__doc__, NULL},
-    {"alpha", (getter)Window_get_alpha, (setter)Window_set_alpha, Window_alpha__doc__, NULL},
+    {"fullscreen", (getter)Window_get_fullscreen, (setter)Window_set_fullscreen, Window_fullscreen__doc__, NULL},
     {"iconified", (getter)Window_get_iconified, (setter)NULL, Window_iconified__doc__, NULL},
+    {"alpha", (getter)Window_get_alpha, (setter)Window_set_alpha, Window_alpha__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
@@ -742,7 +806,6 @@ int initialize_window(PyObject* module) {
 }
 
 /*
-    "-fullscreen"
     "-topmost"
     "-zoomed"
 */
