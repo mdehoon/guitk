@@ -192,20 +192,6 @@ Window_deiconify(Window* self)
 }
 
 static PyObject*
-Window_maximize(Window* self)
-{
-    NSWindow* window = self->window;
-    if (!window)
-    {
-        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
-        return NULL;
-    }
-    if (![window isZoomed]) [window zoom: NSApp];
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-static PyObject*
 Window_put(Window* self, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
@@ -294,11 +280,6 @@ static PyMethodDef Window_methods[] = {
      (PyCFunction)Window_deiconify,
      METH_NOARGS,
      "Attempts to deiconify the window."
-    },
-    {"maximize",
-     (PyCFunction)Window_maximize,
-     METH_NOARGS,
-     "Attempts to maximize the window."
     },
     {"put",
      (PyCFunction)Window_put,
@@ -674,23 +655,59 @@ Window_set_fullscreen(Window* self, PyObject* value, void* closure)
     view = [window contentView];
     fullscreen = [view fullscreen];
     if (value==Py_False) {
-        if (fullscreen) {
-            [window toggleFullScreen: NSApp];
-        }
+        if (!fullscreen) return 0;
     }
     else if (value==Py_True) {
-        if (!fullscreen) {
-            [window toggleFullScreen: NSApp];
-        }
+        if (fullscreen) return 0;
     }
     else {
         PyErr_SetString(PyExc_RuntimeError, "fullscreen should be True or False");
         return -1;
     }
+    [window toggleFullScreen: NSApp];
     return 0;
 }
 
 static char Window_fullscreen__doc__[] = "specify if the window is in full-screen mode";
+
+static PyObject* Window_get_zoomed(Window* self, void* closure)
+{
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    if (window.zoomed) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static int
+Window_set_zoomed(Window* self, PyObject* value, void* closure)
+{
+    BOOL zoomed;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    zoomed = window.zoomed;
+    if (value==Py_False) {
+        if (!zoomed) return 0;
+    }
+    else if (value==Py_True) {
+        if (zoomed) return 0;
+    }
+    else {
+        PyErr_SetString(PyExc_RuntimeError, "zoomed should be True or False");
+        return -1;
+    }
+    [window zoom: NSApp];
+    return 0;
+}
+
+static char Window_zoomed__doc__[] = "specify if the window is in full-screen mode";
 
 static PyObject* Window_get_topmost(Window* self, void* closure)
 {
@@ -795,6 +812,7 @@ static PyGetSetDef Window_getset[] = {
     {"min_height", (getter)Window_get_min_height, (setter)Window_set_min_height, Window_min_height__doc__, NULL},
     {"max_height", (getter)Window_get_max_height, (setter)Window_set_max_height, Window_max_height__doc__, NULL},
     {"fullscreen", (getter)Window_get_fullscreen, (setter)Window_set_fullscreen, Window_fullscreen__doc__, NULL},
+    {"zoomed", (getter)Window_get_zoomed, (setter)Window_set_zoomed, Window_zoomed__doc__, NULL},
     {"iconified", (getter)Window_get_iconified, (setter)NULL, Window_iconified__doc__, NULL},
     {"topmost", (getter)Window_get_topmost, (setter)Window_set_topmost, Window_topmost__doc__, NULL},
     {"alpha", (getter)Window_get_alpha, (setter)Window_set_alpha, Window_alpha__doc__, NULL},
@@ -850,7 +868,3 @@ int initialize_window(PyObject* module) {
     Py_INCREF(&WindowType);
     return PyModule_AddObject(module, "Window", (PyObject*) &WindowType);
 }
-
-/*
-    "-zoomed"
-*/
