@@ -850,3 +850,36 @@ int initialize_window(PyObject* module) {
     Py_INCREF(&WindowType);
     return PyModule_AddObject(module, "Window", (PyObject*) &WindowType);
 }
+
+/*
+Remaining:
+
+
+    wm client window ?name? 
+    wm colormapwindows window ?windowList? 
+    wm command window ?value? 
+    wm deiconify window 
+    wm focusmodel window ?active|passive? 
+    wm frame window 
+    wm geometry window ?newGeometry? 
+    wm grid window ?baseWidth baseHeight widthInc heightInc? 
+    wm group window ?pathName? 
+    wm iconbitmap window ?bitmap? 
+    wm iconify window 
+    wm iconmask window ?bitmap? 
+    wm iconname window ?newName? 
+    wm iconposition window ?x y? 
+    wm iconwindow window ?pathName? 
+    wm maxsize window ?width height? 
+    wm minsize window ?width height? 
+    wm overrideredirect window ?boolean? 
+    wm positionfrom window ?who? 
+    wm protocol window ?name? ?command? 
+    wm resizable window ?width height? 
+    wm sizefrom window ?who? 
+    wm stackorder window ?isabove|isbelow window? 
+    wm state window ?newstate? 
+    wm title window ?string? 
+    wm transient window ?master? 
+    wm withdraw window 
+*/
