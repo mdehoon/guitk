@@ -17,12 +17,9 @@
 
 @interface View : NSView <NSWindowDelegate>
 {
-    BOOL _fullscreen;
 }
 - (BOOL)isFlipped;
 - (BOOL)autoresizesSubviews;
-- (void)windowDidEnterFullScreen:(NSNotification*)notification;
-- (void)windowDidExitFullScreen:(NSNotification*)notification;
 @end
 
 @implementation View
@@ -34,21 +31,6 @@
 - (BOOL)autoresizesSubviews
 {
     return NO;
-}
-
-- (BOOL)fullscreen
-{
-    return _fullscreen;
-}
-
-- (void)windowDidEnterFullScreen:(NSNotification*)notification
-{
-    _fullscreen = YES;
-}
-
-- (void)windowDidExitFullScreen:(NSNotification*)notification
-{
-    _fullscreen = NO;
 }
 @end
 
@@ -629,15 +611,15 @@ static char Window_max_height__doc__[] = "the maximum height to which the window
 
 static PyObject* Window_get_fullscreen(Window* self, void* closure)
 {
-    View* view;
+    NSUInteger styleMask;
     NSWindow* window = self->window;
     if (!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    view = [window contentView];
-    if ([view fullscreen]) Py_RETURN_TRUE;
+    styleMask = [window styleMask];
+    if (styleMask & NSFullScreenWindowMask) Py_RETURN_TRUE;
     Py_RETURN_FALSE;
 }
 
@@ -645,15 +627,15 @@ static int
 Window_set_fullscreen(Window* self, PyObject* value, void* closure)
 {
     BOOL fullscreen;
-    View* view;
+    NSUInteger styleMask;
     NSWindow* window = self->window;
     if (!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return -1;
     }
-    view = [window contentView];
-    fullscreen = [view fullscreen];
+    styleMask = [window styleMask];
+    fullscreen = (styleMask & NSFullScreenWindowMask) ? true : false;
     if (value==Py_False) {
         if (!fullscreen) return 0;
     }
