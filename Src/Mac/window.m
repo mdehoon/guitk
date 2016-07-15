@@ -692,6 +692,51 @@ Window_set_fullscreen(Window* self, PyObject* value, void* closure)
 
 static char Window_fullscreen__doc__[] = "specify if the window is in full-screen mode";
 
+static PyObject* Window_get_topmost(Window* self, void* closure)
+{
+    const char* s = "(unknown)";
+    NSInteger level;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    level = [window level];
+    if (level==NSNormalWindowLevel) Py_RETURN_FALSE;
+    else if (level==NSStatusWindowLevel) Py_RETURN_TRUE;
+    if (level== NSFloatingWindowLevel) s = "NSFloatingWindowLevel";
+    else if (level== NSSubmenuWindowLevel) s = "NSSubmenuWindowLevel";
+    else if (level== NSTornOffMenuWindowLevel) s = "NSTornOffMenuWindowLevel";
+    else if (level== NSMainMenuWindowLevel) s = "NSMainMenuWindowLevel";
+    else if (level== NSModalPanelWindowLevel) s = "NSModalPanelWindowLevel";
+    else if (level== NSPopUpMenuWindowLevel) s = "NSPopUpMenuWindowLevel";
+    else if (level== NSScreenSaverWindowLevel) s = "NSScreenSaverWindowLevel";
+    else if (level== NSDockWindowLevel) s = "NSDockWindowLevel";
+    PyErr_Format(PyExc_RuntimeError, "unexpected window level %s", s);
+    return NULL;
+}
+
+static int
+Window_set_topmost(Window* self, PyObject* value, void* closure)
+{
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    if (value==Py_False) [window setLevel: NSNormalWindowLevel];
+    else if (value==Py_True) [window setLevel: NSStatusWindowLevel];
+    else {
+        PyErr_SetString(PyExc_RuntimeError, "topmost should be True or False");
+        return -1;
+    }
+    return 0;
+}
+
+static char Window_topmost__doc__[] = "True if the window is topmost; False otherwise";
+
 static PyObject* Window_get_iconified(Window* self, void* closure)
 {
     NSWindow* window = self->window;
@@ -751,6 +796,7 @@ static PyGetSetDef Window_getset[] = {
     {"max_height", (getter)Window_get_max_height, (setter)Window_set_max_height, Window_max_height__doc__, NULL},
     {"fullscreen", (getter)Window_get_fullscreen, (setter)Window_set_fullscreen, Window_fullscreen__doc__, NULL},
     {"iconified", (getter)Window_get_iconified, (setter)NULL, Window_iconified__doc__, NULL},
+    {"topmost", (getter)Window_get_topmost, (setter)Window_set_topmost, Window_topmost__doc__, NULL},
     {"alpha", (getter)Window_get_alpha, (setter)Window_set_alpha, Window_alpha__doc__, NULL},
     {NULL}  /* Sentinel */
 };
@@ -806,6 +852,5 @@ int initialize_window(PyObject* module) {
 }
 
 /*
-    "-topmost"
     "-zoomed"
 */
