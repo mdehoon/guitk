@@ -324,6 +324,48 @@ Window_set_title(Window* self, PyObject* value, void* closure)
 
 static char Window_title__doc__[] = "window title";
 
+static PyObject* Window_get_origin(Window* self, void* closure)
+{
+    CGFloat x;
+    CGFloat y;
+    CGFloat height;
+    NSRect frame;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    frame = [[window screen] visibleFrame];
+    height = NSMaxY(frame);
+    frame = [window frame];
+    x = NSMinX(frame);
+    y = height - NSMaxY(frame);
+    return Py_BuildValue("ii", (int) round(x), (int) round(y));
+}
+
+static int Window_set_origin(Window* self, PyObject* value, void* closure)
+{
+    int x;
+    int y;
+    CGFloat height;
+    NSPoint point;
+    NSRect frame;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    if (!PyArg_ParseTuple(value, "ii", &x, &y)) return -1;
+    frame = [[window screen] visibleFrame];
+    height = NSMaxY(frame);
+    point.x = x;
+    point.y = height - y;
+    [window setFrameTopLeftPoint: point];
+    return 0;
+}
+
+static char Window_origin__doc__[] = "position of the top-left corner of the window";
+
 static PyObject* Window_get_width(Window* self, void* closure)
 {
     long width;
@@ -646,6 +688,7 @@ Window_set_fullscreen(Window* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "fullscreen should be True or False");
         return -1;
     }
+printf("toggling\n");
     [window toggleFullScreen: NSApp];
     return 0;
 }
@@ -785,6 +828,7 @@ static char Window_alpha__doc__[] = "alpha transparency level of the window, ran
 
 static PyGetSetDef Window_getset[] = {
     {"title", (getter)Window_get_title, (setter)Window_set_title, Window_title__doc__, NULL},
+    {"origin", (getter)Window_get_origin, (setter)Window_set_origin, Window_origin__doc__, NULL},
     {"width", (getter)Window_get_width, (setter)Window_set_width, Window_width__doc__, NULL},
     {"height", (getter)Window_get_height, (setter)Window_set_height, Window_height__doc__, NULL},
     {"size", (getter)Window_get_size, (setter)Window_set_size, Window_size__doc__, NULL},
@@ -853,14 +897,6 @@ int initialize_window(PyObject* module) {
 
 /*
 Remaining:
-
-
-    wm client window ?name? 
-    wm colormapwindows window ?windowList? 
-    wm command window ?value? 
-    wm deiconify window 
-    wm focusmodel window ?active|passive? 
-    wm frame window 
     wm geometry window ?newGeometry? 
     wm grid window ?baseWidth baseHeight widthInc heightInc? 
     wm group window ?pathName? 
