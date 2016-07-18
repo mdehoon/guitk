@@ -657,7 +657,9 @@ static char Window_max_height__doc__[] = "the maximum height to which the window
 
 static PyObject* Window_get_fullscreen(Window* self, void* closure)
 {
+#ifdef COMPILING_FOR_10_7
     NSUInteger styleMask;
+#endif
     NSWindow* window = self->window;
     if (!window)
     {
@@ -674,8 +676,10 @@ static PyObject* Window_get_fullscreen(Window* self, void* closure)
 static int
 Window_set_fullscreen(Window* self, PyObject* value, void* closure)
 {
+#ifdef COMPILING_FOR_10_7
     BOOL fullscreen;
     NSUInteger styleMask;
+#endif
     NSWindow* window = self->window;
     if (!window)
     {
@@ -698,7 +702,8 @@ Window_set_fullscreen(Window* self, PyObject* value, void* closure)
     [window toggleFullScreen: NSApp];
     return 0;
 #else
-    PyErr_SetString(PyExc_RuntimeError, "fullscreen mode is not available if compied for Mac OS X earlier than version 10.7");
+    if (value==Py_False) return 0;
+    PyErr_SetString(PyExc_RuntimeError, "fullscreen mode is not available if compiled for Mac OS X versions older than 10.7.");
     return -1;
 #endif
 }
