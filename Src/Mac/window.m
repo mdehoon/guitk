@@ -486,6 +486,54 @@ static int Window_set_size(Window* self, PyObject* value, void* closure)
 
 static char Window_size__doc__[] = "window content size";
 
+static PyObject* Window_get_frame(Window* self, void* closure)
+{
+    CGFloat x;
+    CGFloat y;
+    CGFloat width;
+    CGFloat height;
+    NSRect frame;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    frame = [[window screen] visibleFrame];
+    height = NSMaxY(frame);
+    frame = [window frame];
+    x = NSMinX(frame);
+    y = height - NSMaxY(frame);
+    width = NSWidth(frame);
+    height = NSHeight(frame);
+    return Py_BuildValue("iiii", (int) round(x), (int) round(y),
+                                 (int) round(width), (int) round(height));
+}
+
+static int Window_set_frame(Window* self, PyObject* value, void* closure)
+{
+    int x;
+    int y;
+    int width;
+    int height;
+    NSRect rect;
+    NSRect frame;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    if (!PyArg_ParseTuple(value, "iiii", &x, &y, &width, &height)) return -1;
+    frame = [[window screen] visibleFrame];
+    rect.origin.x = x;
+    rect.origin.y = NSMaxY(frame) - y - height;
+    rect.size.width = width;
+    rect.size.height = height;
+    [window setFrame: rect display: NO];
+    return 0;
+}
+
+static char Window_frame__doc__[] = "position and size of the window; position is the position of the top-left corner of the window; the size is the window size, which may be larger than the content size";
+
 static PyObject* Window_get_resizable(Window* self, void* closure)
 {
     NSWindow* window = self->window;
@@ -847,6 +895,7 @@ static PyGetSetDef Window_getset[] = {
     {"width", (getter)Window_get_width, (setter)Window_set_width, Window_width__doc__, NULL},
     {"height", (getter)Window_get_height, (setter)Window_set_height, Window_height__doc__, NULL},
     {"size", (getter)Window_get_size, (setter)Window_set_size, Window_size__doc__, NULL},
+    {"frame", (getter)Window_get_frame, (setter)Window_set_frame, Window_frame__doc__, NULL},
     {"resizable", (getter)Window_get_resizable, (setter)Window_set_resizable, Window_resizable__doc__, NULL},
     {"min_width", (getter)Window_get_min_width, (setter)Window_set_min_width, Window_min_width__doc__, NULL},
     {"max_width", (getter)Window_get_max_width, (setter)Window_set_max_width, Window_max_width__doc__, NULL},
@@ -912,8 +961,6 @@ int initialize_window(PyObject* module) {
 
 /*
 Remaining:
-    wm geometry window ?newGeometry? 
-    wm grid window ?baseWidth baseHeight widthInc heightInc? 
     wm group window ?pathName? 
     wm iconbitmap window ?bitmap? 
     wm iconify window 
