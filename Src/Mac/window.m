@@ -14,6 +14,10 @@
 #endif
 #endif
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+#define COMPILING_FOR_10_7
+#endif
+
 
 @interface View : NSView <NSWindowDelegate>
 {
@@ -660,8 +664,10 @@ static PyObject* Window_get_fullscreen(Window* self, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
+#ifdef COMPILING_FOR_10_7
     styleMask = [window styleMask];
     if (styleMask & NSFullScreenWindowMask) Py_RETURN_TRUE;
+#endif
     Py_RETURN_FALSE;
 }
 
@@ -676,6 +682,7 @@ Window_set_fullscreen(Window* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return -1;
     }
+#ifdef COMPILING_FOR_10_7
     styleMask = [window styleMask];
     fullscreen = (styleMask & NSFullScreenWindowMask) ? true : false;
     if (value==Py_False) {
@@ -688,9 +695,12 @@ Window_set_fullscreen(Window* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "fullscreen should be True or False");
         return -1;
     }
-printf("toggling\n");
     [window toggleFullScreen: NSApp];
     return 0;
+#else
+    PyErr_SetString(PyExc_RuntimeError, "fullscreen mode is not available if compied for Mac OS X earlier than version 10.7");
+    return -1;
+#endif
 }
 
 static char Window_fullscreen__doc__[] = "specify if the window is in full-screen mode";
