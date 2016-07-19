@@ -18,6 +18,7 @@
 #define COMPILING_FOR_10_7
 #endif
 
+static PyTypeObject WindowType;
 
 @interface View : NSView <NSWindowDelegate>
 {
@@ -42,6 +43,19 @@ typedef struct {
     PyObject_HEAD
     NSWindow* window;
 } Window;
+
+static int converter(PyObject* object, void* address)
+{
+    NSWindow** p;
+    if (!PyObject_IsInstance(object, (PyObject*) &WindowType)) {
+        PyErr_SetString(PyExc_RuntimeError, "expected a window");
+        return 0;
+    }
+    Window* window = (Window*)object;
+    p = address;
+    *p = window->window;
+    return 1;
+}
 
 static PyObject*
 Window_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -246,6 +260,43 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
     return Py_None;
 }
 
+static PyObject*
+Window_add_child(Window* self, PyObject *args, PyObject *kwds)
+{
+    PyObject* above;
+    NSWindowOrderingMode ordered;
+    NSWindow* child;
+    NSWindow* parent;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+
+    if (!PyArg_ParseTuple(args, "O&O", converter, &child, &above)) return NULL;
+
+    parent = window;
+    while (parent) {
+        if (parent==child) {
+            PyErr_SetString(PyExc_ValueError,
+                            "cyclical parent-child relations are not allowed");
+            return NULL;
+        }
+        parent = [parent parentWindow];
+    }
+
+    if (above==Py_True) ordered = NSWindowAbove;
+    else if (above==Py_False) ordered = NSWindowBelow;
+    else {
+        PyErr_SetString(PyExc_ValueError, "above should be True or False");
+        return NULL;
+    }
+    [window addChildWindow: child ordered: ordered];
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static PyMethodDef Window_methods[] = {
     {"show",
      (PyCFunction)Window_show,
@@ -276,6 +327,11 @@ static PyMethodDef Window_methods[] = {
      (PyCFunction)Window_add,
      METH_VARARGS,
      "Adds a control to the window."
+    },
+    {"add_child",
+     (PyCFunction)Window_add_child,
+     METH_VARARGS,
+     "Specifies a child window."
     },
     {NULL}  /* Sentinel */
 };
