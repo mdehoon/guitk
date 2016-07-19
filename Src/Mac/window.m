@@ -261,8 +261,10 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject*
-Window_add_child(Window* self, PyObject *args, PyObject *kwds)
+Window_add_child(Window* self, PyObject *args, PyObject *keywords)
+
 {
+    static char* kwlist[] = {"child", "above", NULL};
     PyObject* above;
     NSWindowOrderingMode ordered;
     NSWindow* child;
@@ -273,7 +275,9 @@ Window_add_child(Window* self, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    if (!PyArg_ParseTuple(args, "O&O", converter, &child, &above)) return NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "O&|O", kwlist,
+                                     converter, &child, &above))
+        return NULL;
 
     parent = window;
     while (parent) {
@@ -292,6 +296,34 @@ Window_add_child(Window* self, PyObject *args, PyObject *kwds)
         return NULL;
     }
     [window addChildWindow: child ordered: ordered];
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject*
+Window_remove_child(Window* self, PyObject *args, PyObject *keywords)
+
+{
+    static char* kwlist[] = {"child", NULL};
+    NSWindow* child;
+    NSArray* children;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "O&", kwlist,
+                                     converter, &child))
+        return NULL;
+
+    children = [window childWindows];
+    if (![children containsObject: child]) {
+        PyErr_SetString(PyExc_ValueError, "child window not found");
+        return NULL;
+    }
+    [window removeChildWindow: child];
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -330,8 +362,13 @@ static PyMethodDef Window_methods[] = {
     },
     {"add_child",
      (PyCFunction)Window_add_child,
-     METH_VARARGS,
-     "Specifies a child window."
+     METH_KEYWORDS | METH_VARARGS,
+     "Adds a child window."
+    },
+    {"remove_child",
+     (PyCFunction)Window_remove_child,
+     METH_KEYWORDS | METH_VARARGS,
+     "Removes a child window."
     },
     {NULL}  /* Sentinel */
 };
