@@ -20,6 +20,34 @@
 
 static PyTypeObject WindowType;
 
+@interface Window : NSWindow
+{
+    PyObject* _object;
+}
+- (void)initWithContentRect:(NSRect)rect object:(PyObject*)obj;
+- (PyObject*)object;
+@end
+
+@implementation Window
+- (void)initWithContentRect:(NSRect)rect object:(PyObject*)object
+{
+    [self initWithContentRect: rect
+                    styleMask: NSTitledWindowMask
+                             | NSClosableWindowMask
+                             | NSResizableWindowMask
+                             | NSMiniaturizableWindowMask
+                      backing: NSBackingStoreBuffered
+                        defer: YES];
+    _object = object;
+}
+
+- (PyObject*)object
+{
+    Py_INCREF(_object);
+    return _object;
+}
+@end
+
 @interface View : NSView <NSWindowDelegate>
 {
 }
@@ -41,7 +69,7 @@ static PyTypeObject WindowType;
 
 typedef struct {
     PyObject_HEAD
-    NSWindow* window;
+    Window* window;
 } WindowObject;
 
 static int converter(PyObject* object, void* address)
@@ -70,7 +98,7 @@ static int
 Window_init(WindowObject *self, PyObject *args, PyObject *kwds)
 {
     NSRect rect;
-    NSWindow* window;
+    Window* window;
     View* view;
     const char* title = "";
     int width = 100;
@@ -86,15 +114,9 @@ Window_init(WindowObject *self, PyObject *args, PyObject *kwds)
     NSApp = [NSApplication sharedApplication];
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
 
-    window = [NSWindow alloc];
+    window = [Window alloc];
     if (!window) return -1;
-    [window initWithContentRect: rect
-                      styleMask: NSTitledWindowMask
-                               | NSClosableWindowMask
-                               | NSResizableWindowMask
-                               | NSMiniaturizableWindowMask
-                        backing: NSBackingStoreBuffered
-                          defer: YES];
+    [window initWithContentRect: rect object: (PyObject*)self];
     [window setTitle: [NSString stringWithCString: title
                                          encoding: NSASCIIStringEncoding]];
 
@@ -982,6 +1004,49 @@ Window_set_alpha(WindowObject* self, PyObject* value, void* closure)
 
 static char Window_alpha__doc__[] = "alpha transparency level of the window, ranging from 0.0 (fully transparent) to 1.0 (opaque); values outside this range will be clipped. If not supported, the alpha value remains at 1.0.";
 
+static PyObject* Window_get_parent(WindowObject* self, void* closure)
+{
+    Window* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    Window* parent = (Window*) [window parentWindow];
+    if (parent) return [parent object];
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static char Window_parent__doc__[] = "parent window (as set by add_children).";
+
+static PyObject* Window_get_children(WindowObject* self, void* closure)
+{
+    PyObject* tuple;
+    PyObject* object;
+    Window* child;
+    NSArray* children;
+    NSUInteger i;
+    NSUInteger len;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    children = [window childWindows];
+    len = [children count];
+    tuple = PyTuple_New(len);
+    for (i = 0; i < len; i++) {
+        child = [children objectAtIndex: i];
+        object = [child object];
+        PyTuple_SET_ITEM(tuple, i, object);
+    }
+    return tuple;
+}
+
+static char Window_children__doc__[] = "child windows (as set by add_children).";
+
 static PyGetSetDef Window_getset[] = {
     {"title", (getter)Window_get_title, (setter)Window_set_title, Window_title__doc__, NULL},
     {"origin", (getter)Window_get_origin, (setter)Window_set_origin, Window_origin__doc__, NULL},
@@ -999,6 +1064,8 @@ static PyGetSetDef Window_getset[] = {
     {"iconified", (getter)Window_get_iconified, (setter)NULL, Window_iconified__doc__, NULL},
     {"topmost", (getter)Window_get_topmost, (setter)Window_set_topmost, Window_topmost__doc__, NULL},
     {"alpha", (getter)Window_get_alpha, (setter)Window_set_alpha, Window_alpha__doc__, NULL},
+    {"parent", (getter)Window_get_parent, (setter)NULL, Window_parent__doc__, NULL},
+    {"children", (getter)Window_get_children, (setter)NULL, Window_children__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
@@ -1054,7 +1121,6 @@ int initialize_window(PyObject* module) {
 
 /*
 Remaining:
-    wm group window ?pathName? 
     wm iconbitmap window ?bitmap? 
     wm iconify window 
     wm iconmask window ?bitmap? 
