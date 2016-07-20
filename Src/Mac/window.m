@@ -42,7 +42,7 @@ static PyTypeObject WindowType;
 typedef struct {
     PyObject_HEAD
     NSWindow* window;
-} Window;
+} WindowObject;
 
 static int converter(PyObject* object, void* address)
 {
@@ -51,7 +51,7 @@ static int converter(PyObject* object, void* address)
         PyErr_SetString(PyExc_RuntimeError, "expected a window");
         return 0;
     }
-    Window* window = (Window*)object;
+    WindowObject* window = (WindowObject*)object;
     p = address;
     *p = window->window;
     return 1;
@@ -60,14 +60,14 @@ static int converter(PyObject* object, void* address)
 static PyObject*
 Window_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    Window *self = (Window*)type->tp_alloc(type, 0);
+    WindowObject *self = (WindowObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     self->window = NULL;
     return (PyObject*)self;
 }
 
 static int
-Window_init(Window *self, PyObject *args, PyObject *kwds)
+Window_init(WindowObject *self, PyObject *args, PyObject *kwds)
 {
     NSRect rect;
     NSWindow* window;
@@ -110,7 +110,7 @@ Window_init(Window *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject*
-Window_repr(Window* self)
+Window_repr(WindowObject* self)
 {
 #if PY3K
     return PyUnicode_FromFormat("Window object %p wrapping NSWindow %p",
@@ -122,7 +122,7 @@ Window_repr(Window* self)
 }
 
 static void
-Window_dealloc(Window* self)
+Window_dealloc(WindowObject* self)
 {
     NSWindow* window = self->window;
     if (window)
@@ -135,7 +135,7 @@ Window_dealloc(Window* self)
 }
 
 static PyObject*
-Window_show(Window* self)
+Window_show(WindowObject* self)
 {
     NSWindow* window = self->window;
     if (window)
@@ -150,7 +150,7 @@ Window_show(Window* self)
 }
 
 static PyObject*
-Window_close(Window* self)
+Window_close(WindowObject* self)
 {
     NSWindow* window = self->window;
     if (window)
@@ -164,7 +164,7 @@ Window_close(Window* self)
 }
 
 static PyObject*
-Window_iconify(Window* self)
+Window_iconify(WindowObject* self)
 {
     NSWindow* window = self->window;
     if (!window)
@@ -178,7 +178,7 @@ Window_iconify(Window* self)
 }
 
 static PyObject*
-Window_deiconify(Window* self)
+Window_deiconify(WindowObject* self)
 {
     NSWindow* window = self->window;
     if (!window)
@@ -192,7 +192,7 @@ Window_deiconify(Window* self)
 }
 
 static PyObject*
-Window_put(Window* self, PyObject *args, PyObject *kwds)
+Window_put(WindowObject* self, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
     PyObject* item;
@@ -227,7 +227,7 @@ Window_put(Window* self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject*
-Window_add(Window* self, PyObject *args, PyObject *kwds)
+Window_add(WindowObject* self, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
     View* view;
@@ -261,7 +261,7 @@ Window_add(Window* self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject*
-Window_add_child(Window* self, PyObject *args, PyObject *keywords)
+Window_add_child(WindowObject* self, PyObject *args, PyObject *keywords)
 
 {
     static char* kwlist[] = {"child", "above", NULL};
@@ -302,7 +302,7 @@ Window_add_child(Window* self, PyObject *args, PyObject *keywords)
 }
 
 static PyObject*
-Window_remove_child(Window* self, PyObject *args, PyObject *keywords)
+Window_remove_child(WindowObject* self, PyObject *args, PyObject *keywords)
 
 {
     static char* kwlist[] = {"child", NULL};
@@ -373,7 +373,7 @@ static PyMethodDef Window_methods[] = {
     {NULL}  /* Sentinel */
 };
 
-static PyObject* Window_get_title(Window* self, void* closure)
+static PyObject* Window_get_title(WindowObject* self, void* closure)
 {
     NSWindow* window = self->window;
     PyObject* result = NULL;
@@ -400,7 +400,7 @@ static PyObject* Window_get_title(Window* self, void* closure)
 }
 
 static int
-Window_set_title(Window* self, PyObject* value, void* closure)
+Window_set_title(WindowObject* self, PyObject* value, void* closure)
 {
     char* title;
     title = PyString_AsString(value);
@@ -421,7 +421,7 @@ Window_set_title(Window* self, PyObject* value, void* closure)
 
 static char Window_title__doc__[] = "window title";
 
-static PyObject* Window_get_origin(Window* self, void* closure)
+static PyObject* Window_get_origin(WindowObject* self, void* closure)
 {
     CGFloat x;
     CGFloat y;
@@ -440,7 +440,7 @@ static PyObject* Window_get_origin(Window* self, void* closure)
     return Py_BuildValue("ii", (int) round(x), (int) round(y));
 }
 
-static int Window_set_origin(Window* self, PyObject* value, void* closure)
+static int Window_set_origin(WindowObject* self, PyObject* value, void* closure)
 {
     int x;
     int y;
@@ -463,7 +463,7 @@ static int Window_set_origin(Window* self, PyObject* value, void* closure)
 
 static char Window_origin__doc__[] = "position of the top-left corner of the window";
 
-static PyObject* Window_get_width(Window* self, void* closure)
+static PyObject* Window_get_width(WindowObject* self, void* closure)
 {
     long width;
     NSWindow* window = self->window;
@@ -477,7 +477,7 @@ static PyObject* Window_get_width(Window* self, void* closure)
     return PyInt_FromLong(width);
 }
 
-static int Window_set_width(Window* self, PyObject* value, void* closure)
+static int Window_set_width(WindowObject* self, PyObject* value, void* closure)
 {
     double width;
     NSRect frame;
@@ -498,7 +498,7 @@ static int Window_set_width(Window* self, PyObject* value, void* closure)
 
 static char Window_width__doc__[] = "width of window content";
 
-static PyObject* Window_get_height(Window* self, void* closure)
+static PyObject* Window_get_height(WindowObject* self, void* closure)
 {
     long height;
     NSRect frame;
@@ -512,7 +512,7 @@ static PyObject* Window_get_height(Window* self, void* closure)
     return PyInt_FromLong(height);
 }
 
-static int Window_set_height(Window* self, PyObject* value, void* closure)
+static int Window_set_height(WindowObject* self, PyObject* value, void* closure)
 {
     int height;
     NSRect frame;
@@ -537,7 +537,7 @@ static int Window_set_height(Window* self, PyObject* value, void* closure)
 
 static char Window_height__doc__[] = "height of window content";
 
-static PyObject* Window_get_size(Window* self, void* closure)
+static PyObject* Window_get_size(WindowObject* self, void* closure)
 {
     int width;
     int height;
@@ -553,7 +553,7 @@ static PyObject* Window_get_size(Window* self, void* closure)
     return Py_BuildValue("ii", width, height);
 }
 
-static int Window_set_size(Window* self, PyObject* value, void* closure)
+static int Window_set_size(WindowObject* self, PyObject* value, void* closure)
 {
     int width;
     int height;
@@ -579,7 +579,7 @@ static int Window_set_size(Window* self, PyObject* value, void* closure)
 
 static char Window_size__doc__[] = "window content size";
 
-static PyObject* Window_get_frame(Window* self, void* closure)
+static PyObject* Window_get_frame(WindowObject* self, void* closure)
 {
     CGFloat x;
     CGFloat y;
@@ -602,7 +602,7 @@ static PyObject* Window_get_frame(Window* self, void* closure)
                                  (int) round(width), (int) round(height));
 }
 
-static int Window_set_frame(Window* self, PyObject* value, void* closure)
+static int Window_set_frame(WindowObject* self, PyObject* value, void* closure)
 {
     int x;
     int y;
@@ -627,7 +627,7 @@ static int Window_set_frame(Window* self, PyObject* value, void* closure)
 
 static char Window_frame__doc__[] = "position and size of the window; position is the position of the top-left corner of the window; the size is the window size, which may be larger than the content size";
 
-static PyObject* Window_get_resizable(Window* self, void* closure)
+static PyObject* Window_get_resizable(WindowObject* self, void* closure)
 {
     NSWindow* window = self->window;
     if (!window)
@@ -640,7 +640,7 @@ static PyObject* Window_get_resizable(Window* self, void* closure)
 }
 
 static int
-Window_set_resizable(Window* self, PyObject* value, void* closure)
+Window_set_resizable(WindowObject* self, PyObject* value, void* closure)
 {
     int flag;
     NSWindow* window = self->window;
@@ -660,7 +660,7 @@ Window_set_resizable(Window* self, PyObject* value, void* closure)
 
 static char Window_resizable__doc__[] = "specifies whether the window can be resized by the user";
 
-static PyObject* Window_get_min_width(Window* self, void* closure)
+static PyObject* Window_get_min_width(WindowObject* self, void* closure)
 {
     long width;
     NSWindow* window = self->window;
@@ -674,7 +674,7 @@ static PyObject* Window_get_min_width(Window* self, void* closure)
 }
 
 static int
-Window_set_min_width(Window* self, PyObject* value, void* closure)
+Window_set_min_width(WindowObject* self, PyObject* value, void* closure)
 {
     long width;
     NSSize size;
@@ -694,7 +694,7 @@ Window_set_min_width(Window* self, PyObject* value, void* closure)
 
 static char Window_min_width__doc__[] = "the minimum width to which the window can be resized by the user";
 
-static PyObject* Window_get_max_width(Window* self, void* closure)
+static PyObject* Window_get_max_width(WindowObject* self, void* closure)
 {
     long width;
     NSWindow* window = self->window;
@@ -708,7 +708,7 @@ static PyObject* Window_get_max_width(Window* self, void* closure)
 }
 
 static int
-Window_set_max_width(Window* self, PyObject* value, void* closure)
+Window_set_max_width(WindowObject* self, PyObject* value, void* closure)
 {
     long width;
     NSSize size;
@@ -728,7 +728,7 @@ Window_set_max_width(Window* self, PyObject* value, void* closure)
 
 static char Window_max_width__doc__[] = "the maximum width to which the window can be resized by the user";
 
-static PyObject* Window_get_min_height(Window* self, void* closure)
+static PyObject* Window_get_min_height(WindowObject* self, void* closure)
 {
     long height;
     NSWindow* window = self->window;
@@ -742,7 +742,7 @@ static PyObject* Window_get_min_height(Window* self, void* closure)
 }
 
 static int
-Window_set_min_height(Window* self, PyObject* value, void* closure)
+Window_set_min_height(WindowObject* self, PyObject* value, void* closure)
 {
     long height;
     NSSize size;
@@ -762,7 +762,7 @@ Window_set_min_height(Window* self, PyObject* value, void* closure)
 
 static char Window_min_height__doc__[] = "the minimum height to which the window can be resized by the user";
 
-static PyObject* Window_get_max_height(Window* self, void* closure)
+static PyObject* Window_get_max_height(WindowObject* self, void* closure)
 {
     long height;
     NSWindow* window = self->window;
@@ -776,7 +776,7 @@ static PyObject* Window_get_max_height(Window* self, void* closure)
 }
 
 static int
-Window_set_max_height(Window* self, PyObject* value, void* closure)
+Window_set_max_height(WindowObject* self, PyObject* value, void* closure)
 {
     long height;
     NSSize size;
@@ -796,7 +796,7 @@ Window_set_max_height(Window* self, PyObject* value, void* closure)
 
 static char Window_max_height__doc__[] = "the maximum height to which the window can be resized by the user";
 
-static PyObject* Window_get_fullscreen(Window* self, void* closure)
+static PyObject* Window_get_fullscreen(WindowObject* self, void* closure)
 {
 #ifdef COMPILING_FOR_10_7
     NSUInteger styleMask;
@@ -815,7 +815,7 @@ static PyObject* Window_get_fullscreen(Window* self, void* closure)
 }
 
 static int
-Window_set_fullscreen(Window* self, PyObject* value, void* closure)
+Window_set_fullscreen(WindowObject* self, PyObject* value, void* closure)
 {
 #ifdef COMPILING_FOR_10_7
     BOOL fullscreen;
@@ -851,7 +851,7 @@ Window_set_fullscreen(Window* self, PyObject* value, void* closure)
 
 static char Window_fullscreen__doc__[] = "specify if the window is in full-screen mode";
 
-static PyObject* Window_get_zoomed(Window* self, void* closure)
+static PyObject* Window_get_zoomed(WindowObject* self, void* closure)
 {
     NSWindow* window = self->window;
     if (!window)
@@ -864,7 +864,7 @@ static PyObject* Window_get_zoomed(Window* self, void* closure)
 }
 
 static int
-Window_set_zoomed(Window* self, PyObject* value, void* closure)
+Window_set_zoomed(WindowObject* self, PyObject* value, void* closure)
 {
     BOOL zoomed;
     NSWindow* window = self->window;
@@ -890,7 +890,7 @@ Window_set_zoomed(Window* self, PyObject* value, void* closure)
 
 static char Window_zoomed__doc__[] = "specify if the window is in full-screen mode";
 
-static PyObject* Window_get_topmost(Window* self, void* closure)
+static PyObject* Window_get_topmost(WindowObject* self, void* closure)
 {
     const char* s = "(unknown)";
     NSInteger level;
@@ -916,7 +916,7 @@ static PyObject* Window_get_topmost(Window* self, void* closure)
 }
 
 static int
-Window_set_topmost(Window* self, PyObject* value, void* closure)
+Window_set_topmost(WindowObject* self, PyObject* value, void* closure)
 {
     NSWindow* window = self->window;
     if (!window)
@@ -935,7 +935,7 @@ Window_set_topmost(Window* self, PyObject* value, void* closure)
 
 static char Window_topmost__doc__[] = "True if the window is topmost; False otherwise";
 
-static PyObject* Window_get_iconified(Window* self, void* closure)
+static PyObject* Window_get_iconified(WindowObject* self, void* closure)
 {
     NSWindow* window = self->window;
     if (!window)
@@ -949,7 +949,7 @@ static PyObject* Window_get_iconified(Window* self, void* closure)
 
 static char Window_iconified__doc__[] = "True if the window is iconified; False otherwise";
 
-static PyObject* Window_get_alpha(Window* self, void* closure)
+static PyObject* Window_get_alpha(WindowObject* self, void* closure)
 {
     double alpha;
     NSWindow* window = self->window;
@@ -963,7 +963,7 @@ static PyObject* Window_get_alpha(Window* self, void* closure)
 }
 
 static int
-Window_set_alpha(Window* self, PyObject* value, void* closure)
+Window_set_alpha(WindowObject* self, PyObject* value, void* closure)
 {
     double alpha;
     NSWindow* window = self->window;
@@ -1008,7 +1008,7 @@ static char Window_doc[] =
 static PyTypeObject WindowType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Window",            /* tp_name */
-    sizeof(Window),             /* tp_basicsize */
+    sizeof(WindowObject),       /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)Window_dealloc, /* tp_dealloc */
     0,                          /* tp_print */
