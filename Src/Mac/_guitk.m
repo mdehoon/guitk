@@ -1,5 +1,6 @@
 #include <Python.h>
 #include "window.h"
+#include "image.h"
 #include "widgets.h"
 #include "label.h"
 #include "button.h"
@@ -15,7 +16,27 @@
 #endif
 #endif
 
+static PyObject*
+Application_set_icon(PyObject* unused, PyObject* args, PyObject* keywords)
+{
+    NSImage* image;
+    static char* kwlist[] = {"icon", NULL};
+    if (PyTuple_Check(args) && PyTuple_GET_SIZE(args)==0)
+        image = nil;
+    else if (!PyArg_ParseTupleAndKeywords(args, keywords, "O&", kwlist,
+                                          Image_converter, &image))
+        return NULL;
+    NSApp.applicationIconImage = image;
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static struct PyMethodDef methods[] = {
+    {"set_icon",
+     (PyCFunction)Application_set_icon,
+     METH_KEYWORDS | METH_VARARGS,
+     "Sets the application icon.\n"
+    },
    {NULL,          NULL, 0, NULL} /* sentinel */
 };
 
