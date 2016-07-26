@@ -1,8 +1,8 @@
-import guitk
+from guitk import gui
 
-window = guitk.Window(300,100, 'Hello')
-label = guitk._guitk.Label("Hello, world!")
-grid = guitk._guitk.Grid(1,1)
+window = gui.Window(300,100, 'Hello')
+label = gui.Label("Hello, world!")
+grid = gui.Grid(1,1)
 griditem = grid[0,0].put(label)
 window.put(grid)
 window.show()

@@ -1073,7 +1073,7 @@ static char Window_doc[] =
 
 PyTypeObject WindowType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_guitk.Window",            /* tp_name */
+    "gui.Window",               /* tp_name */
     sizeof(WindowObject),       /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)Window_dealloc, /* tp_dealloc */

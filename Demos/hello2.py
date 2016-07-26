@@ -1,12 +1,11 @@
-import guitk
+from guitk import gui
 
 def say_hi():
     print "hi there, everyone"
 
-window = guitk.Window(300,100, 'Hello')
+window = gui.Window(300,100, 'Hello')
 # button = guitk._guitk.Button(text="Hello", command=say_hi)
-button = guitk._guitk.Button("Hello")
+button = gui.Button("Hello")
 window.add(button)
-window.pack()
 window.show()
 

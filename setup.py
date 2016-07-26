@@ -24,7 +24,7 @@ extension.extra_link_args.extend(['-framework', 'Cocoa'])
 
 extensions.append(extension)
 
-sources = ["Src/Mac/_guitk.m",
+sources = ["Src/Mac/gui.m",
            "Src/Mac/window.m",
            "Src/Mac/image.m",
            "Src/Mac/widgets.m",
@@ -33,7 +33,7 @@ sources = ["Src/Mac/_guitk.m",
            "Src/Mac/button.m",
           ]
 
-extension = Extension("guitk._guitk",
+extension = Extension("guitk.gui",
                       sources,
                       include_dirs=['Src','Src/Generic'],
                       )
