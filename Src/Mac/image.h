@@ -1,4 +1,9 @@
+#include <Cocoa/Cocoa.h>
 #include <Python.h>
 
-int initialize_image(PyObject* module);
-int Image_converter(PyObject* argument, void* address);
+typedef struct {
+    PyObject_HEAD
+    NSImage* image;
+} ImageObject;
+
+extern PyTypeObject ImageType;

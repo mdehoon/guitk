@@ -19,14 +19,17 @@
 static PyObject*
 Application_set_icon(PyObject* unused, PyObject* args, PyObject* keywords)
 {
-    NSImage* image;
+    PyObject* argument;
     static char* kwlist[] = {"icon", NULL};
     if (PyTuple_Check(args) && PyTuple_GET_SIZE(args)==0)
-        image = nil;
-    else if (!PyArg_ParseTupleAndKeywords(args, keywords, "O&", kwlist,
-                                          Image_converter, &image))
+        NSApp.applicationIconImage = nil;
+    else if (PyArg_ParseTupleAndKeywords(args, keywords, "O!", kwlist,
+                                         &ImageType, &argument)) {
+        ImageObject* object = (ImageObject*)argument;
+        NSApp.applicationIconImage = object->image;
+    } else {
         return NULL;
-    NSApp.applicationIconImage = image;
+    }
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -76,7 +79,7 @@ void init_guitk(void)
 
     if (initialize_window(module) < 0)
         goto error;
-    if (initialize_image(module) < 0)
+    if (PyType_Ready(&ImageType) < 0)
         goto error;
     if (PyType_Ready(&GridType) < 0)
         goto error;
@@ -86,17 +89,20 @@ void init_guitk(void)
         goto error;
     if (PyType_Ready(&ButtonType) < 0)
         goto error;
+    Py_INCREF(&ImageType);
     Py_INCREF(&GridType);
     Py_INCREF(&GridItemType);
     Py_INCREF(&LabelType);
     Py_INCREF(&ButtonType);
-    if (PyModule_AddObject(module, "Grid", (PyObject*) &GridType) < -1)
+    if (PyModule_AddObject(module, "Image", (PyObject*) &ImageType) < 0)
         goto error;
-    if (PyModule_AddObject(module, "GridItem", (PyObject*) &GridItemType) < -1)
+    if (PyModule_AddObject(module, "Grid", (PyObject*) &GridType) < 0)
         goto error;
-    if (PyModule_AddObject(module, "Label", (PyObject*) &LabelType) < -1)
+    if (PyModule_AddObject(module, "GridItem", (PyObject*) &GridItemType) < 0)
         goto error;
-    if (PyModule_AddObject(module, "Button", (PyObject*) &ButtonType) < -1)
+    if (PyModule_AddObject(module, "Label", (PyObject*) &LabelType) < 0)
+        goto error;
+    if (PyModule_AddObject(module, "Button", (PyObject*) &ButtonType) < 0)
         goto error;
 
     initialize_widgets();

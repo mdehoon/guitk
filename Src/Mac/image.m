@@ -1,26 +1,5 @@
-#include <Cocoa/Cocoa.h>
 #include "image.h"
 
-
-static PyTypeObject ImageType;
-
-typedef struct {
-    PyObject_HEAD
-    NSImage* image;
-} ImageObject;
-
-int Image_converter(PyObject* argument, void* address)
-{
-    NSImage** p;
-    if (!PyObject_IsInstance(argument, (PyObject*) &ImageType)) {
-        PyErr_SetString(PyExc_RuntimeError, "expected an image");
-        return 0;
-    }
-    ImageObject* object = (ImageObject*)argument;
-    p = address;
-    *p = object->image;
-    return 1;
-}
 
 static PyObject*
 Image_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -87,7 +66,7 @@ static PyGetSetDef Image_getset[] = {
 static char Image_doc[] =
 "A Image object wraps a Cocoa NSImage object.\n";
 
-static PyTypeObject ImageType = {
+PyTypeObject ImageType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "graphics.Image",           /* tp_name */
     sizeof(ImageObject),        /* tp_basicsize */
@@ -127,9 +106,3 @@ static PyTypeObject ImageType = {
     0,                          /* tp_alloc */
     Image_new,                  /* tp_new */
 };
-
-int initialize_image(PyObject* module) {
-    if (PyType_Ready(&ImageType) < 0) return -1;
-    Py_INCREF(&ImageType);
-    return PyModule_AddObject(module, "Image", (PyObject*) &ImageType);
-}
