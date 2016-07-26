@@ -76,6 +76,8 @@ void init_guitk(void)
 
     if (initialize_window(module) < 0)
         goto error;
+    if (initialize_image(module) < 0)
+        goto error;
     if (PyType_Ready(&GridType) < 0)
         goto error;
     if (PyType_Ready(&GridItemType) < 0)
