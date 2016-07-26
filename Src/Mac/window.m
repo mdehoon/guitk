@@ -18,7 +18,6 @@
 #define COMPILING_FOR_10_7
 #endif
 
-static PyTypeObject WindowType;
 
 @interface Window : NSWindow
 {
@@ -1072,7 +1071,7 @@ static PyGetSetDef Window_getset[] = {
 static char Window_doc[] =
 "A Window object wraps a Cocoa NSWindow object.\n";
 
-static PyTypeObject WindowType = {
+PyTypeObject WindowType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Window",            /* tp_name */
     sizeof(WindowObject),       /* tp_basicsize */
@@ -1112,12 +1111,6 @@ static PyTypeObject WindowType = {
     0,                          /* tp_alloc */
     Window_new,                 /* tp_new */
 };
-
-int initialize_window(PyObject* module) {
-    if (PyType_Ready(&WindowType) < 0) return -1;
-    Py_INCREF(&WindowType);
-    return PyModule_AddObject(module, "Window", (PyObject*) &WindowType);
-}
 
 /*
 Remaining:

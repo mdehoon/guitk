@@ -77,7 +77,7 @@ void init_guitk(void)
 #endif
     if (module==NULL) goto error;
 
-    if (initialize_window(module) < 0)
+    if (PyType_Ready(&WindowType) < 0)
         goto error;
     if (PyType_Ready(&ImageType) < 0)
         goto error;
@@ -89,11 +89,16 @@ void init_guitk(void)
         goto error;
     if (PyType_Ready(&ButtonType) < 0)
         goto error;
+
+    Py_INCREF(&WindowType);
     Py_INCREF(&ImageType);
     Py_INCREF(&GridType);
     Py_INCREF(&GridItemType);
     Py_INCREF(&LabelType);
     Py_INCREF(&ButtonType);
+
+    if (PyModule_AddObject(module, "Window", (PyObject*) &WindowType) < 0)
+        goto error;
     if (PyModule_AddObject(module, "Image", (PyObject*) &ImageType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Grid", (PyObject*) &GridType) < 0)
