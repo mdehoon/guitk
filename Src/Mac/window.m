@@ -817,6 +817,43 @@ Window_set_max_height(WindowObject* self, PyObject* value, void* closure)
 
 static char Window_max_height__doc__[] = "the maximum height to which the window can be resized by the user";
 
+static PyObject* Window_get_titled(WindowObject* self, void* closure)
+{
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    if (window.styleMask & NSTitledWindowMask) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static int
+Window_set_titled(WindowObject* self, PyObject* value, void* closure)
+{
+    int flag;
+    NSUInteger mask = NSTitledWindowMask
+                    | NSClosableWindowMask
+                    | NSResizableWindowMask
+                    | NSMiniaturizableWindowMask;
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    flag = PyObject_IsTrue(value);
+    switch (flag) {
+        case 1: window.styleMask |= mask; break;
+        case 0: window.styleMask &= ~mask; break;
+        case -1: return -1;
+    }
+    return 0;
+}
+
+static char Window_titled__doc__[] = "specifies if the window has a title bar";
+
 static PyObject* Window_get_fullscreen(WindowObject* self, void* closure)
 {
 #ifdef COMPILING_FOR_10_7
@@ -1058,6 +1095,7 @@ static PyGetSetDef Window_getset[] = {
     {"max_width", (getter)Window_get_max_width, (setter)Window_set_max_width, Window_max_width__doc__, NULL},
     {"min_height", (getter)Window_get_min_height, (setter)Window_set_min_height, Window_min_height__doc__, NULL},
     {"max_height", (getter)Window_get_max_height, (setter)Window_set_max_height, Window_max_height__doc__, NULL},
+    {"titled", (getter)Window_get_titled, (setter)Window_set_titled, Window_titled__doc__, NULL},
     {"fullscreen", (getter)Window_get_fullscreen, (setter)Window_set_fullscreen, Window_fullscreen__doc__, NULL},
     {"zoomed", (getter)Window_get_zoomed, (setter)Window_set_zoomed, Window_zoomed__doc__, NULL},
     {"iconified", (getter)Window_get_iconified, (setter)NULL, Window_iconified__doc__, NULL},
@@ -1114,8 +1152,6 @@ PyTypeObject WindowType = {
 
 /*
 Remaining:
-    wm maxsize window ?width height? 
-    wm minsize window ?width height? 
     wm overrideredirect window ?boolean? 
     wm positionfrom window ?who? 
     wm protocol window ?name? ?command? 
