@@ -1114,12 +1114,6 @@ PyTypeObject WindowType = {
 
 /*
 Remaining:
-    wm iconbitmap window ?bitmap? 
-    wm iconify window 
-    wm iconmask window ?bitmap? 
-    wm iconname window ?newName? 
-    wm iconposition window ?x y? 
-    wm iconwindow window ?pathName? 
     wm maxsize window ?width height? 
     wm minsize window ?width height? 
     wm overrideredirect window ?boolean? 
