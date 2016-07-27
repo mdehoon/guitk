@@ -999,6 +999,20 @@ Window_set_zoomed(WindowObject* self, PyObject* value, void* closure)
 
 static char Window_zoomed__doc__[] = "specify if the window is in full-screen mode";
 
+static PyObject* Window_get_visible(WindowObject* self, void* closure)
+{
+    NSWindow* window = self->window;
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    if (window.visible) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static char Window_visible__doc__[] = "True if the window is being shown onscreen";
+
 static PyObject* Window_get_topmost(WindowObject* self, void* closure)
 {
     const char* s = "(unknown)";
@@ -1149,6 +1163,7 @@ static PyGetSetDef Window_getset[] = {
     {"titled", (getter)Window_get_titled, (setter)Window_set_titled, Window_titled__doc__, NULL},
     {"fullscreen", (getter)Window_get_fullscreen, (setter)Window_set_fullscreen, Window_fullscreen__doc__, NULL},
     {"zoomed", (getter)Window_get_zoomed, (setter)Window_set_zoomed, Window_zoomed__doc__, NULL},
+    {"visible", (getter)Window_get_visible, (setter)NULL, Window_visible__doc__, NULL},
     {"iconified", (getter)Window_get_iconified, (setter)NULL, Window_iconified__doc__, NULL},
     {"topmost", (getter)Window_get_topmost, (setter)Window_set_topmost, Window_topmost__doc__, NULL},
     {"alpha", (getter)Window_get_alpha, (setter)Window_set_alpha, Window_alpha__doc__, NULL},
