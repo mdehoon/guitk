@@ -14,6 +14,9 @@
 #endif
 #endif
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+#define COMPILING_FOR_10_6
+#endif
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 #define COMPILING_FOR_10_7
 #endif
@@ -23,18 +26,19 @@
 {
     PyObject* _object;
 }
-- (void)initWithContentRect:(NSRect)rect object:(PyObject*)obj;
+- (void)initWithContentRect:(NSRect)rect
+                  styleMask:(NSUInteger)windowStyle
+                     object:(PyObject*)object;
 - (PyObject*)object;
 @end
 
 @implementation Window
-- (void)initWithContentRect:(NSRect)rect object:(PyObject*)object
+- (void)initWithContentRect:(NSRect)rect
+                  styleMask:(NSUInteger)windowStyle
+                     object:(PyObject*)object
 {
     [self initWithContentRect: rect
-                    styleMask: NSTitledWindowMask
-                             | NSClosableWindowMask
-                             | NSResizableWindowMask
-                             | NSMiniaturizableWindowMask
+                    styleMask: windowStyle
                       backing: NSBackingStoreBuffered
                         defer: YES];
     _object = object;
@@ -94,16 +98,31 @@ Window_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 static int
-Window_init(WindowObject *self, PyObject *args, PyObject *kwds)
+Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
 {
     NSRect rect;
+    NSUInteger style;
     Window* window;
     View* view;
     const char* title = "";
     int width = 100;
     int height = 100;
+    PyObject* titled = Py_True;
+    static char* kwlist[] = {"width", "height", "title", "titled", NULL};
 
-    if (!PyArg_ParseTuple(args, "|iis", &width, &height, &title)) return -1;
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|iisO", kwlist,
+                                     &width, &height, &title, &titled))
+        return -1;
+
+    if (PyObject_IsTrue(titled)) {
+        style = NSTitledWindowMask
+              | NSClosableWindowMask
+              | NSResizableWindowMask
+              | NSMiniaturizableWindowMask;
+    }
+    else {
+        style = NSBorderlessWindowMask;
+    }
 
     rect.origin.x = 100;
     rect.origin.y = 350;
@@ -115,7 +134,7 @@ Window_init(WindowObject *self, PyObject *args, PyObject *kwds)
 
     window = [Window alloc];
     if (!window) return -1;
-    [window initWithContentRect: rect object: (PyObject*)self];
+    [window initWithContentRect: rect styleMask: style object: (PyObject*)self];
     [window setTitle: [NSString stringWithCString: title
                                          encoding: NSASCIIStringEncoding]];
 
@@ -832,7 +851,6 @@ static PyObject* Window_get_titled(WindowObject* self, void* closure)
 static int
 Window_set_titled(WindowObject* self, PyObject* value, void* closure)
 {
-    int flag;
     NSUInteger mask = NSTitledWindowMask
                     | NSClosableWindowMask
                     | NSResizableWindowMask
@@ -842,12 +860,18 @@ Window_set_titled(WindowObject* self, PyObject* value, void* closure)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return -1;
-    }
-    flag = PyObject_IsTrue(value);
-    switch (flag) {
-        case 1: window.styleMask |= mask; break;
-        case 0: window.styleMask &= ~mask; break;
-        case -1: return -1;
+    } else {
+#ifdef COMPILING_FOR_10_6
+        int flag = PyObject_IsTrue(value);
+        switch (flag) {
+            case 1: window.styleMask |= mask; break;
+            case 0: window.styleMask &= ~mask; break;
+            case -1: return -1;
+        }
+#else
+        PyErr_SetString(PyExc_RuntimeError, "if compiled for Mac OS X versions older than 10.6, the window style cannot be changed after the window is created.");
+        return -1;
+#endif
     }
     return 0;
 }
@@ -1152,7 +1176,6 @@ PyTypeObject WindowType = {
 
 /*
 Remaining:
-    wm overrideredirect window ?boolean? 
     wm positionfrom window ?who? 
     wm protocol window ?name? ?command? 
     wm resizable window ?width height? 
