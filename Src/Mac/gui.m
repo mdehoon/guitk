@@ -1,3 +1,4 @@
+#include <Cocoa/Cocoa.h>
 #include <Python.h>
 #include "window.h"
 #include "image.h"
@@ -14,6 +15,10 @@
 #else
 #define PY3K 0
 #endif
+#endif
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
+#define COMPILING_FOR_10_6
 #endif
 
 static PyObject*
@@ -34,13 +39,66 @@ Application_set_icon(PyObject* unused, PyObject* args, PyObject* keywords)
     return Py_None;
 }
 
+static PyObject*
+Application_get_windows(PyObject* unused, PyObject* args)
+{
+#ifdef COMPILING_FOR_10_6
+    Py_ssize_t i;
+    Py_ssize_t len;
+    PyObject* list;
+    id item;
+    NSInteger number;
+    NSWindow* window;
+    NSArray* windows;
+    NSEnumerator* enumerator;
+    NSWindowNumberListOptions options = 0;
+    PyObject* object;
+    /* visible windows on the active space belonging to the calling application.
+     */
+    windows = [NSWindow windowNumbersWithOptions: options];
+    enumerator = [windows objectEnumerator];
+    len = 0;
+    while (item = [enumerator nextObject]) {
+        number = [item integerValue];
+        window = [NSApp windowWithWindowNumber: number];
+        if ([window isKindOfClass: [Window class]]) {
+            len++;
+        }
+    }
+    list = PyList_New(len);
+    if (!list) return NULL;
+    enumerator = [windows objectEnumerator];
+    i = 0;
+    while (item = [enumerator nextObject]) {
+        number = [item integerValue];
+        window = [NSApp windowWithWindowNumber: number];
+        if ([window isKindOfClass: [Window class]]) {
+            Window* w = (Window*) window;
+            object = [w object];
+            Py_INCREF(object);
+            PyList_SET_ITEM(list, i, object);
+            i++;
+        }
+    }
+    return list;
+#else
+    PyErr_SetString(PyExc_RuntimeError, "this function is not available if compiled for Mac OS X versions older than 10.6.");
+    return NULL;
+#endif
+}
+
 static struct PyMethodDef methods[] = {
     {"set_icon",
      (PyCFunction)Application_set_icon,
      METH_KEYWORDS | METH_VARARGS,
      "Sets the application icon.\n"
     },
-   {NULL,          NULL, 0, NULL} /* sentinel */
+    {"get_windows",
+     (PyCFunction)Application_get_windows,
+     METH_NOARGS,
+     "Returns a list of windows ordered front-to-back."
+    },
+    {NULL,          NULL, 0, NULL} /* sentinel */
 };
 
 #if PY3K

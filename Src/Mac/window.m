@@ -25,16 +25,6 @@
 #define CGFloat float
 #endif
 
-@interface Window : NSWindow
-{
-    PyObject* _object;
-}
-- (void)initWithContentRect:(NSRect)rect
-                  styleMask:(NSUInteger)windowStyle
-                     object:(PyObject*)object;
-- (PyObject*)object;
-@end
-
 @implementation Window
 - (void)initWithContentRect:(NSRect)rect
                   styleMask:(NSUInteger)windowStyle
