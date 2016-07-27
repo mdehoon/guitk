@@ -21,6 +21,9 @@
 #define COMPILING_FOR_10_7
 #endif
 
+#ifndef CGFloat
+#define CGFloat float
+#endif
 
 @interface Window : NSWindow
 {
@@ -724,8 +727,12 @@ Window_set_min_width(WindowObject* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return -1;
     }
-    width = PyInt_AsLong(value);
-    if (PyErr_Occurred()) return -1;
+    if (value == Py_None) {
+        width = 0;
+    } else {
+        width = PyInt_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+    }
     size = window.minSize;
     size.width = width;
     window.minSize = size;
@@ -736,15 +743,19 @@ static char Window_min_width__doc__[] = "the minimum width to which the window c
 
 static PyObject* Window_get_max_width(WindowObject* self, void* closure)
 {
-    long width;
+    CGFloat width;
     NSWindow* window = self->window;
     if (!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    width = (int) window.maxSize.width;
-    return PyInt_FromLong(width);
+    width = window.maxSize.width;
+    if (width > LONG_MAX) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    return PyInt_FromLong((long)width);
 }
 
 static int
@@ -758,10 +769,14 @@ Window_set_max_width(WindowObject* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return -1;
     }
-    width = PyInt_AsLong(value);
-    if (PyErr_Occurred()) return -1;
     size = window.maxSize;
-    size.width = width;
+    if (value == Py_None) {
+        size.width = FLT_MAX;
+    } else {
+        width = PyInt_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        size.width = width;
+    }
     window.maxSize = size;
     return 0;
 }
@@ -792,8 +807,12 @@ Window_set_min_height(WindowObject* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return -1;
     }
-    height = PyInt_AsLong(value);
-    if (PyErr_Occurred()) return -1;
+    if (value == Py_None) {
+        height = 0;
+    } else {
+        height = PyInt_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+    }
     size = window.minSize;
     size.height = height;
     window.minSize = size;
@@ -804,15 +823,19 @@ static char Window_min_height__doc__[] = "the minimum height to which the window
 
 static PyObject* Window_get_max_height(WindowObject* self, void* closure)
 {
-    long height;
+    CGFloat height;
     NSWindow* window = self->window;
     if (!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    height = (int) window.maxSize.height;
-    return PyInt_FromLong(height);
+    height = window.maxSize.height;
+    if (height > LONG_MAX) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    return PyInt_FromLong((long)height);
 }
 
 static int
@@ -826,10 +849,14 @@ Window_set_max_height(WindowObject* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return -1;
     }
-    height = PyInt_AsLong(value);
-    if (PyErr_Occurred()) return -1;
     size = window.maxSize;
-    size.height = height;
+    if (value == Py_None) {
+        size.height = FLT_MAX;
+    } else {
+        height = PyInt_AsLong(value);
+        if (PyErr_Occurred()) return -1;
+        size.height = height;
+    }
     window.maxSize = size;
     return 0;
 }
@@ -1176,10 +1203,6 @@ PyTypeObject WindowType = {
 
 /*
 Remaining:
-    wm positionfrom window ?who? 
-    wm protocol window ?name? ?command? 
-    wm resizable window ?width height? 
-    wm sizefrom window ?who? 
     wm stackorder window ?isabove|isbelow window? 
     wm state window ?newstate? 
     wm title window ?string? 
