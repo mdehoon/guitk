@@ -27,7 +27,6 @@
 
 @implementation Window
 @synthesize object;
-@synthesize closed;
 @end
 
 @interface View : NSView <NSWindowDelegate>
@@ -54,7 +53,6 @@
     Window* window = [notification object];
     PyObject* object = window.object;
     Py_DECREF(object);
-    window.closed = true;
 }
 @end
 
@@ -127,7 +125,6 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
                                  backing: NSBackingStoreBuffered
                                    defer: YES];
     window.object = (PyObject*)self;
-    window.closed = YES;
     window.releasedWhenClosed = NO;
     [window setTitle: [NSString stringWithCString: title
                                          encoding: NSASCIIStringEncoding]];
@@ -168,13 +165,19 @@ static PyObject*
 Window_show(WindowObject* self)
 {
     Window* window = self->window;
-    if (window && window.closed)
+    if (!window)
     {
-        PyObject* object = window.object;
-        Py_INCREF(object);
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    if (!window.visible)
+    {
+        if (!window.miniaturized) {
+            PyObject* object = window.object;
+            Py_INCREF(object);
+        }
         [window makeKeyAndOrderFront: nil];
         [window orderFrontRegardless];
-        window.closed = NO;
     }
     Py_INCREF(Py_None);
     return Py_None;
@@ -184,7 +187,12 @@ static PyObject*
 Window_close(WindowObject* self)
 {
     Window* window = self->window;
-    if (window && !window.closed) [window close];
+    if (!window)
+    {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    if (window.visible || window.miniaturized) [window close];
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -192,13 +200,13 @@ Window_close(WindowObject* self)
 static PyObject*
 Window_iconify(WindowObject* self)
 {
-    NSWindow* window = self->window;
+    Window* window = self->window;
     if (!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    [window miniaturize: NSApp];
+    if (window.visible && !window.miniaturized) [window miniaturize: NSApp];
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -206,13 +214,20 @@ Window_iconify(WindowObject* self)
 static PyObject*
 Window_deiconify(WindowObject* self)
 {
-    NSWindow* window = self->window;
+    Window* window = self->window;
     if (!window)
     {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    [window deminiaturize: NSApp];
+    if (!window.visible)
+    {
+        if (!window.miniaturized) {
+            PyObject* object = window.object;
+            Py_INCREF(object);
+        }
+        [window deminiaturize: NSApp];
+    }
     Py_INCREF(Py_None);
     return Py_None;
 }
