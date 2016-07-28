@@ -149,10 +149,10 @@ Window_repr(WindowObject* self)
     Window* window = self->window;
 #if PY3K
     return PyUnicode_FromFormat("Window object %p wrapping NSWindow %p",
-                               (void*) self, (void*)window);
+                               self, window);
 #else
     return PyString_FromFormat("Window object %p wrapping NSWindow %p",
-                               (void*) self, (void*)window);
+                                self, window);
 #endif
 }
 
