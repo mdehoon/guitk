@@ -1221,7 +1221,6 @@ PyTypeObject WindowType = {
 
 /*
 Remaining:
-    wm state window ?newstate? 
     wm title window ?string? 
     wm transient window ?master? 
     wm withdraw window 
