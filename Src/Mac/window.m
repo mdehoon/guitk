@@ -26,22 +26,8 @@
 #endif
 
 @implementation Window
-- (void)initWithContentRect:(NSRect)rect
-                  styleMask:(NSUInteger)windowStyle
-                     object:(PyObject*)object
-{
-    [self initWithContentRect: rect
-                    styleMask: windowStyle
-                      backing: NSBackingStoreBuffered
-                        defer: YES];
-    _object = object;
-}
-
-- (PyObject*)object
-{
-    Py_INCREF(_object);
-    return _object;
-}
+@synthesize object;
+@synthesize closed;
 @end
 
 @interface View : NSView <NSWindowDelegate>
@@ -49,6 +35,7 @@
 }
 - (BOOL)isFlipped;
 - (BOOL)autoresizesSubviews;
+- (void)windowWillClose:(NSNotification *)notification;
 @end
 
 @implementation View
@@ -60,6 +47,14 @@
 - (BOOL)autoresizesSubviews
 {
     return NO;
+}
+
+- (void)windowWillClose:(NSNotification *)notification
+{
+    Window* window = [notification object];
+    PyObject* object = window.object;
+    Py_DECREF(object);
+    window.closed = true;
 }
 @end
 
@@ -94,7 +89,7 @@ static int
 Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
 {
     NSRect rect;
-    NSUInteger style;
+    NSUInteger windowStyle;
     Window* window;
     View* view;
     const char* title = "";
@@ -108,13 +103,13 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
         return -1;
 
     if (PyObject_IsTrue(titled)) {
-        style = NSTitledWindowMask
-              | NSClosableWindowMask
-              | NSResizableWindowMask
-              | NSMiniaturizableWindowMask;
+        windowStyle = NSTitledWindowMask
+                    | NSClosableWindowMask
+                    | NSResizableWindowMask
+                    | NSMiniaturizableWindowMask;
     }
     else {
-        style = NSBorderlessWindowMask;
+        windowStyle = NSBorderlessWindowMask;
     }
 
     rect.origin.x = 100;
@@ -127,7 +122,13 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
 
     window = [Window alloc];
     if (!window) return -1;
-    [window initWithContentRect: rect styleMask: style object: (PyObject*)self];
+    window = [window initWithContentRect: rect
+                               styleMask: windowStyle
+                                 backing: NSBackingStoreBuffered
+                                   defer: YES];
+    window.object = (PyObject*)self;
+    window.closed = YES;
+    window.releasedWhenClosed = NO;
     [window setTitle: [NSString stringWithCString: title
                                          encoding: NSASCIIStringEncoding]];
 
@@ -145,12 +146,13 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
 static PyObject*
 Window_repr(WindowObject* self)
 {
+    Window* window = self->window;
 #if PY3K
     return PyUnicode_FromFormat("Window object %p wrapping NSWindow %p",
-                               (void*) self, (void*)(self->window));
+                               (void*) self, (void*)window);
 #else
     return PyString_FromFormat("Window object %p wrapping NSWindow %p",
-                               (void*) self, (void*)(self->window));
+                               (void*) self, (void*)window);
 #endif
 }
 
@@ -158,25 +160,21 @@ static void
 Window_dealloc(WindowObject* self)
 {
     NSWindow* window = self->window;
-    if (window)
-    {
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        [window close];
-        [pool release];
-    }
+    if (window) [window release];
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject*
 Window_show(WindowObject* self)
 {
-    NSWindow* window = self->window;
-    if (window)
+    Window* window = self->window;
+    if (window && window.closed)
     {
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+        PyObject* object = window.object;
+        Py_INCREF(object);
         [window makeKeyAndOrderFront: nil];
         [window orderFrontRegardless];
-        [pool release];
+        window.closed = NO;
     }
     Py_INCREF(Py_None);
     return Py_None;
@@ -185,13 +183,8 @@ Window_show(WindowObject* self)
 static PyObject*
 Window_close(WindowObject* self)
 {
-    NSWindow* window = self->window;
-    if (window)
-    {
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        [window close];
-        [pool release];
-    }
+    Window* window = self->window;
+    if (window && !window.closed) [window close];
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -1104,7 +1097,11 @@ static PyObject* Window_get_parent(WindowObject* self, void* closure)
         return NULL;
     }
     Window* parent = (Window*) [window parentWindow];
-    if (parent) return [parent object];
+    if (parent) {
+        PyObject* object = parent.object;
+        Py_INCREF(object);
+        return object;
+    }
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -1130,7 +1127,8 @@ static PyObject* Window_get_children(WindowObject* self, void* closure)
     tuple = PyTuple_New(len);
     for (i = 0; i < len; i++) {
         child = [children objectAtIndex: i];
-        object = [child object];
+        object = child.object;
+        Py_INCREF(object);
         PyTuple_SET_ITEM(tuple, i, object);
     }
     return tuple;

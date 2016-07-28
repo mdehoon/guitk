@@ -4,10 +4,9 @@ extern PyTypeObject WindowType;
 
 @interface Window : NSWindow
 {
-    PyObject* _object;
+    PyObject* object;
+    BOOL closed;
 }
-- (void)initWithContentRect:(NSRect)rect
-                  styleMask:(NSUInteger)windowStyle
-                     object:(PyObject*)object;
-- (PyObject*)object;
+@property PyObject* object;
+@property BOOL closed;
 @end

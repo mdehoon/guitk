@@ -725,6 +725,8 @@ stdin_callout(CFFileDescriptorRef fdref, CFOptionFlags callBackTypes, void *info
 
 static Boolean _run(CFRunLoopRef runloop)
 {
+    NSArray* windows;
+    NSUInteger count;
     Boolean interrupted = false;
     CFMachPortContext machport_context;
     CFRunLoopSourceRef source;
@@ -743,7 +745,10 @@ static Boolean _run(CFRunLoopRef runloop)
     CFRunLoopAddSource(runloop, source, kCFRunLoopDefaultMode);
     CFRelease(source);
     py_sigint_handler = PyOS_setsig(SIGINT, _sigint_handler);
-    if ([[NSApp windows] count] > 0)
+    windows = [NSApp windows];
+    count = [windows count];
+    [windows release];
+    if (count > 0)
         [NSApp run];
     else
         CFRunLoopRun(); 
