@@ -1206,7 +1206,6 @@ PyTypeObject WindowType = {
 
 /*
 Remaining:
-    wm stackorder window ?isabove|isbelow window? 
     wm state window ?newstate? 
     wm title window ?string? 
     wm transient window ?master? 
