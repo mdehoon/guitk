@@ -27,38 +27,9 @@
 
 @implementation Window
 @synthesize object;
-@end
-
-@interface View : NSView <NSWindowDelegate>
-{
-}
-- (BOOL)isFlipped;
-- (BOOL)autoresizesSubviews;
-- (void)windowWillClose:(NSNotification *)notification;
-- (void)drawRect:(NSRect)rect;
-@end
-
-@implementation View
-- (void)drawRect:(NSRect)rect
-{
-    printf("In drawRect\n");
-    [super drawRect: rect];
-}
-
-- (BOOL)isFlipped
-{
-    return YES;
-}
-
-- (BOOL)autoresizesSubviews
-{
-    return NO;
-}
 
 - (void)windowWillClose:(NSNotification *)notification
 {
-    Window* window = [notification object];
-    PyObject* object = window.object;
     Py_DECREF(object);
 }
 @end
@@ -96,7 +67,6 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
     NSRect rect;
     NSUInteger windowStyle;
     Window* window;
-    View* view;
     const char* title = "";
     int width = 100;
     int height = 100;
@@ -137,9 +107,7 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
                                          encoding: NSASCIIStringEncoding]];
 
     [window setAcceptsMouseMovedEvents: YES];
-    view = [[View alloc] initWithFrame: rect];
-    [window setContentView: view];
-    [window setDelegate: view];
+    [window setDelegate: window];
 
     self->window = window;
 
@@ -243,11 +211,8 @@ static PyObject*
 Window_put(WindowObject* self, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
-    PyObject* item;
-    PyObject* items;
-    Py_ssize_t i;
-    Py_ssize_t n;
-    View* view;
+    NSView* view;
+    WidgetObject* widget;
 
     NSWindow* window = self->window;
     if (!window) {
@@ -255,20 +220,12 @@ Window_put(WindowObject* self, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    view = [window contentView];
-    if (!PyArg_ParseTuple(args, "O", &object))
+    if (!PyArg_ParseTuple(args, "O!", &WidgetType, &object))
         return NULL;
-    if (!PyMapping_Check(object)) {
-        PyErr_SetString(PyExc_RuntimeError, "argument is not a layout manager");
-        return NULL;
-    }
-    items = PyMapping_Values(object);
-    n = PyMapping_Length(object);
-    for (i = 0; i < n; i++) {
-        item = PyList_GET_ITEM(items, i);
-        if (!PyObject_IsInstance(item, widgets)) break;
-        printf("Item %ld OK\n", i);
-    }
+
+    widget = (WidgetObject*)object;
+    view = widget->view;
+    [window setContentView: view];
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -278,7 +235,7 @@ static PyObject*
 Window_add(WindowObject* self, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
-    View* view;
+    NSView* view;
 
     NSWindow* window = self->window;
     if (!window) {

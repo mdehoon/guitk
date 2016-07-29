@@ -1,14 +1,14 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
 
+
+@interface View : NSView
+- (BOOL)isFlipped;
+@end
+
+extern PyTypeObject WidgetType;
+
 typedef struct {
     PyObject_HEAD
-    NSView* view;
-} Widget;
-
-extern PyTypeObject GridItemType;
-extern PyTypeObject GridType;
-
-extern PyObject* widgets;
-
-void initialize_widgets(void);
+    View* view;
+} WidgetObject;

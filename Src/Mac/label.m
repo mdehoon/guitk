@@ -1,5 +1,6 @@
 #include <Cocoa/Cocoa.h>
 #include "label.h"
+#include "widgets.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -36,12 +37,14 @@
     rect.size.width = 100;
     rect.size.height = 100;
     self = [super initWithFrame: rect];
+/*
     [self setAutoresizingMask: NSViewMinXMargin
                              | NSViewWidthSizable
                              | NSViewMaxXMargin
                              | NSViewMinYMargin
                              | NSViewHeightSizable
                              | NSViewMaxYMargin];
+*/
     fontsize = [NSFont systemFontSizeForControlSize: size];
     fontsize = 50;
     font = [NSFont systemFontOfSize: fontsize];
@@ -57,6 +60,7 @@
 - (void)drawRect:(NSRect)rect
 {
     static int counter = 0;
+    printf("In label drawRect\n");
     if (counter==0) [[NSColor greenColor] setFill];
     else if (counter==1) [[NSColor blueColor] setFill];
     counter++;
@@ -146,101 +150,6 @@
     }
     CGContextRelease(cr);
     return rect;
-}
-
-- (BOOL)pack:(NSRect*)cavity
-{
-    static int counter = 0;
-    float coordinates[4];
-    float padx = 20;
-    float pady = 20;
-    float ipadx = 80;
-    float ipady = 30;
-    CGRect rect = [self textbounds];
-    CGSize size = rect.size;
-    CGFloat bearing = rect.origin.x;
-    CGFloat descent = rect.origin.y;
-    NSRect frame;
-    int flags = 0;
-    flags |= TOP;
-    flags |= EAST;
-/*
-    if (counter==0) flags |= TOP;
-    else if (counter==1) flags |= LEFT;
-    if (counter==2) counter = 0;
-*/
-    counter++;
-    if (counter==2) { flags |= FILLX; counter = 0;}
-    printf("drawing %s with flags %d\n", [text cString], flags);
-    coordinates[0] = cavity->origin.x;
-    coordinates[1] = cavity->origin.y;
-    coordinates[2] = cavity->origin.x + cavity->size.width;
-    coordinates[3] = cavity->origin.y + cavity->size.height;
-    if ((flags & TOP) || (flags & BOTTOM)) {
-        rect.origin.x = cavity->origin.x;
-        if (flags & FILLX) {
-            rect.origin.x += padx;
-            rect.size.width = cavity->size.width - 2 * padx;
-        }
-        else {
-            rect.origin.x += 0.5 * (cavity->size.width - rect.size.width) - ipadx;
-            rect.size.width += 2 * ipadx;
-        }
-        rect.size.height += pady + ipady;
-        cavity->size.height -= rect.size.height;
-        if (cavity->size.height < 0) {
-            rect.size.height += cavity->size.height;
-            cavity->size.height = 0;
-        }
-        if (flags & TOP) {
-            rect.origin.y = cavity->origin.y;
-            cavity->origin.y += rect.size.height;
-        } else { /* BOTTOM */
-            rect.origin.y = cavity->origin.y + cavity->size.height;
-        }
-    }
-    if ((flags & LEFT) || (flags & RIGHT)) {
-        rect.origin.x = cavity->origin.y;
-        if (flags & FILLY) {
-            rect.origin.y += pady;
-            rect.size.height = cavity->size.height - 2 * padx;
-        }
-        else {
-            rect.origin.y += 0.5 * (cavity->size.height - rect.size.height) - ipady;
-            rect.size.height += 2 * ipady;
-        }
-        cavity->size.width -= rect.size.width;
-        if (cavity->size.width < 0) {
-            rect.size.width += cavity->size.width;
-            cavity->size.width = 0;
-        }
-        rect.origin.y = cavity->origin.y;
-        if (flags & LEFT) {
-            rect.origin.x = cavity->origin.x;
-            cavity->origin.x += rect.size.width;
-        } else { /* RIGHT */
-            rect.origin.x = cavity->origin.x + cavity->size.width;
-        }
-    }
-    switch (flags & (NORTH | SOUTH)) {
-        case NORTH: position.y = rect.size.height - size.height; break;
-        case SOUTH: position.y = 0; break;
-        default   : position.y = 0.5 * (rect.size.height - size.height); break;
-    }
-    position.y += descent;
-    switch (flags & (WEST | EAST)) {
-        case WEST: position.x = ipadx; break;
-        case EAST: position.x = rect.size.width - size.width - ipadx; break;
-        default  : position.x = 0.5 * (rect.size.width - size.width); break;
-    }
-    position.x += bearing;
-    frame.origin.x = rect.origin.x;
-    frame.origin.y = rect.origin.y;
-    frame.size.width = rect.size.width;
-    frame.size.height = rect.size.height;
-    [self setFrameOrigin: frame.origin];
-    [self setFrameSize: frame.size];
-    return true;
 }
 @end
 
@@ -333,72 +242,6 @@ Label_get_size(PyLabel* self, PyObject *args)
     return Py_BuildValue("ff", width, height);
 }
 
-static PyObject*
-Label_pack(PyLabel* self, PyObject *args)
-{
-    int i;
-    double values[4];
-    NSPoint origin;
-    NSPoint corner;
-    NSPoint position;
-    NSRect frame;
-    NSSize size;
-    PyObject* item;
-    PyObject* cavity;
-    NSTextField* label = self->label;
-    if (!label) {
-        PyErr_SetString(PyExc_RuntimeError, "label has not been initialized");
-        return NULL;
-    }
-/*
-    if(!PyArg_ParseTuple(args, "O", &cavity))
-        return NULL;
-    if(!PyList_Check(cavity)) {
-        PyErr_SetString(PyExc_RuntimeError, "cavity argument should be a list");
-        return NULL;
-    }
-    if(PyList_GET_SIZE(cavity)!=4) {
-        PyErr_SetString(PyExc_RuntimeError, "cavity argument should be a list of four elements");
-        return NULL;
-    }
-    for (i = 0; i < 4; i++) {
-        item = PyList_GET_ITEM(cavity, i);
-        values[i] = PyFloat_AsDouble(item);
-        if (values[i] < 0 && PyErr_Occurred()) {
-            PyErr_SetString(PyExc_RuntimeError, "cavity argument should be a list of four numbers");
-            return NULL;
-        }
-    }
-
-    origin.x = values[0];
-    origin.y = values[1];
-    corner.x = values[2];
-    corner.y = values[3];
-    frame = [label frame];
-    size = frame.size;
-    position.y = origin.y;
-    position.x = 0.5 * (origin.x + corner.x - size.width);
-    origin.y += size.height;
-
-    [label setFrameOrigin: position];
-
-    values[0] = origin.x;
-    values[1] = origin.y;
-    values[2] = corner.x;
-    values[3] = corner.y;
-    for (i = 0; i < 4; i++) {
-        item = PyFloat_FromDouble(values[i]);
-        if (!item) return NULL;
-        if (PyList_SetItem(cavity, i, item)==-1) {
-            Py_DECREF(item);
-            return NULL;
-        }
-    }
-*/
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 static PyMethodDef Label_methods[] = {
     {"set_position",
      (PyCFunction)Label_set_position,
@@ -409,11 +252,6 @@ static PyMethodDef Label_methods[] = {
      (PyCFunction)Label_get_size,
      METH_NOARGS,
      "Returns the size of the label."
-    },
-    {"pack",
-     (PyCFunction)Label_pack,
-     METH_VARARGS,
-     "Pack the label into the available cavity."
     },
     {NULL}  /* Sentinel */
 };
@@ -456,7 +294,7 @@ PyTypeObject LabelType = {
     Label_methods,              /* tp_methods */
     0,                          /* tp_members */
     Label_getseters,            /* tp_getset */
-    0,                          /* tp_base */
+    &WidgetType,                /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */
     0,                          /* tp_descr_set */

@@ -1,8 +1,8 @@
 #include <Cocoa/Cocoa.h>
 #include <Python.h>
 #include "window.h"
-#include "image.h"
 #include "widgets.h"
+#include "image.h"
 #include "label.h"
 #include "button.h"
 
@@ -137,11 +137,9 @@ void initgui(void)
 
     if (PyType_Ready(&WindowType) < 0)
         goto error;
+    if (PyType_Ready(&WidgetType) < 0)
+        goto error;
     if (PyType_Ready(&ImageType) < 0)
-        goto error;
-    if (PyType_Ready(&GridType) < 0)
-        goto error;
-    if (PyType_Ready(&GridItemType) < 0)
         goto error;
     if (PyType_Ready(&LabelType) < 0)
         goto error;
@@ -149,26 +147,21 @@ void initgui(void)
         goto error;
 
     Py_INCREF(&WindowType);
+    Py_INCREF(&WidgetType);
     Py_INCREF(&ImageType);
-    Py_INCREF(&GridType);
-    Py_INCREF(&GridItemType);
     Py_INCREF(&LabelType);
     Py_INCREF(&ButtonType);
 
     if (PyModule_AddObject(module, "Window", (PyObject*) &WindowType) < 0)
         goto error;
+    if (PyModule_AddObject(module, "Widget", (PyObject*) &WidgetType) < 0)
+        goto error;
     if (PyModule_AddObject(module, "Image", (PyObject*) &ImageType) < 0)
-        goto error;
-    if (PyModule_AddObject(module, "Grid", (PyObject*) &GridType) < 0)
-        goto error;
-    if (PyModule_AddObject(module, "GridItem", (PyObject*) &GridItemType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Label", (PyObject*) &LabelType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Button", (PyObject*) &ButtonType) < 0)
         goto error;
-
-    initialize_widgets();
 
 #if PY3K
     return module;
