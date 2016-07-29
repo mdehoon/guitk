@@ -840,10 +840,6 @@ static PyObject* Window_get_titled(WindowObject* self, void* closure)
 static int
 Window_set_titled(WindowObject* self, PyObject* value, void* closure)
 {
-    NSUInteger mask = NSTitledWindowMask
-                    | NSClosableWindowMask
-                    | NSResizableWindowMask
-                    | NSMiniaturizableWindowMask;
     NSWindow* window = self->window;
     if (!window)
     {
@@ -851,6 +847,10 @@ Window_set_titled(WindowObject* self, PyObject* value, void* closure)
         return -1;
     } else {
 #ifdef COMPILING_FOR_10_6
+        NSUInteger mask = NSTitledWindowMask
+                        | NSClosableWindowMask
+                        | NSResizableWindowMask
+                        | NSMiniaturizableWindowMask;
         int flag = PyObject_IsTrue(value);
         switch (flag) {
             case 1: window.styleMask |= mask; break;
