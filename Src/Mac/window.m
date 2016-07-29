@@ -35,9 +35,16 @@
 - (BOOL)isFlipped;
 - (BOOL)autoresizesSubviews;
 - (void)windowWillClose:(NSNotification *)notification;
+- (void)drawRect:(NSRect)rect;
 @end
 
 @implementation View
+- (void)drawRect:(NSRect)rect
+{
+    printf("In drawRect\n");
+    [super drawRect: rect];
+}
+
 - (BOOL)isFlipped
 {
     return YES;
@@ -1218,9 +1225,3 @@ PyTypeObject WindowType = {
     0,                          /* tp_alloc */
     Window_new,                 /* tp_new */
 };
-
-/*
-Remaining:
-    wm transient window ?master? 
-    wm withdraw window 
-*/
