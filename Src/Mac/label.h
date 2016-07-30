@@ -7,7 +7,6 @@ extern PyTypeObject LabelType;
 typedef struct {
     PyObject_HEAD
     Label* label;
-    PyObject* layout;
 } PyLabel;
 
 @interface Label : NSView

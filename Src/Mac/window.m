@@ -225,6 +225,7 @@ Window_put(WindowObject* self, PyObject *args, PyObject *kwds)
 
     widget = (WidgetObject*)object;
     view = widget->view;
+    printf("new content view is %p\n", view);
     [window setContentView: view];
 
     Py_INCREF(Py_None);

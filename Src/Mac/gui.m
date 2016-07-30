@@ -4,6 +4,7 @@
 #include "widgets.h"
 #include "image.h"
 #include "label.h"
+#include "grid.h"
 #include "button.h"
 
 
@@ -139,6 +140,8 @@ void initgui(void)
         goto error;
     if (PyType_Ready(&WidgetType) < 0)
         goto error;
+    if (PyType_Ready(&GridType) < 0)
+        goto error;
     if (PyType_Ready(&ImageType) < 0)
         goto error;
     if (PyType_Ready(&LabelType) < 0)
@@ -148,6 +151,7 @@ void initgui(void)
 
     Py_INCREF(&WindowType);
     Py_INCREF(&WidgetType);
+    Py_INCREF(&GridType);
     Py_INCREF(&ImageType);
     Py_INCREF(&LabelType);
     Py_INCREF(&ButtonType);
@@ -155,6 +159,8 @@ void initgui(void)
     if (PyModule_AddObject(module, "Window", (PyObject*) &WindowType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Widget", (PyObject*) &WidgetType) < 0)
+        goto error;
+    if (PyModule_AddObject(module, "Grid", (PyObject*) &GridType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Image", (PyObject*) &ImageType) < 0)
         goto error;

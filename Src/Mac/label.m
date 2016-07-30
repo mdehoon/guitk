@@ -159,7 +159,6 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     PyLabel *self = (PyLabel*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     self->label = NULL;
-    self->layout = NULL;
     return (PyObject*)self;
 }
 
