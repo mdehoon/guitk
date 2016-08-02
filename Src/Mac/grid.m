@@ -30,6 +30,11 @@
 - (void)frameDidChange:(NSNotification *)notification {
     printf("Grid frame changed\n");
 }
+
+- (void)drawRect:(NSRect)rect {
+    printf("In GridView drawRect\n");
+    return [super drawRect: rect];
+}
 @end
 
 static PyObject*
@@ -44,6 +49,8 @@ Grid_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 Grid_init(GridObject *self, PyObject *args, PyObject *kwds)
 {
+    int irow;
+    int icol;
     int nrows = 1;
     int ncols = 1;
     GridView* view;
@@ -58,7 +65,14 @@ Grid_init(GridObject *self, PyObject *args, PyObject *kwds)
     self->view = view;
     self->nrows = nrows;
     self->ncols = ncols;
-    
+    self->objects = malloc(nrows*sizeof(PyObject**));
+    for (irow = 0; irow < nrows; irow++) {
+        self->objects[irow] = malloc(ncols*sizeof(PyObject*));
+        for (icol = 0; icol < ncols; icol++) {
+            Py_INCREF(Py_None);
+            self->objects[irow][icol] = Py_None;
+        }
+    }
     return 0;
 }
 
@@ -176,6 +190,68 @@ static PyGetSetDef Grid_getset[] = {
     {NULL}  /* Sentinel */
 };
 
+static Py_ssize_t Grid_length(GridObject* self) {
+    const Py_ssize_t size = self->nrows * self->ncols;
+    return size;
+}
+
+static PyObject* Grid_get_item(GridObject* self, PyObject* key) {
+    Py_ssize_t irow;
+    Py_ssize_t icol;
+    PyObject* object;
+    if (!PyTuple_Check(key) || PyTuple_GET_SIZE(key)!=2) {
+        PyErr_SetString(PyExc_ValueError, "expected a typle of size 2");
+        return NULL;
+    }
+    object = PyTuple_GET_ITEM(key, 0);
+    irow = PyInt_AsSsize_t(object);
+    if (PyErr_Occurred()) return NULL;
+    object = PyTuple_GET_ITEM(key, 1);
+    icol = PyInt_AsSsize_t(object);
+    if (PyErr_Occurred()) return NULL;
+    object = self->objects[irow][icol];
+    Py_INCREF(object);
+    return object;
+}
+
+static int Grid_set_item(GridObject* self, PyObject* key, PyObject* value) {
+    Py_ssize_t irow;
+    Py_ssize_t icol;
+    PyObject* object;
+    PyTypeObject* type;
+    WidgetObject* widget;
+    NSView* view;
+    if (!PyTuple_Check(key) || PyTuple_GET_SIZE(key)!=2) {
+        PyErr_SetString(PyExc_ValueError, "expected a typle of size 2");
+        return -1;
+    }
+    type = Py_TYPE(value);
+    if (!PyType_IsSubtype(type, &WidgetType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a widget");
+        return -1;
+    }
+    object = PyTuple_GET_ITEM(key, 0);
+    irow = PyInt_AsSsize_t(object);
+    if (PyErr_Occurred()) return -1;
+    object = PyTuple_GET_ITEM(key, 1);
+    icol = PyInt_AsSsize_t(object);
+    if (PyErr_Occurred()) return -1;
+    object = self->objects[irow][icol];
+    Py_DECREF(object);
+    Py_INCREF(value);
+    self->objects[irow][icol] = value;
+    widget = (WidgetObject*)value;
+    view = widget->view;
+    [self->view addSubview: view];
+    return 0;
+}
+
+static PyMappingMethods Grid_as_mapping = {
+    (lenfunc)Grid_length,               /* mp_length */
+    (binaryfunc)Grid_get_item,          /* mp_subscript */
+    (objobjargproc)Grid_set_item,       /* mp_ass_subscript */
+};
+
 static char Grid_doc[] =
 "Grid is the layout manager for a grid layout.\n";
 
@@ -192,7 +268,7 @@ PyTypeObject GridType = {
     (reprfunc)Grid_repr,        /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
-    0,                          /* tp_as_mapping */
+    &Grid_as_mapping,           /* tp_as_mapping */
     0,                          /* tp_hash */
     0,                          /* tp_call */
     0,                          /* tp_str */
