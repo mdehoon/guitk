@@ -349,14 +349,17 @@ static PyMethodDef Window_methods[] = {
 static PyObject* Window_get_contents(WindowObject* self, void* closure)
 {
     PyObject* object;
-    WidgetView* view;
+    NSView* view;
     NSWindow* window = self->window;
     if (!window) {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
     view = [window contentView];
-    if ([view isKindOfClass: [WidgetView class]]) object = view.object;
+    if ([[view class] conformsToProtocol:@protocol(Widget)]) {
+        NSView <Widget> *v = (NSView <Widget> *)view;
+        object = v.object;
+    }
     else object = Py_None;
     Py_INCREF(object);
     return object;
@@ -367,7 +370,7 @@ Window_set_contents(WindowObject* self, PyObject* value, void* closure)
 {
     PyTypeObject* type;
     WidgetObject* widget;
-    WidgetView* view;
+    NSView* view;
     NSWindow* window = self->window;
     if (!window) {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
@@ -379,7 +382,10 @@ Window_set_contents(WindowObject* self, PyObject* value, void* closure)
         return -1;
     }
     view = [window contentView];
-    if ([view isKindOfClass: [WidgetView class]]) Py_DECREF(view.object);
+    if ([[view class] conformsToProtocol:@protocol(Widget)]) {
+        NSView <Widget> *v = (NSView <Widget> *)view;
+        Py_DECREF(v.object);
+    }
     widget = (WidgetObject*)value;
     view = widget->view;
     [window setContentView: view];

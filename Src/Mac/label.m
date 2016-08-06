@@ -15,7 +15,13 @@
 #define COMPILING_FOR_10_10
 #endif
 
-@interface Label : WidgetView
+@interface Label : NSView <Widget>
+{
+    PyObject* _object;
+}
+@property (readonly) PyObject* object;
+- (Label*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
+- (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
 @end
 
@@ -28,6 +34,18 @@ typedef struct {
 } LabelObject;
 
 @implementation Label
+- (PyObject*)object
+{
+    return (PyObject*)_object;
+}
+
+- (Label*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
+{
+    self = [super initWithFrame: rect];
+    _object = object;
+    return self;
+}
+
 - (void)drawRect:(NSRect)dirtyRect
 {
     CTLineRef line;
@@ -87,6 +105,11 @@ typedef struct {
     CGContextSetTextPosition(cr, x, y);
     CTLineDraw(line, cr);
     CFRelease(line);
+}
+
+- (BOOL)isFlipped
+{
+    return YES;
 }
 @end
 

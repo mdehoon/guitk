@@ -1,5 +1,5 @@
 #include <Cocoa/Cocoa.h>
-#include "button.h"
+#include "widgets.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -11,24 +11,20 @@
 #endif
 #endif
 
-@class Button;
+@interface Button : NSButton <Widget>
+{
+    PyObject* _object;
+}
+@property (readonly) PyObject* object;
+- (Button*)initWithObject:(PyObject*)obj;
+@end
 
 typedef struct {
     PyObject_HEAD
     Button* button;
-} PyButton;
-
-@interface Button : NSButton <Widget>
-{
-    PyButton* _object;
-    NSFont* font;
     NSString* text;
-}
-@property (readonly) PyObject* object;
-- (PyObject*)object;
-- (Button*)initWithObject:(PyButton*)obj;
-- (void)setString:(const char*)text;
-@end
+    NSFont* font;
+} PyButton;
 
 @implementation Button
 
@@ -37,7 +33,7 @@ typedef struct {
     return (PyObject*)_object;
 }
 
-- (Button*)initWithObject:(PyButton*)object
+- (Button*)initWithObject:(PyObject*)object
 {
     NSRect rect;
     rect.origin.x = 10;
@@ -55,12 +51,6 @@ typedef struct {
     _object = object;
     return self;
 }
-
-- (void)setString:(const char*)s
-{
-    text = [[NSString alloc] initWithCString: s encoding: NSUTF8StringEncoding];
-    [self setTitle: text];
-}
 @end
 
 static PyObject*
@@ -75,12 +65,15 @@ static int
 Button_init(PyButton *self, PyObject *args, PyObject *kwds)
 {
     Button *button;
-    const char* text = "";
+    const char* title = "";
+    NSString* text;
 
-    if(!PyArg_ParseTuple(args, "|s", &text)) return -1;
+    if(!PyArg_ParseTuple(args, "|s", &title)) return -1;
 
-    button = [[Button alloc] initWithObject: self];
-    [button setString: text];
+    button = [[Button alloc] initWithObject: (PyObject*)self];
+    text = [[NSString alloc] initWithCString: title encoding: NSUTF8StringEncoding];
+    [button setTitle: text];
+    [text release];
     self->button = button;
 
     return 0;

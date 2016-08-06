@@ -23,7 +23,40 @@
 #define CGFloat float
 #endif
 
+@interface GridView : NSView <Widget>
+{
+    PyObject* _object;
+    BOOL layoutIsValid;
+}
+@property (readonly) PyObject* object;
+- (GridView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
+- (void)frameDidChange:(NSNotification *)notification;
+- (void)doLayout;
+- (void)invalidateLayout;
+- (BOOL)isFlipped;
+@end
+
+typedef struct {
+    PyObject_HEAD
+    GridView* view;
+    unsigned int nrows;
+    unsigned int ncols;
+    WidgetObject*** objects;
+} GridObject;
+
 @implementation GridView
+- (PyObject*)object
+{
+    return (PyObject*)_object;
+}
+
+- (GridView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
+{
+    self = [super initWithFrame: rect];
+    _object = object;
+    return self;
+}
+
 - (void)doLayout {
     NSSize size;
     NSRect rect;
@@ -66,6 +99,11 @@
     printf("In GridView drawRect\n");
     if (layoutIsValid == NO) [self doLayout];
     return [super drawRect: rect];
+}
+
+- (BOOL)isFlipped
+{
+    return YES;
 }
 @end
 
