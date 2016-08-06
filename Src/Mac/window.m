@@ -1,8 +1,6 @@
 #include <Cocoa/Cocoa.h>
 #include "window.h"
 #include "widgets.h"
-#include "label.h"
-#include "button.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -67,24 +65,32 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
     NSRect rect;
     NSUInteger windowStyle;
     Window* window;
-    const char* title = "";
+    PyObject* title = NULL;
+    const char* string;
     int width = 100;
     int height = 100;
-    PyObject* titled = Py_True;
-    static char* kwlist[] = {"width", "height", "title", "titled", NULL};
+    static char* kwlist[] = {"width", "height", "title", NULL};
 
-    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|iisO", kwlist,
-                                     &width, &height, &title, &titled))
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|iiO", kwlist,
+                                     &width, &height, &title))
         return -1;
 
-    if (PyObject_IsTrue(titled)) {
+    if (title == Py_None) {
+        windowStyle = NSBorderlessWindowMask;
+    }
+    else  {
         windowStyle = NSTitledWindowMask
                     | NSClosableWindowMask
                     | NSResizableWindowMask
                     | NSMiniaturizableWindowMask;
-    }
-    else {
-        windowStyle = NSBorderlessWindowMask;
+        if (title == NULL) string = "";
+        else if (PyString_Check(title)) {
+            string = PyString_AsString(title);
+        }
+        else {
+            PyErr_SetString(PyExc_TypeError,
+                            "title should be a string or None");
+        }
     }
 
     rect.origin.x = 100;
@@ -103,8 +109,9 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
                                    defer: YES];
     window.object = (PyObject*)self;
     window.releasedWhenClosed = NO;
-    [window setTitle: [NSString stringWithCString: title
-                                         encoding: NSASCIIStringEncoding]];
+    if (string)
+        [window setTitle: [NSString stringWithCString: string
+                                             encoding: NSASCIIStringEncoding]];
 
     [window setAcceptsMouseMovedEvents: YES];
     [window setDelegate: window];
@@ -225,42 +232,7 @@ Window_put(WindowObject* self, PyObject *args, PyObject *kwds)
 
     widget = (WidgetObject*)object;
     view = widget->view;
-    printf("new content view is %p\n", view);
     [window setContentView: view];
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-static PyObject*
-Window_add(WindowObject* self, PyObject *args, PyObject *kwds)
-{
-    PyObject* object;
-    NSView* view;
-
-    NSWindow* window = self->window;
-    if (!window) {
-        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
-        return NULL;
-    }
-
-    view = [window contentView];
-    if (!PyArg_ParseTuple(args, "O", &object))
-        return NULL;
-
-    if (PyObject_IsInstance(object, (PyObject*) &LabelType)) {
-        PyLabel* label = (PyLabel*)object;
-        Py_INCREF(label);
-        [view addSubview: label->label];
-    } else
-    if (PyObject_IsInstance(object, (PyObject*) &ButtonType)) {
-        PyButton* button = (PyButton*)object;
-        Py_INCREF(button);
-        [view addSubview: button->button];
-    } else {
-        PyErr_SetString(PyExc_TypeError, "windows can only add labels or buttons");
-        return NULL;
-    }
 
     Py_INCREF(Py_None);
     return Py_None;
@@ -361,11 +333,6 @@ static PyMethodDef Window_methods[] = {
      METH_VARARGS,
      "Sets the layout manager."
     },
-    {"add",
-     (PyCFunction)Window_add,
-     METH_VARARGS,
-     "Adds a control to the window."
-    },
     {"add_child",
      (PyCFunction)Window_add_child,
      METH_KEYWORDS | METH_VARARGS,
@@ -379,49 +346,122 @@ static PyMethodDef Window_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+static PyObject* Window_get_contents(WindowObject* self, void* closure)
+{
+    PyObject* object;
+    WidgetView* view;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
+    }
+    view = [window contentView];
+    if ([view isKindOfClass: [WidgetView class]]) object = view.object;
+    else object = Py_None;
+    Py_INCREF(object);
+    return object;
+}
+
+static int
+Window_set_contents(WindowObject* self, PyObject* value, void* closure)
+{
+    PyTypeObject* type;
+    WidgetObject* widget;
+    WidgetView* view;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+    type = Py_TYPE(value);
+    if (!PyType_IsSubtype(type, &WidgetType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a widget or None");
+        return -1;
+    }
+    view = [window contentView];
+    if ([view isKindOfClass: [WidgetView class]]) Py_DECREF(view.object);
+    widget = (WidgetObject*)value;
+    view = widget->view;
+    [window setContentView: view];
+    Py_INCREF(value);
+    return 0;
+}
+
+static char Window_contents__doc__[] = "window contents";
+
 static PyObject* Window_get_title(WindowObject* self, void* closure)
 {
-    NSWindow* window = self->window;
     PyObject* result = NULL;
-    if (window)
-    {
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        NSString* title = [window title];
-        if (title) {
-            const char* cTitle = [title UTF8String];
-#if PY3K || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION >= 6)
-            result = PyUnicode_FromString(cTitle);
-#else
-            result = PyString_FromString(cTitle);
-#endif
-        }
-        [pool release];
+    NSAutoreleasePool* pool;
+    NSString* title;
+    NSWindow* window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return NULL;
     }
-    if (result) {
-        return result;
-    } else {
+    if (! (window.styleMask & NSTitledWindowMask)) {
         Py_INCREF(Py_None);
         return Py_None;
     }
+    pool = [[NSAutoreleasePool alloc] init];
+    title = [window title];
+    if (title) {
+        const char* cTitle = [title UTF8String];
+#if PY3K || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION >= 6)
+        result = PyUnicode_FromString(cTitle);
+#else
+        result = PyString_FromString(cTitle);
+#endif
+    }
+    [pool release];
+    return result;
 }
 
 static int
 Window_set_title(WindowObject* self, PyObject* value, void* closure)
 {
     char* title;
+    NSWindow* window;
+    NSAutoreleasePool* pool;
+    NSString* s;
+    const NSUInteger mask = NSTitledWindowMask
+                          | NSClosableWindowMask
+                          | NSResizableWindowMask
+                          | NSMiniaturizableWindowMask;
+
+    window = self->window;
+    if (!window) {
+        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
+        return -1;
+    }
+
+
+    if (value == Py_None) {
+        if (! (window.styleMask & mask)) return 0;
+#ifdef COMPILING_FOR_10_6
+        window.styleMask &= ~mask;
+        return 0;
+#else
+        PyErr_SetString(PyExc_RuntimeError, "if compiled for Mac OS X versions older than 10.6, the window style cannot be changed after the window is created.");
+        return -1;
+#endif
+    }
     title = PyString_AsString(value);
     if (!title) return -1;
-
-    NSWindow* window = self->window;
-    if (window)
-    {
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        NSString* s = [[NSString alloc] initWithCString: title
-                                               encoding: NSUTF8StringEncoding];
-        [window setTitle: s];
-        [s release];
-        [pool release];
+    if (! (window.styleMask & mask)) {
+#ifdef COMPILING_FOR_10_6
+        window.styleMask |= mask;
+#else
+        PyErr_SetString(PyExc_RuntimeError, "if compiled for Mac OS X versions older than 10.6, the window style cannot be changed after the window is created.");
+        return -1;
+#endif
     }
+    pool = [[NSAutoreleasePool alloc] init];
+    s = [[NSString alloc] initWithCString: title
+                                 encoding: NSUTF8StringEncoding];
+    [window setTitle: s];
+    [s release];
+    [pool release];
     return 0;
 }
 
@@ -826,48 +866,6 @@ Window_set_max_height(WindowObject* self, PyObject* value, void* closure)
 
 static char Window_max_height__doc__[] = "the maximum height to which the window can be resized by the user";
 
-static PyObject* Window_get_titled(WindowObject* self, void* closure)
-{
-    NSWindow* window = self->window;
-    if (!window)
-    {
-        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
-        return NULL;
-    }
-    if (window.styleMask & NSTitledWindowMask) Py_RETURN_TRUE;
-    Py_RETURN_FALSE;
-}
-
-static int
-Window_set_titled(WindowObject* self, PyObject* value, void* closure)
-{
-    NSWindow* window = self->window;
-    if (!window)
-    {
-        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
-        return -1;
-    } else {
-#ifdef COMPILING_FOR_10_6
-        NSUInteger mask = NSTitledWindowMask
-                        | NSClosableWindowMask
-                        | NSResizableWindowMask
-                        | NSMiniaturizableWindowMask;
-        int flag = PyObject_IsTrue(value);
-        switch (flag) {
-            case 1: window.styleMask |= mask; break;
-            case 0: window.styleMask &= ~mask; break;
-            case -1: return -1;
-        }
-#else
-        PyErr_SetString(PyExc_RuntimeError, "if compiled for Mac OS X versions older than 10.6, the window style cannot be changed after the window is created.");
-        return -1;
-#endif
-    }
-    return 0;
-}
-
-static char Window_titled__doc__[] = "specifies if the window has a title bar";
-
 static PyObject* Window_get_fullscreen(WindowObject* self, void* closure)
 {
 #ifdef COMPILING_FOR_10_7
@@ -1117,6 +1115,7 @@ static PyObject* Window_get_children(WindowObject* self, void* closure)
 static char Window_children__doc__[] = "child windows (as set by add_children).";
 
 static PyGetSetDef Window_getset[] = {
+    {"contents", (getter)Window_get_contents, (setter)Window_set_contents, Window_contents__doc__, NULL},
     {"title", (getter)Window_get_title, (setter)Window_set_title, Window_title__doc__, NULL},
     {"origin", (getter)Window_get_origin, (setter)Window_set_origin, Window_origin__doc__, NULL},
     {"width", (getter)Window_get_width, (setter)Window_set_width, Window_width__doc__, NULL},
@@ -1128,7 +1127,6 @@ static PyGetSetDef Window_getset[] = {
     {"max_width", (getter)Window_get_max_width, (setter)Window_set_max_width, Window_max_width__doc__, NULL},
     {"min_height", (getter)Window_get_min_height, (setter)Window_set_min_height, Window_min_height__doc__, NULL},
     {"max_height", (getter)Window_get_max_height, (setter)Window_set_max_height, Window_max_height__doc__, NULL},
-    {"titled", (getter)Window_get_titled, (setter)Window_set_titled, Window_titled__doc__, NULL},
     {"fullscreen", (getter)Window_get_fullscreen, (setter)Window_set_fullscreen, Window_fullscreen__doc__, NULL},
     {"zoomed", (getter)Window_get_zoomed, (setter)Window_set_zoomed, Window_zoomed__doc__, NULL},
     {"visible", (getter)Window_get_visible, (setter)NULL, Window_visible__doc__, NULL},

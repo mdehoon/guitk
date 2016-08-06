@@ -23,7 +23,18 @@
 #define CGFloat float
 #endif
 
-@implementation View
+@implementation WidgetView
+
+@synthesize object = _object;
+
+- (WidgetView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
+{
+    self = [super initWithFrame: rect];
+    _object = object;
+    return self;
+}
+
+
 - (BOOL)isFlipped
 {
     return YES;
@@ -42,7 +53,7 @@ Widget_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static PyObject*
 Widget_repr(WidgetObject* self)
 {
-    View* view = self->view;
+    WidgetView* view = self->view;
 #if PY3K
     return PyUnicode_FromFormat("Widget object %p wrapping NSView %p",
                                self, view);
@@ -55,7 +66,7 @@ Widget_repr(WidgetObject* self)
 static void
 Widget_dealloc(WidgetObject* self)
 {
-    View* view = self->view;
+    WidgetView* view = self->view;
     if (view) [view release];
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
@@ -82,7 +93,7 @@ static PyObject* Widget_get_origin(WidgetObject* self, void* closure)
 {
     CGFloat x;
     CGFloat y;
-    View* view = self->view;
+    WidgetView* view = self->view;
     NSRect frame = view.frame;
     x = NSMinX(frame);
     y = NSMinY(frame);
@@ -94,7 +105,7 @@ static int Widget_set_origin(WidgetObject* self, PyObject* value, void* closure)
     int x;
     int y;
     NSPoint point;
-    View* view = self->view;
+    WidgetView* view = self->view;
     NSWindow* window = [view window];
     if (!PyArg_ParseTuple(value, "ii", &x, &y)) return -1;
     if (view == [window contentView])
@@ -115,7 +126,7 @@ static PyObject* Widget_get_size(WidgetObject* self, void* closure)
     int width;
     int height;
     NSRect frame;
-    View* view = self->view;
+    WidgetView* view = self->view;
     frame = [view frame];
     width = round(frame.size.width);
     height = round(frame.size.height);
@@ -127,7 +138,7 @@ static int Widget_set_size(WidgetObject* self, PyObject* value, void* closure)
     int width;
     int height;
     NSSize size;
-    View* view = self->view;
+    WidgetView* view = self->view;
     NSWindow* window = [view window];
     if (!PyArg_ParseTuple(value, "ii", &width, &height)) return -1;
     if (view == [window contentView])

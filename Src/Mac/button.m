@@ -11,74 +11,6 @@
 #endif
 #endif
 
-#define FILLX     1
-#define FILLY     2
-#define EXPAND    4
-#define NORTH     8
-#define EAST     16
-#define SOUTH    32
-#define WEST     64
-#define TOP     128
-#define BOTTOM  256
-#define LEFT    512
-#define RIGHT  1024
-
-
-void dopack(CGRect* rect, CGRect* cavity)
-{
-    int flags;
-    float padx = 20;
-    float pady = 20;
-    float ipadx = 80;
-    float ipady = 30;
-    if ((flags & TOP) || (flags & BOTTOM)) {
-        rect->origin.x = cavity->origin.x;
-        if (flags & FILLX) {
-            rect->origin.x += padx;
-            rect->size.width = cavity->size.width - 2 * padx;
-        }
-        else {
-            rect->origin.x += 0.5 * (cavity->size.width - rect->size.width) - ipadx;
-            rect->size.width += 2 * ipadx;
-        }
-        rect->size.height += pady + ipady;
-        cavity->size.height -= rect->size.height;
-        if (cavity->size.height < 0) {
-            rect->size.height += cavity->size.height;
-            cavity->size.height = 0;
-        }
-        if (flags & TOP) {
-            rect->origin.y = cavity->origin.y;
-            cavity->origin.y += rect->size.height;
-        } else { /* BOTTOM */
-            rect->origin.y = cavity->origin.y + cavity->size.height;
-        }
-    }
-    if ((flags & LEFT) || (flags & RIGHT)) {
-        rect->origin.x = cavity->origin.y;
-        if (flags & FILLY) {
-            rect->origin.y += pady;
-            rect->size.height = cavity->size.height - 2 * padx;
-        }
-        else {
-            rect->origin.y += 0.5 * (cavity->size.height - rect->size.height) - ipady;
-            rect->size.height += 2 * ipady;
-        }
-        cavity->size.width -= rect->size.width;
-        if (cavity->size.width < 0) {
-            rect->size.width += cavity->size.width;
-            cavity->size.width = 0;
-        }
-        rect->origin.y = cavity->origin.y;
-        if (flags & LEFT) {
-            rect->origin.x = cavity->origin.x;
-            cavity->origin.x += rect->size.width;
-        } else { /* RIGHT */
-            rect->origin.x = cavity->origin.x + cavity->size.width;
-        }
-    }
-}
-
 @implementation Button
 - (Button*)initWithObject:(PyButton*)obj
 {
@@ -94,7 +26,8 @@ void dopack(CGRect* rect, CGRect* cavity)
                              | NSViewMinYMargin
                              | NSViewHeightSizable
                              | NSViewMaxYMargin];
-[[self cell] setBackgroundColor:[NSColor redColor]];
+    self->button = [[NSButton alloc] initWithFrame: rect];
+[[self->button cell] setBackgroundColor:[NSColor redColor]];
     object = obj;
     return self;
 }
@@ -102,50 +35,9 @@ void dopack(CGRect* rect, CGRect* cavity)
 - (void)setString:(const char*)s
 {
     text = [[NSString alloc] initWithCString: s encoding: NSUTF8StringEncoding];
-    [self setTitle: text];
+    [self->button setTitle: text];
 }
 
-- (BOOL)pack:(NSRect*)cavity
-{
-    static int counter = 0;
-    float coordinates[4];
-    float padx = 20;
-    float pady = 20;
-    float ipadx = 80;
-    float ipady = 30;
-    PyObject* layout;
-    int flags = 0;
-    flags |= TOP;
-    CGRect rect;
-    CGSize size;
-    NSRect frame;
-    [self sizeToFit];
-    frame = [self frame];
-    size.width = frame.size.width;
-    size.height = frame.size.height;
-    rect.size = size;
-    coordinates[0] = cavity->origin.x;
-    coordinates[1] = cavity->origin.y;
-    coordinates[2] = cavity->origin.x + cavity->size.width;
-    coordinates[3] = cavity->origin.y + cavity->size.height;
-    layout = PyObject_GetAttrString(object, "layout");
-    PyObject* result = PyObject_CallMethod(layout, "arrange", "ffff",
-                                                   cavity->origin.x,
-                                                   cavity->origin.y,
-                                                   cavity->size.width,
-                                                   cavity->size.height);
-    if (result==NULL) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "calling 'arrange' on layout manager failed");
-        return false;
-    }
-    PyArg_ParseTuple(result, "dddd", &rect.origin.x, &rect.origin.y, &rect.size.width, &rect.size.height);
-    printf("rect.origin.x = %f\n", rect.origin.x);
-    printf("rect.origin.y = %f\n", rect.origin.y);
-    printf("rect.size.height = %f\n", rect.size.height);
-    printf("rect.size.width = %f\n", rect.size.width);
-    return true;
-}
 @end
 
 static PyObject*
@@ -162,8 +54,6 @@ static int
 Button_init(PyButton *self, PyObject *args, PyObject *kwds)
 {
     Button *button;
-    PyObject* layout;
-    PyObject* arguments;
     const char* text = "";
 
     if(!PyArg_ParseTuple(args, "|s", &text)) return -1;
@@ -190,7 +80,7 @@ Button_repr(PyButton* self)
 static void
 Button_dealloc(PyButton* self)
 {
-    NSButton* button = self->button;
+    Button* button = self->button;
     if (button)
     {
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
@@ -209,7 +99,7 @@ Button_set_frame(PyButton* self, PyObject *args)
     float y1;
     NSPoint position;
     NSSize size;
-    NSButton* button = self->button;
+    Button* button = self->button;
     if (!button) {
         PyErr_SetString(PyExc_RuntimeError, "button has not been initialized");
         return NULL;
@@ -235,7 +125,7 @@ Button_get_size(PyButton* self, PyObject *args)
     float width;
     float height;
     NSRect frame;
-    NSButton* button = self->button;
+    Button* button = self->button;
     if (!button) {
         PyErr_SetString(PyExc_RuntimeError, "button has not been initialized");
         return NULL;
@@ -252,7 +142,7 @@ Button_set_size(PyButton* self, PyObject *args)
     float width;
     float height;
     NSSize size;
-    NSButton* button = self->button;
+    Button* button = self->button;
     if (!button) {
         PyErr_SetString(PyExc_RuntimeError, "button has not been initialized");
         return NULL;
@@ -265,72 +155,6 @@ Button_set_size(PyButton* self, PyObject *args)
     size.width = width;
     size.height = height;
     [button setFrameSize: size];
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-static PyObject*
-Button_pack(PyButton* self, PyObject *args)
-{
-    int i;
-    double values[4];
-    NSPoint origin;
-    NSPoint corner;
-    NSPoint position;
-    NSRect frame;
-    NSSize size;
-    PyObject* item;
-    PyObject* cavity;
-    NSButton* button = self->button;
-    if (!button) {
-        PyErr_SetString(PyExc_RuntimeError, "button has not been initialized");
-        return NULL;
-    }
-/*
-    if(!PyArg_ParseTuple(args, "O", &cavity))
-        return NULL;
-    if(!PyList_Check(cavity)) {
-        PyErr_SetString(PyExc_RuntimeError, "cavity argument should be a list");
-        return NULL;
-    }
-    if(PyList_GET_SIZE(cavity)!=4) {
-        PyErr_SetString(PyExc_RuntimeError, "cavity argument should be a list of four elements");
-        return NULL;
-    }
-    for (i = 0; i < 4; i++) {
-        item = PyList_GET_ITEM(cavity, i);
-        values[i] = PyFloat_AsDouble(item);
-        if (values[i] < 0 && PyErr_Occurred()) {
-            PyErr_SetString(PyExc_RuntimeError, "cavity argument should be a list of four numbers");
-            return NULL;
-        }
-    }
-
-    origin.x = values[0];
-    origin.y = values[1];
-    corner.x = values[2];
-    corner.y = values[3];
-    frame = [button frame];
-    size = frame.size;
-    position.y = origin.y;
-    position.x = 0.5 * (origin.x + corner.x - size.width);
-    origin.y += size.height;
-
-    [button setFrameOrigin: position];
-
-    values[0] = origin.x;
-    values[1] = origin.y;
-    values[2] = corner.x;
-    values[3] = corner.y;
-    for (i = 0; i < 4; i++) {
-        item = PyFloat_FromDouble(values[i]);
-        if (!item) return NULL;
-        if (PyList_SetItem(cavity, i, item)==-1) {
-            Py_DECREF(item);
-            return NULL;
-        }
-    }
-*/
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -350,11 +174,6 @@ static PyMethodDef Button_methods[] = {
      (PyCFunction)Button_set_size,
      METH_VARARGS,
      "Sets the size of the button."
-    },
-    {"pack",
-     (PyCFunction)Button_pack,
-     METH_VARARGS,
-     "Pack the button into the available cavity."
     },
     {NULL}  /* Sentinel */
 };
@@ -417,7 +236,7 @@ PyTypeObject ButtonType = {
     Button_methods,             /* tp_methods */
     0,                          /* tp_members */
     Button_getseters,           /* tp_getset */
-    0,                          /* tp_base */
+    &WidgetType,                /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */
     0,                          /* tp_descr_set */

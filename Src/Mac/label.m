@@ -1,5 +1,4 @@
 #include <Cocoa/Cocoa.h>
-#include "label.h"
 #include "widgets.h"
 
 #if PY_MAJOR_VERSION >= 3
@@ -12,60 +11,25 @@
 #endif
 #endif
 
-#define FILLX     1
-#define FILLY     2
-#define EXPAND    4
-#define NORTH     8
-#define EAST     16
-#define SOUTH    32
-#define WEST     64
-#define TOP     128
-#define BOTTOM  256
-#define LEFT    512
-#define RIGHT  1024
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
+#define COMPILING_FOR_10_10
+#endif
 
+@interface Label : WidgetView
+- (void)drawRect:(NSRect)rect;
+@end
 
+typedef struct {
+    PyObject_HEAD
+    Label* label;
+    CGColorRef background;
+    CFStringRef text;
+    NSFont* font;
+} LabelObject;
 
 @implementation Label
-- (Label*)initWithObject:(PyLabel*)obj
+- (void)drawRect:(NSRect)dirtyRect
 {
-    NSRect rect;
-    CGFloat fontsize;
-    NSControlSize size = 12;
-    rect.origin.x = 10;
-    rect.origin.y = 10;
-    rect.size.width = 100;
-    rect.size.height = 100;
-    self = [super initWithFrame: rect];
-/*
-    [self setAutoresizingMask: NSViewMinXMargin
-                             | NSViewWidthSizable
-                             | NSViewMaxXMargin
-                             | NSViewMinYMargin
-                             | NSViewHeightSizable
-                             | NSViewMaxYMargin];
-*/
-    fontsize = [NSFont systemFontSizeForControlSize: size];
-    fontsize = 50;
-    font = [NSFont systemFontOfSize: fontsize];
-    object = obj;
-    return self;
-}
-
-- (void)setString:(const char*)s
-{
-    text = [[NSString alloc] initWithCString: s encoding: NSUTF8StringEncoding];
-}
-
-- (void)drawRect:(NSRect)rect
-{
-    static int counter = 0;
-    printf("In label drawRect\n");
-    if (counter==0) [[NSColor greenColor] setFill];
-    else if (counter==1) [[NSColor blueColor] setFill];
-    counter++;
-    if (counter==2) counter = 0;
-    NSRectFill(rect);
     CTLineRef line;
     CFAttributedStringRef string = NULL;
     CFDictionaryRef attributes = NULL;
@@ -73,13 +37,27 @@
     CFTypeRef values[1];
     CGContextRef cr;
     NSGraphicsContext* gc;
+    CGFloat x;
+    CGFloat y;
+    CGSize size;
+    CGRect rect;
+    CGFloat ascent;
+    CGFloat descent;
+    double width;
+    CGFloat height;
+    LabelObject* object = (LabelObject*)_object;
     gc = [NSGraphicsContext currentContext];
-/* Before 10.10:
-    cr = (CGContextRef) [gc graphicsPort];
-*/
+#ifdef COMPILING_FOR_10_10
     cr = [gc CGContext];
+#else
+    cr = (CGContextRef) [gc graphicsPort];
+#endif
+    CGContextSetFillColorWithColor(cr, object->background);
+    rect = NSRectToCGRect(dirtyRect);
+    CGContextFillRect(cr, rect);
     keys[0] = kCTFontAttributeName;
-    values[0] = font;
+    values[0] = object->font;
+    values[0] = [NSFont systemFontOfSize: 13.0];
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
                                     (const void**)&values,
@@ -88,127 +66,98 @@
                                     &kCFTypeDictionaryValueCallBacks);
     if (!attributes) return;
     string = CFAttributedStringCreate(kCFAllocatorDefault,
-                                      text,
+                                      object->text,
                                       attributes);
     CFRelease(attributes);
     if (!string) return;
     line = CTLineCreateWithAttributedString(string);
     CFRelease(string);
-    CGContextSetTextPosition(cr, position.x, position.y);
+    rect = NSRectToCGRect(self.frame);
+    size = rect.size;
+    y = 0.5 * size.height;
+    x = 0.5 * size.width;
+    rect = CTLineGetImageBounds(line, cr);
+    width = CTLineGetTypographicBounds(line, &ascent, &descent, NULL);
+    height = ascent + descent;
+    x -= 0.5 * width;
+    y += 0.5 * height;
+    y -= descent;
+    CGAffineTransform transform = CGAffineTransformMakeScale (1.0, -1.0); 
+    CGContextSetTextMatrix(cr, transform);
+    CGContextSetTextPosition(cr, x, y);
     CTLineDraw(line, cr);
     CFRelease(line);
-}
-
-- (CGRect)textbounds
-{
-    char data[8];
-    CGRect rect;
-    CGPoint point;
-    CFStringRef keys[1];
-    CFTypeRef values[1];
-    CTLineRef line = NULL;
-    CGContextRef cr = NULL;
-    CFAttributedStringRef string = NULL;
-    CFDictionaryRef attributes = NULL;
-    CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceGray();
-    if (colorspace) {
-        cr = CGBitmapContextCreate(data,
-                                   1,
-                                   1,
-                                   8,
-                                   1,
-                                   colorspace,
-                                   0);
-        CGColorSpaceRelease(colorspace);
-    }
-    if (cr) {
-        keys[0] = kCTFontAttributeName;
-        values[0] = font;
-        attributes = CFDictionaryCreate(kCFAllocatorDefault,
-                                        (const void**)&keys,
-                                        (const void**)&values,
-                                        1,
-                                        &kCFTypeDictionaryKeyCallBacks,
-                                        &kCFTypeDictionaryValueCallBacks);
-    }
-    if (attributes) {
-        string = CFAttributedStringCreate(kCFAllocatorDefault,
-                                          text,
-                                          attributes);
-        CFRelease(attributes);
-    }
-    if (string) {
-       line = CTLineCreateWithAttributedString(string);
-       CFRelease(string);
-    }
-    if (line) {
-        point = CGContextGetTextPosition(cr);
-        rect = CTLineGetImageBounds(line, cr);
-        CFRelease(line);
-        CTLineGetTypographicBounds(line, NULL, &rect.origin.y, NULL);
-        rect.origin.x = point.x - rect.origin.x; /* bearing */
-    }
-    CGContextRelease(cr);
-    return rect;
 }
 @end
 
 static PyObject*
 Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    PyLabel *self = (PyLabel*)type->tp_alloc(type, 0);
+    LabelObject *self = (LabelObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     self->label = NULL;
     return (PyObject*)self;
 }
 
 static int
-Label_init(PyLabel *self, PyObject *args, PyObject *kwds)
+Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
 {
     Label *label;
-    const char* text = "";
+    const char* string = "";
+    CGColorRef background;
+    CFStringRef text;
+    NSRect rect;
+    NSFont* font;
 
-    if(!PyArg_ParseTuple(args, "|s", &text)) return -1;
+    if(!PyArg_ParseTuple(args, "|s", &string)) return -1;
 
-    label = [[Label alloc] initWithObject: self];
-    [label setString: text];
+    rect.origin.x = 0;
+    rect.origin.y = 0;
+    rect.size.width = 100;
+    rect.size.height = 100;
+    label = [[Label alloc] initWithFrame: rect withObject: (PyObject*)self];
+    font = [NSFont systemFontOfSize: 13.0];
+    text = CFStringCreateWithCString(kCFAllocatorDefault, string, kCFStringEncodingUTF8);
+    background = CGColorGetConstantColor(kCGColorClear);
+    /* CGColorGetConstantColor returns the color with a reference count of 1 */
+    [font retain];
+    self->text = text;
     self->label = label;
+    self->background = background;
+    self->font = font;
 
     return 0;
 }
 
 static PyObject*
-Label_repr(PyLabel* self)
+Label_repr(LabelObject* self)
 {
 #if PY3K
-    return PyUnicode_FromFormat("Label object %p wrapping NSTextField %p",
+    return PyUnicode_FromFormat("Label object %p wrapping NSView %p",
                                (void*) self, (void*)(self->label));
 #else
-    return PyString_FromFormat("Label object %p wrapping NSTextField %p",
+    return PyString_FromFormat("Label object %p wrapping NSView %p",
                                (void*) self, (void*)(self->label));
 #endif
 }
 
 static void
-Label_dealloc(PyLabel* self)
+Label_dealloc(LabelObject* self)
 {
-    NSTextField* label = self->label;
-    if (label)
-    {
-        NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        [label release];
-        [pool release];
-    }
+    [self->label release];
+    [self->font release];
+    CFRelease(self->text);
+    CGColorRelease(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject*
-Label_set_position(PyLabel* self, PyObject *args)
+Label_set_position(LabelObject* self, PyObject *args)
 {
     float x;
     float y;
     NSPoint position;
-    NSTextField* label = self->label;
+    Label* label = self->label;
     if (!label) {
         PyErr_SetString(PyExc_RuntimeError, "label has not been initialized");
         return NULL;
@@ -225,12 +174,12 @@ Label_set_position(PyLabel* self, PyObject *args)
 }
 
 static PyObject*
-Label_get_size(PyLabel* self, PyObject *args)
+Label_get_size(LabelObject* self, PyObject *args)
 {
     float width;
     float height;
     NSRect frame;
-    NSTextField* label = self->label;
+    Label* label = self->label;
     if (!label) {
         PyErr_SetString(PyExc_RuntimeError, "label has not been initialized");
         return NULL;
@@ -255,7 +204,55 @@ static PyMethodDef Label_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+static PyObject* Label_get_background(LabelObject* self, void* closure)
+{
+    const CGFloat* components = CGColorGetComponents(self->background);
+    double red, green, blue, alpha;
+    red = components[0];
+    green = components[1];
+    blue = components[2];
+    alpha = components[3];
+    return Py_BuildValue("ffff", red, green, blue, alpha);
+}
+
+static int
+Label_set_background(LabelObject* self, PyObject* value, void* closure)
+{
+    Py_ssize_t i;
+    PyObject* item;
+    CGFloat rgba[4];
+    CGColorRef background;
+    CGColorSpaceRef colorspace;
+    Label* label = self->label;
+    if (!PyTuple_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "expected a tuple");
+        return -1;
+    }
+    if (PyTuple_GET_SIZE(value) != 4) {
+        PyErr_SetString(PyExc_RuntimeError, "expected a tuple with 4 components");
+        return -1;
+    }
+    for (i = 0; i < 4; i++) {
+        item = PyTuple_GET_ITEM(value, i);
+        rgba[i] = PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            PyErr_SetString(PyExc_RuntimeError, "expected a tuple with 4 values");
+            return -1;
+        }
+    }
+    CGColorRelease(self->background);
+    colorspace = CGColorSpaceCreateDeviceRGB();
+    background = CGColorCreate(colorspace, rgba);
+    CGColorSpaceRelease(colorspace);
+    self->background = background;
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_background__doc__[] = "background color.";
+
 static PyGetSetDef Label_getseters[] = {
+    {"background", (getter)Label_get_background, (setter)Label_set_background, Label_background__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
@@ -265,7 +262,7 @@ static char Label_doc[] =
 PyTypeObject LabelType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Label",             /* tp_name */
-    sizeof(PyLabel),            /* tp_basicsize */
+    sizeof(LabelObject),        /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)Label_dealloc,  /* tp_dealloc */
     0,                          /* tp_print */

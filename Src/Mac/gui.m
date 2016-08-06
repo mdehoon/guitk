@@ -3,9 +3,6 @@
 #include "window.h"
 #include "widgets.h"
 #include "image.h"
-#include "label.h"
-#include "grid.h"
-#include "button.h"
 
 
 #if PY_MAJOR_VERSION >= 3

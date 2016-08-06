@@ -1,7 +1,6 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
-#include "grid.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -25,14 +24,47 @@
 #endif
 
 @implementation GridView
-@synthesize object;
+- (void)doLayout {
+    NSSize size;
+    NSRect rect;
+    Py_ssize_t irow;
+    Py_ssize_t icol;
+    GridObject* obj = (GridObject*)_object;
+    unsigned nrows = obj->nrows;
+    unsigned ncols = obj->ncols;
+    WidgetObject* widget;
+    NSView* view;
+    NSPoint origin;
+    rect = [self frame];
+    size = rect.size;
+    size.width /= ncols;
+    size.height /= nrows;
+    for (irow = 0; irow < nrows; irow++) {
+        for (icol = 0; icol < ncols; icol++) {
+            widget = obj->objects[irow][icol];
+            if (!widget) continue;
+            view = widget->view;
+            origin.x = icol * size.width;
+            origin.y = irow * size.height;
+            [view setFrameSize: size];
+            [view setFrameOrigin: origin];
+        }
+    }
+    layoutIsValid = YES;
+}
+
+- (void)invalidateLayout {
+    layoutIsValid = NO;
+}
 
 - (void)frameDidChange:(NSNotification *)notification {
     printf("Grid frame changed\n");
+    [self invalidateLayout];
 }
 
 - (void)drawRect:(NSRect)rect {
     printf("In GridView drawRect\n");
+    if (layoutIsValid == NO) [self doLayout];
     return [super drawRect: rect];
 }
 @end
@@ -50,13 +82,14 @@ static int
 Grid_init(GridObject *self, PyObject *args, PyObject *kwds)
 {
     int irow;
-    int icol;
     int nrows = 1;
     int ncols = 1;
     GridView* view;
     NSNotificationCenter* notificationCenter;
     if(!PyArg_ParseTuple(args, "|ii", &nrows, &ncols)) return -1;
-    view = [[GridView alloc] initWithFrame: NSZeroRect];
+    view = [[GridView alloc] initWithFrame: NSZeroRect
+                                withObject: (PyObject*)self];
+    [view invalidateLayout];
     notificationCenter = [NSNotificationCenter defaultCenter];
     [notificationCenter addObserver: view
                            selector: @selector(frameDidChange:)
@@ -67,11 +100,7 @@ Grid_init(GridObject *self, PyObject *args, PyObject *kwds)
     self->ncols = ncols;
     self->objects = malloc(nrows*sizeof(PyObject**));
     for (irow = 0; irow < nrows; irow++) {
-        self->objects[irow] = malloc(ncols*sizeof(PyObject*));
-        for (icol = 0; icol < ncols; icol++) {
-            Py_INCREF(Py_None);
-            self->objects[irow][icol] = Py_None;
-        }
+        self->objects[irow] = calloc(ncols,sizeof(PyObject*));
     }
     return 0;
 }
@@ -195,19 +224,20 @@ static Py_ssize_t Grid_length(GridObject* self) {
     return size;
 }
 
-static PyObject* Grid_get_item(GridObject* self, PyObject* key) {
+static WidgetObject* Grid_get_item(GridObject* self, PyObject* key) {
     Py_ssize_t irow;
     Py_ssize_t icol;
-    PyObject* object;
+    PyObject* item;
+    WidgetObject* object;
     if (!PyTuple_Check(key) || PyTuple_GET_SIZE(key)!=2) {
         PyErr_SetString(PyExc_ValueError, "expected a typle of size 2");
         return NULL;
     }
-    object = PyTuple_GET_ITEM(key, 0);
-    irow = PyInt_AsSsize_t(object);
+    item = PyTuple_GET_ITEM(key, 0);
+    irow = PyInt_AsSsize_t(item);
     if (PyErr_Occurred()) return NULL;
-    object = PyTuple_GET_ITEM(key, 1);
-    icol = PyInt_AsSsize_t(object);
+    item = PyTuple_GET_ITEM(key, 1);
+    icol = PyInt_AsSsize_t(item);
     if (PyErr_Occurred()) return NULL;
     object = self->objects[irow][icol];
     Py_INCREF(object);
@@ -217,32 +247,48 @@ static PyObject* Grid_get_item(GridObject* self, PyObject* key) {
 static int Grid_set_item(GridObject* self, PyObject* key, PyObject* value) {
     Py_ssize_t irow;
     Py_ssize_t icol;
-    PyObject* object;
+    PyObject* item;
     PyTypeObject* type;
+    WidgetObject* object;
     WidgetObject* widget;
-    NSView* view;
+    NSView* view = nil;
     if (!PyTuple_Check(key) || PyTuple_GET_SIZE(key)!=2) {
         PyErr_SetString(PyExc_ValueError, "expected a typle of size 2");
         return -1;
     }
-    type = Py_TYPE(value);
-    if (!PyType_IsSubtype(type, &WidgetType)) {
-        PyErr_SetString(PyExc_ValueError, "expected a widget");
-        return -1;
+    if (value == Py_None) {
+        value = NULL;
+    } else {
+        type = Py_TYPE(value);
+        if (!PyType_IsSubtype(type, &WidgetType)) {
+            PyErr_SetString(PyExc_ValueError, "expected a widget or None");
+            return -1;
+        }
+        widget = (WidgetObject*)value;
+        view = widget->view;
+        if ([view superview]) {
+            PyErr_SetString(PyExc_ValueError, "this widget is already in use");
+            return -1;
+        }
     }
-    object = PyTuple_GET_ITEM(key, 0);
-    irow = PyInt_AsSsize_t(object);
+    item = PyTuple_GET_ITEM(key, 0);
+    irow = PyInt_AsSsize_t(item);
     if (PyErr_Occurred()) return -1;
-    object = PyTuple_GET_ITEM(key, 1);
-    icol = PyInt_AsSsize_t(object);
+    item = PyTuple_GET_ITEM(key, 1);
+    icol = PyInt_AsSsize_t(item);
     if (PyErr_Occurred()) return -1;
     object = self->objects[irow][icol];
-    Py_DECREF(object);
-    Py_INCREF(value);
-    self->objects[irow][icol] = value;
-    widget = (WidgetObject*)value;
-    view = widget->view;
-    [self->view addSubview: view];
+    if (object) {
+        [object->view removeFromSuperview];
+        Py_DECREF(object);
+    }
+    if (value) {
+        Py_INCREF(value);
+        [self->view addSubview: view];
+    }
+    self->objects[irow][icol] = widget;
+    [self->view frameDidChange:nil];
+
     return 0;
 }
 

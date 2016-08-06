@@ -1,4 +1,5 @@
 #include <Python.h>
+#include "widgets.h"
 
 @class Button;
 
@@ -10,13 +11,13 @@ typedef struct {
     PyObject* layout;
 } PyButton;
 
-@interface Button : NSButton
+@interface Button : WidgetView
 {
     PyButton* object;
+    NSButton* button;
     NSFont* font;
     NSString* text;
 }
 - (Button*)initWithObject:(PyButton*)obj;
 - (void)setString:(const char*)text;
-- (BOOL)pack:(NSRect*)cavity;
 @end
