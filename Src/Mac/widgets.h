@@ -2,6 +2,10 @@
 #include <Cocoa/Cocoa.h>
 
 
+@protocol Widget
+@property (readonly) PyObject* object;
+@end
+
 @interface WidgetView : NSView
 {
     PyObject* _object;

@@ -11,8 +11,33 @@
 #endif
 #endif
 
+@class Button;
+
+typedef struct {
+    PyObject_HEAD
+    Button* button;
+} PyButton;
+
+@interface Button : NSButton <Widget>
+{
+    PyButton* _object;
+    NSFont* font;
+    NSString* text;
+}
+@property (readonly) PyObject* object;
+- (PyObject*)object;
+- (Button*)initWithObject:(PyButton*)obj;
+- (void)setString:(const char*)text;
+@end
+
 @implementation Button
-- (Button*)initWithObject:(PyButton*)obj
+
+- (PyObject*)object
+{
+    return (PyObject*)_object;
+}
+
+- (Button*)initWithObject:(PyButton*)object
 {
     NSRect rect;
     rect.origin.x = 10;
@@ -26,18 +51,16 @@
                              | NSViewMinYMargin
                              | NSViewHeightSizable
                              | NSViewMaxYMargin];
-    self->button = [[NSButton alloc] initWithFrame: rect];
-[[self->button cell] setBackgroundColor:[NSColor redColor]];
-    object = obj;
+    [[self cell] setBackgroundColor:[NSColor redColor]];
+    _object = object;
     return self;
 }
 
 - (void)setString:(const char*)s
 {
     text = [[NSString alloc] initWithCString: s encoding: NSUTF8StringEncoding];
-    [self->button setTitle: text];
+    [self setTitle: text];
 }
-
 @end
 
 static PyObject*
@@ -45,8 +68,6 @@ Button_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     PyButton *self = (PyButton*)type->tp_alloc(type, 0);
     if (!self) return NULL;
-    self->button = NULL;
-    self->layout = NULL;
     return (PyObject*)self;
 }
 
@@ -178,27 +199,7 @@ static PyMethodDef Button_methods[] = {
     {NULL}  /* Sentinel */
 };
 
-static char Button_layout__doc__[] =
-"layout manager associated with this button";
-
-static PyObject*
-Button_getlayout(PyButton* self, void* closure)
-{
-    PyObject* layout = self->layout;
-    Py_INCREF(layout);
-    return layout;
-}
-
-static int
-Button_setlayout(PyButton* self, PyObject* value, void* closure)
-{
-    Py_INCREF(value);
-    self->layout = value;
-    return 0;
-}
-
 static PyGetSetDef Button_getseters[] = {
-    {"layout", (getter)Button_getlayout, (setter)Button_setlayout, Button_layout__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
