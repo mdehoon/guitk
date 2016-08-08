@@ -118,7 +118,10 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     LabelObject *self = (LabelObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
-    self->label = NULL;
+    self->label = nil;
+    self->background = NULL;
+    self->text = NULL;
+    self->font = nil;
     return (PyObject*)self;
 }
 
@@ -142,7 +145,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
     font = [NSFont systemFontOfSize: 13.0];
     text = CFStringCreateWithCString(kCFAllocatorDefault, string, kCFStringEncodingUTF8);
     background = CGColorGetConstantColor(kCGColorClear);
-    /* CGColorGetConstantColor returns the color with a reference count of 1 */
+    CGColorRetain(background);
     [font retain];
     self->text = text;
     self->label = label;
@@ -167,9 +170,12 @@ Label_repr(LabelObject* self)
 static void
 Label_dealloc(LabelObject* self)
 {
-    [self->label release];
-    [self->font release];
-    CFRelease(self->text);
+    Label* label = self->label;
+    CFStringRef text = self->text;
+    NSFont* font = self->font;
+    if (label) [label release];
+    if (font) [font release];
+    if (text) CFRelease(text);
     CGColorRelease(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
