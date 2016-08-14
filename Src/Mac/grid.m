@@ -26,14 +26,9 @@
 @interface GridView : NSView <Widget>
 {
     PyObject* _object;
-    BOOL layoutIsValid;
 }
 @property (readonly) PyObject* object;
 - (GridView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
-- (void)frameDidChange:(NSNotification *)notification;
-- (void)doLayout;
-- (void)invalidateLayout;
-- (BOOL)isFlipped;
 @end
 
 typedef struct {
@@ -83,22 +78,56 @@ typedef struct {
             [view setFrameOrigin: origin];
         }
     }
-    layoutIsValid = YES;
 }
 
-- (void)invalidateLayout {
-    layoutIsValid = NO;
-}
-
-- (void)frameDidChange:(NSNotification *)notification {
-    printf("Grid frame changed\n");
-    [self invalidateLayout];
+- (void)viewWillDraw {
+    printf("In viewWillDraw\n");
+    WidgetObject* o;
+    NSView* view;
+    Py_ssize_t ii;
+    Py_ssize_t jj;
+    GridObject* object = _object;
+    for (ii = 0; ii < 3; ii++) {
+        for (jj = 0; jj < 3; jj++) {
+            o = object->objects[ii][jj];
+            if (!o) continue;
+            view = o->view;
+            if (!view) continue;
+            printf("In viewWillDraw BEFORE: grid[%d][%d] needs display? %s\n", ii, jj, view.needsDisplay ? "YES" : "NO");
+        }
+    }
+    o = object->objects[0][0];
+    view = o->view;
+    [view setNeedsDisplay: YES];
+    for (ii = 0; ii < 3; ii++) {
+        for (jj = 0; jj < 3; jj++) {
+            o = object->objects[ii][jj];
+            if (!o) continue;
+            view = o->view;
+            if (!view) continue;
+            printf("In viewWillDraw AFTER: grid[%d][%d] needs display? %s\n", ii, jj, view.needsDisplay ? "YES" : "NO");
+        }
+    }
+    [super viewWillDraw];
 }
 
 - (void)drawRect:(NSRect)rect {
-    printf("In GridView drawRect\n");
-    if (layoutIsValid == NO) [self doLayout];
-    return [super drawRect: rect];
+    printf("In GridView drawRect; rect origin is %f, %f; size is %f, %f\n", rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+    Py_ssize_t ii;
+    Py_ssize_t jj;
+    GridObject* object = _object;
+    [self doLayout];
+    for (ii = 0; ii < 3; ii++) {
+        for (jj = 0; jj < 3; jj++) {
+            WidgetObject* o = object->objects[ii][jj];
+            if (!o) continue;
+            NSView* v = o->view;
+            if (!v) continue;
+            printf("In drawRect: grid[%d][%d] needs display? %s\n", ii, jj, v.needsDisplay ? "YES" : "NO");
+            v.needsDisplay = NO;
+            printf("In drawRect; checking: grid[%d][%d] needs display? %s\n", ii, jj, v.needsDisplay ? "YES" : "NO");
+        }
+    }
 }
 
 - (BOOL)isFlipped
@@ -123,16 +152,9 @@ Grid_init(GridObject *self, PyObject *args, PyObject *kwds)
     int nrows = 1;
     int ncols = 1;
     GridView* view;
-    NSNotificationCenter* notificationCenter;
     if(!PyArg_ParseTuple(args, "|ii", &nrows, &ncols)) return -1;
     view = [[GridView alloc] initWithFrame: NSZeroRect
                                 withObject: (PyObject*)self];
-    [view invalidateLayout];
-    notificationCenter = [NSNotificationCenter defaultCenter];
-    [notificationCenter addObserver: view
-                           selector: @selector(frameDidChange:)
-                               name: NSViewFrameDidChangeNotification 
-                             object: view];
     self->view = view;
     self->nrows = nrows;
     self->ncols = ncols;
@@ -258,7 +280,31 @@ static PyGetSetDef Grid_getset[] = {
 };
 
 static Py_ssize_t Grid_length(GridObject* self) {
+    NSView* view;
     const Py_ssize_t size = self->nrows * self->ncols;
+    Py_ssize_t ii;
+    Py_ssize_t jj;
+    printf("BEFORE: grid needs display? %s\n", self->view.needsDisplay ? "YES" : "NO");
+    for (ii = 0; ii < 3; ii++) {
+        for (jj = 0; jj < 3; jj++) {
+            WidgetObject* o = self->objects[ii][jj];
+            if (!o) continue;
+            view = o->view;
+            if (!view) continue;
+            printf("BEFORE: grid[%d][%d] needs display? %s\n", ii, jj, view.needsDisplay ? "YES" : "NO");
+        }
+    }
+    view.needsDisplay = YES;
+    printf("AFTER: grid needs display? %s\n", self->view.needsDisplay ? "YES" : "NO");
+    for (ii = 0; ii < 3; ii++) {
+        for (jj = 0; jj < 3; jj++) {
+            WidgetObject* o = self->objects[ii][jj];
+            if (!o) continue;
+            view = o->view;
+            if (!view) continue;
+            printf("AFTER: grid[%d][%d] needs display? %s\n", ii, jj, view.needsDisplay ? "YES" : "NO");
+        }
+    }
     return size;
 }
 
@@ -320,13 +366,32 @@ static int Grid_set_item(GridObject* self, PyObject* key, PyObject* value) {
         [object->view removeFromSuperview];
         Py_DECREF(object);
     }
+    Py_ssize_t ii;
+    Py_ssize_t jj;
+    for (ii = 0; ii < 2; ii++) {
+        for (jj = 0; jj < 2; jj++) {
+            WidgetObject* o = self->objects[ii][jj];
+            if (!o) continue;
+            NSView* v = o->view;
+            if (!v) continue;
+            printf("DURING: grid[%d][%d] needs display? %s\n", ii, jj, v.needsDisplay ? "YES" : "NO");
+        }
+    }
     if (value) {
         Py_INCREF(value);
         [self->view addSubview: view];
     }
     self->objects[irow][icol] = widget;
-    [self->view frameDidChange:nil];
-
+    for (irow = 0; irow < 2; irow++) {
+        for (icol = 0; icol < 2; icol++) {
+            object = self->objects[irow][icol];
+            if (!object) continue;
+            view = object->view;
+            if (!view) continue;
+            printf("AFTER: grid[%d][%d] needs display? %s\n", irow, icol, view.needsDisplay ? "YES" : "NO");
+        }
+    }
+    self->view.needsDisplay = YES;
     return 0;
 }
 

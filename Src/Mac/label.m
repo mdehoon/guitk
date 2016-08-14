@@ -33,6 +33,42 @@ typedef struct {
     NSFont* font;
 } LabelObject;
 
+static CFStringRef PyString_AsCFString(const PyObject* object)
+{
+    if (object==NULL) {
+        return CFSTR("");
+    }
+    if (PyString_Check(object)) {
+        const char* text = PyString_AS_STRING(object); 
+        return CFStringCreateWithCString(kCFAllocatorDefault, text, kCFStringEncodingUTF8);
+    }
+    if (PyUnicode_Check(object)) {
+        const UniChar* text = (const UniChar*)PyUnicode_AS_DATA(object); 
+        const Py_ssize_t size = PyUnicode_GET_SIZE(object);
+        return CFStringCreateWithCharacters(kCFAllocatorDefault, text, size);
+    }
+    return NULL;
+}
+
+static PyObject* PyString_FromCFString(const CFStringRef text)
+{
+    PyObject* object;
+    CFIndex usedBufLen;
+    UInt8* buffer;
+    size_t size;
+    CFRange range;
+    range.location = 0;
+    range.length = CFStringGetLength(text);
+    CFStringGetBytes(text, range, kCFStringEncodingUTF8, 0, false, NULL, 0, &usedBufLen);
+    size = usedBufLen*sizeof(UInt8);
+    buffer = malloc(size);
+    if (!buffer) return PyErr_NoMemory();
+    CFStringGetBytes(text, range, kCFStringEncodingUTF8, 0, false, buffer, size, &usedBufLen);
+    object = PyString_FromStringAndSize((const char*)buffer, usedBufLen);
+    free(buffer);
+    return object;
+}
+
 @implementation Label
 - (PyObject*)object
 {
@@ -70,6 +106,8 @@ typedef struct {
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
+    const CGFloat* components = CGColorGetComponents(object->background);
+    printf("In drawRect for label %f, %f\n", components[0], components[1]);
     CGContextSetFillColorWithColor(cr, object->background);
     rect = NSRectToCGRect(dirtyRect);
     CGContextFillRect(cr, rect);
@@ -129,13 +167,18 @@ static int
 Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
 {
     Label *label;
-    const char* string = "";
+    const PyObject* argument = NULL;
     CGColorRef background;
     CFStringRef text;
     NSRect rect;
     NSFont* font;
 
-    if(!PyArg_ParseTuple(args, "|s", &string)) return -1;
+    if(!PyArg_ParseTuple(args, "|O", &argument)) return -1;
+    text = PyString_AsCFString(argument);
+    if (!text) {
+        PyErr_SetString(PyExc_TypeError, "string or unicode string expected");
+        return -1;
+    }
 
     rect.origin.x = 0;
     rect.origin.y = 0;
@@ -143,7 +186,6 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
     rect.size.height = 100;
     label = [[Label alloc] initWithFrame: rect withObject: (PyObject*)self];
     font = [NSFont systemFontOfSize: 13.0];
-    text = CFStringCreateWithCString(kCFAllocatorDefault, string, kCFStringEncodingUTF8);
     background = CGColorGetConstantColor(kCGColorClear);
     CGColorRetain(background);
     [font retain];
@@ -233,6 +275,26 @@ static PyMethodDef Label_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+static PyObject* Label_get_text(LabelObject* self, void* closure)
+{
+    return PyString_FromCFString(self->text);
+}
+
+static int
+Label_set_text(LabelObject* self, PyObject* value, void* closure)
+{
+    CFStringRef text;
+    Label* label = self->label;
+    text = PyString_AsCFString(value);
+    if (!text) return -1;
+    if (self->text) CFRelease(self->text);
+    self->text = text;
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_text__doc__[] = "label text.";
+
 static PyObject* Label_get_background(LabelObject* self, void* closure)
 {
     const CGFloat* components = CGColorGetComponents(self->background);
@@ -281,6 +343,7 @@ Label_set_background(LabelObject* self, PyObject* value, void* closure)
 static char Label_background__doc__[] = "background color.";
 
 static PyGetSetDef Label_getseters[] = {
+    {"text", (getter)Label_get_text, (setter)Label_set_text, Label_text__doc__, NULL},
     {"background", (getter)Label_get_background, (setter)Label_set_background, Label_background__doc__, NULL},
     {NULL}  /* Sentinel */
 };
