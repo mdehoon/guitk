@@ -31,6 +31,7 @@ typedef struct {
     CGColorRef background;
     CFStringRef text;
     NSFont* font;
+    PyObject* minimum_size;
 } LabelObject;
 
 static CFStringRef PyString_AsCFString(const PyObject* object)
@@ -113,7 +114,6 @@ static PyObject* PyString_FromCFString(const CFStringRef text)
     CGContextFillRect(cr, rect);
     keys[0] = kCTFontAttributeName;
     values[0] = object->font;
-    values[0] = [NSFont systemFontOfSize: 13.0];
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
                                     (const void**)&values,
@@ -132,7 +132,6 @@ static PyObject* PyString_FromCFString(const CFStringRef text)
     size = rect.size;
     y = 0.5 * size.height;
     x = 0.5 * size.width;
-    rect = CTLineGetImageBounds(line, cr);
     width = CTLineGetTypographicBounds(line, &ascent, &descent, NULL);
     height = ascent + descent;
     x -= 0.5 * width;
@@ -160,6 +159,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->background = NULL;
     self->text = NULL;
     self->font = nil;
+    self->minimum_size = NULL;
     return (PyObject*)self;
 }
 
@@ -244,33 +244,11 @@ Label_set_position(LabelObject* self, PyObject *args)
     return Py_None;
 }
 
-static PyObject*
-Label_get_size(LabelObject* self, PyObject *args)
-{
-    float width;
-    float height;
-    NSRect frame;
-    Label* label = self->label;
-    if (!label) {
-        PyErr_SetString(PyExc_RuntimeError, "label has not been initialized");
-        return NULL;
-    }
-    frame = [label frame];
-    width = frame.size.width;
-    height = frame.size.height;
-    return Py_BuildValue("ff", width, height);
-}
-
 static PyMethodDef Label_methods[] = {
     {"set_position",
      (PyCFunction)Label_set_position,
      METH_VARARGS,
      "Moves the label to the new position."
-    },
-    {"get_size",
-     (PyCFunction)Label_get_size,
-     METH_NOARGS,
-     "Returns the size of the label."
     },
     {NULL}  /* Sentinel */
 };
@@ -289,6 +267,10 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
     if (!text) return -1;
     if (self->text) CFRelease(self->text);
     self->text = text;
+    if (self->minimum_size) {
+        Py_DECREF(self->minimum_size);
+        self->minimum_size = NULL;
+    }
     label.needsDisplay = YES;
     return 0;
 }
@@ -342,9 +324,57 @@ Label_set_background(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_background__doc__[] = "background color.";
 
+static PyObject* Label_calculate_minimum_size(LabelObject* self)
+{
+    CGFloat ascent;
+    CGFloat descent;
+    CGFloat width;
+    CGFloat height;
+    CTLineRef line;
+    CFAttributedStringRef string;
+    CFDictionaryRef attributes;
+    CFStringRef keys[1];
+    CFTypeRef values[1];
+    keys[0] = kCTFontAttributeName;
+    values[0] = self->font;
+    attributes = CFDictionaryCreate(kCFAllocatorDefault,
+                                    (const void**)&keys,
+                                    (const void**)&values,
+                                    1,
+                                    &kCFTypeDictionaryKeyCallBacks,
+                                    &kCFTypeDictionaryValueCallBacks);
+    if (!attributes) return PyErr_NoMemory();
+    string = CFAttributedStringCreate(kCFAllocatorDefault,
+                                      self->text,
+                                      attributes);
+    CFRelease(attributes);
+    if (!string) return PyErr_NoMemory();
+    line = CTLineCreateWithAttributedString(string);
+    CFRelease(string);
+    if (!line) return PyErr_NoMemory();
+    width = CTLineGetTypographicBounds(line, &ascent, &descent, NULL);
+    height = ascent + descent;
+    return Py_BuildValue("ff", width, height);
+}
+
+static PyObject* Label_get_minimum_size(LabelObject* self, void* closure)
+{
+    PyObject* minimum_size = self->minimum_size;
+    if (minimum_size)
+        Py_INCREF(minimum_size);
+    else {
+        minimum_size = Label_calculate_minimum_size(self);
+        self->minimum_size = minimum_size;
+    }
+    return minimum_size;
+}
+
+static char Label_minimum_size__doc__[] = "minimum size needed to show the label.";
+
 static PyGetSetDef Label_getseters[] = {
     {"text", (getter)Label_get_text, (setter)Label_set_text, Label_text__doc__, NULL},
     {"background", (getter)Label_get_background, (setter)Label_set_background, Label_background__doc__, NULL},
+    {"minimum_size", (getter)Label_get_minimum_size, (setter)NULL, Label_minimum_size__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
