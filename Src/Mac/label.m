@@ -360,12 +360,11 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self)
 static PyObject* Label_get_minimum_size(LabelObject* self, void* closure)
 {
     PyObject* minimum_size = self->minimum_size;
-    if (minimum_size)
-        Py_INCREF(minimum_size);
-    else {
+    if (minimum_size==NULL) {
         minimum_size = Label_calculate_minimum_size(self);
         self->minimum_size = minimum_size;
     }
+    Py_INCREF(minimum_size);
     return minimum_size;
 }
 

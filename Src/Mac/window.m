@@ -591,8 +591,8 @@ static char Window_height__doc__[] = "height of window content";
 
 static PyObject* Window_get_size(WindowObject* self, void* closure)
 {
-    int width;
-    int height;
+    CGFloat width;
+    CGFloat height;
     NSRect frame;
     NSWindow* window = self->window;
     if (!window) {
@@ -600,15 +600,15 @@ static PyObject* Window_get_size(WindowObject* self, void* closure)
         return NULL;
     }
     frame = [[window contentView] frame];
-    width = round(frame.size.width);
-    height = round(frame.size.height);
-    return Py_BuildValue("ii", width, height);
+    width = frame.size.width;
+    height = frame.size.height;
+    return Py_BuildValue("dd", width, height);
 }
 
 static int Window_set_size(WindowObject* self, PyObject* value, void* closure)
 {
-    int width;
-    int height;
+    double width;
+    double height;
     NSRect frame;
     NSSize size;
     NSPoint point;
@@ -621,7 +621,7 @@ static int Window_set_size(WindowObject* self, PyObject* value, void* closure)
     size = frame.size;
     point = frame.origin;
     point.y += size.height;
-    if (!PyArg_ParseTuple(value, "ii", &width, &height)) return -1;
+    if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
     size.width = width;
     size.height = height;
     [window setContentSize: size];

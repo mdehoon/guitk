@@ -132,24 +132,24 @@ static char Widget_origin__doc__[] = "position of the top-left corner of the wid
 
 static PyObject* Widget_get_size(WidgetObject* self, void* closure)
 {
-    int width;
-    int height;
+    CGFloat width;
+    CGFloat height;
     NSRect frame;
     NSView* view = self->view;
     frame = [view frame];
-    width = round(frame.size.width);
-    height = round(frame.size.height);
-    return Py_BuildValue("ii", width, height);
+    width = frame.size.width;
+    height = frame.size.height;
+    return Py_BuildValue("dd", width, height);
 }
 
 static int Widget_set_size(WidgetObject* self, PyObject* value, void* closure)
 {
-    int width;
-    int height;
+    double width;
+    double height;
     NSSize size;
     NSView* view = self->view;
     NSWindow* window = [view window];
-    if (!PyArg_ParseTuple(value, "ii", &width, &height)) return -1;
+    if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
     if (view == [window contentView])
     {
         PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be resized.");
