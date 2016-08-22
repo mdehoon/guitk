@@ -2,10 +2,6 @@
 #include <Cocoa/Cocoa.h>
 
 
-@protocol Widget
-@property (readonly) PyObject* object;
-@end
-
 typedef struct {
     PyObject_HEAD
     NSView* view;

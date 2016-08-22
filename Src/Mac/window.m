@@ -35,6 +35,7 @@
 typedef struct {
     PyObject_HEAD
     Window* window;
+    PyObject* contents;
 } WindowObject;
 
 static int converter(PyObject* object, void* address)
@@ -119,6 +120,10 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
     self->window = window;
 
     [pool release];
+
+    Py_INCREF(Py_None);
+    self->contents = Py_None;
+
     return 0;
 }
 
@@ -140,6 +145,7 @@ Window_dealloc(WindowObject* self)
 {
     NSWindow* window = self->window;
     if (window) [window release];
+    Py_DECREF(self->contents);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -349,18 +355,12 @@ static PyMethodDef Window_methods[] = {
 static PyObject* Window_get_contents(WindowObject* self, void* closure)
 {
     PyObject* object;
-    NSView* view;
     NSWindow* window = self->window;
     if (!window) {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    view = [window contentView];
-    if ([[view class] conformsToProtocol:@protocol(Widget)]) {
-        NSView <Widget> *v = (NSView <Widget> *)view;
-        object = v.object;
-    }
-    else object = Py_None;
+    object = self->contents;
     Py_INCREF(object);
     return object;
 }
@@ -381,15 +381,12 @@ Window_set_contents(WindowObject* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_ValueError, "expected a widget or None");
         return -1;
     }
-    view = [window contentView];
-    if ([[view class] conformsToProtocol:@protocol(Widget)]) {
-        NSView <Widget> *v = (NSView <Widget> *)view;
-        Py_DECREF(v.object);
-    }
     widget = (WidgetObject*)value;
     view = widget->view;
     [window setContentView: view];
+    Py_DECREF(self->contents);
     Py_INCREF(value);
+    self->contents = value;
     return 0;
 }
 

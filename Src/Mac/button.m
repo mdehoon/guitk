@@ -11,7 +11,7 @@
 #endif
 #endif
 
-@interface Button : NSButton <Widget>
+@interface Button : NSButton
 {
     PyObject* _object;
 }

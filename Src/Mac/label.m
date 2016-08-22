@@ -15,7 +15,7 @@
 #define COMPILING_FOR_10_10
 #endif
 
-@interface Label : NSView <Widget>
+@interface Label : NSView
 {
     PyObject* _object;
 }

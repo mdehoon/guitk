@@ -23,7 +23,7 @@
 #define CGFloat float
 #endif
 
-@interface GridView : NSView <Widget>
+@interface GridView : NSView
 {
     PyObject* _object;
 }
