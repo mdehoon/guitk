@@ -9,3 +9,9 @@ extern PyTypeObject WindowType;
 @property PyObject* object;
 - (void)windowWillClose:(NSNotification *)notification;
 @end
+
+typedef struct {
+    PyObject_HEAD
+    Window* window;
+    PyObject* content;
+} WindowObject;

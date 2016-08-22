@@ -8,6 +8,7 @@ typedef struct {
 } WidgetObject;
 
 extern PyTypeObject WidgetType;
+extern PyTypeObject LayoutType;
 extern PyTypeObject LabelType;
 extern PyTypeObject ButtonType;
 extern PyTypeObject GridType;

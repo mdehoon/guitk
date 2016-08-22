@@ -1,6 +1,7 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
+#include "window.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -22,6 +23,14 @@
 #ifndef CGFloat
 #define CGFloat float
 #endif
+
+typedef struct {
+    PyObject_HEAD
+    NSView* view;
+    BOOL layout_requested;
+} LayoutObject;
+
+PyTypeObject LayoutType;
 
 @interface WidgetView : NSView
 {
@@ -92,14 +101,24 @@ Widget_resize(WidgetObject* self, PyObject *args, PyObject *keywords)
 static PyObject*
 Widget_request_layout(WidgetObject* self)
 {
-    NSWindow* window;
+    Window* window;
+    WindowObject* object;
+    PyObject* content;
+    LayoutObject* layout;
     NSView* view = self->view;
     if (!view) {
         PyErr_SetString(PyExc_RuntimeError, "widget does not have a view");
         return NULL;
     }
-    window = [view window];
-    view = [window contentView];
+    window = (Window*) [view window];
+    if (window) {
+        object = (WindowObject*) window.object;
+        content = object->content;
+        if (PyObject_TypeCheck(content, &LayoutType)) {
+            layout = (LayoutObject*)content;
+            layout->layout_requested = true;
+        }
+    }
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -231,4 +250,96 @@ PyTypeObject WidgetType = {
     0,                          /* tp_init */
     0,                          /* tp_alloc */
     Widget_new,                 /* tp_new */
+};
+
+static PyObject*
+Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    LayoutObject *self = (LayoutObject*)type->tp_alloc(type, 0);
+    if (!self) return NULL;
+    self->view = NULL;
+    self->layout_requested = false;
+    return (PyObject*)self;
+}
+
+static PyObject*
+Layout_repr(LayoutObject* self)
+{
+    NSView* view = self->view;
+#if PY3K
+    return PyUnicode_FromFormat("Layout object %p wrapping NSView %p",
+                               self, view);
+#else
+    return PyString_FromFormat("Layout object %p wrapping NSView %p",
+                                self, view);
+#endif
+}
+
+static void
+Layout_dealloc(WidgetObject* self)
+{
+    NSView* view = self->view;
+    if (view) [view release];
+    Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+static PyMethodDef Layout_methods[] = {
+    {NULL}  /* Sentinel */
+};
+
+static PyObject* Layout_get_layout_requested(LayoutObject* self, void* closure)
+{
+    if (self->layout_requested) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static char Layout_layout_requested__doc__[] = "True if any of the widgets managed by this layout requested the layout to be recalculated";
+
+static PyGetSetDef Layout_getset[] = {
+    {"layout_requested", (getter)Layout_get_layout_requested, (setter)NULL, Layout_layout_requested__doc__, NULL},
+    {NULL}  /* Sentinel */
+};
+
+static char Layout_doc[] =
+"Layout is the base class for layout managers.\n";
+
+PyTypeObject LayoutType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "gui.Layout",               /* tp_name */
+    sizeof(LayoutObject),       /* tp_basicsize */
+    0,                          /* tp_itemsize */
+    (destructor)Layout_dealloc, /* tp_dealloc */
+    0,                          /* tp_print */
+    0,                          /* tp_getattr */
+    0,                          /* tp_setattr */
+    0,                          /* tp_compare */
+    (reprfunc)Layout_repr,      /* tp_repr */
+    0,                          /* tp_as_number */
+    0,                          /* tp_as_sequence */
+    0,                          /* tp_as_mapping */
+    0,                          /* tp_hash */
+    0,                          /* tp_call */
+    0,                          /* tp_str */
+    0,                          /* tp_getattro */
+    0,                          /* tp_setattro */
+    0,                          /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /* tp_flags */
+    Layout_doc,                 /* tp_doc */
+    0,                          /* tp_traverse */
+    0,                          /* tp_clear */
+    0,                          /* tp_richcompare */
+    0,                          /* tp_weaklistoffset */
+    0,                          /* tp_iter */
+    0,                          /* tp_iternext */
+    Layout_methods,             /* tp_methods */
+    0,                          /* tp_members */
+    Layout_getset,              /* tp_getset */
+    &WidgetType,                /* tp_base */
+    0,                          /* tp_dict */
+    0,                          /* tp_descr_get */
+    0,                          /* tp_descr_set */
+    0,                          /* tp_dictoffset */
+    0,                          /* tp_init */
+    0,                          /* tp_alloc */
+    Layout_new,                 /* tp_new */
 };

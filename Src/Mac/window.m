@@ -32,12 +32,6 @@
 }
 @end
 
-typedef struct {
-    PyObject_HEAD
-    Window* window;
-    PyObject* contents;
-} WindowObject;
-
 static int converter(PyObject* object, void* address)
 {
     NSWindow** p;
@@ -122,7 +116,7 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
     [pool release];
 
     Py_INCREF(Py_None);
-    self->contents = Py_None;
+    self->content = Py_None;
 
     return 0;
 }
@@ -145,7 +139,7 @@ Window_dealloc(WindowObject* self)
 {
     NSWindow* window = self->window;
     if (window) [window release];
-    Py_DECREF(self->contents);
+    Py_DECREF(self->content);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -352,7 +346,7 @@ static PyMethodDef Window_methods[] = {
     {NULL}  /* Sentinel */
 };
 
-static PyObject* Window_get_contents(WindowObject* self, void* closure)
+static PyObject* Window_get_content(WindowObject* self, void* closure)
 {
     PyObject* object;
     NSWindow* window = self->window;
@@ -360,13 +354,13 @@ static PyObject* Window_get_contents(WindowObject* self, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    object = self->contents;
+    object = self->content;
     Py_INCREF(object);
     return object;
 }
 
 static int
-Window_set_contents(WindowObject* self, PyObject* value, void* closure)
+Window_set_content(WindowObject* self, PyObject* value, void* closure)
 {
     PyTypeObject* type;
     WidgetObject* widget;
@@ -384,13 +378,13 @@ Window_set_contents(WindowObject* self, PyObject* value, void* closure)
     widget = (WidgetObject*)value;
     view = widget->view;
     [window setContentView: view];
-    Py_DECREF(self->contents);
+    Py_DECREF(self->content);
     Py_INCREF(value);
-    self->contents = value;
+    self->content = value;
     return 0;
 }
 
-static char Window_contents__doc__[] = "window contents";
+static char Window_content__doc__[] = "window content";
 
 static PyObject* Window_get_title(WindowObject* self, void* closure)
 {
@@ -1118,7 +1112,7 @@ static PyObject* Window_get_children(WindowObject* self, void* closure)
 static char Window_children__doc__[] = "child windows (as set by add_children).";
 
 static PyGetSetDef Window_getset[] = {
-    {"contents", (getter)Window_get_contents, (setter)Window_set_contents, Window_contents__doc__, NULL},
+    {"content", (getter)Window_get_content, (setter)Window_set_content, Window_content__doc__, NULL},
     {"title", (getter)Window_get_title, (setter)Window_set_title, Window_title__doc__, NULL},
     {"origin", (getter)Window_get_origin, (setter)Window_set_origin, Window_origin__doc__, NULL},
     {"width", (getter)Window_get_width, (setter)Window_set_width, Window_width__doc__, NULL},

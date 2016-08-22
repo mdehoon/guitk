@@ -137,6 +137,8 @@ void initgui(void)
         goto error;
     if (PyType_Ready(&WidgetType) < 0)
         goto error;
+    if (PyType_Ready(&LayoutType) < 0)
+        goto error;
     if (PyType_Ready(&GridType) < 0)
         goto error;
     if (PyType_Ready(&ImageType) < 0)
@@ -148,6 +150,7 @@ void initgui(void)
 
     Py_INCREF(&WindowType);
     Py_INCREF(&WidgetType);
+    Py_INCREF(&LayoutType);
     Py_INCREF(&GridType);
     Py_INCREF(&ImageType);
     Py_INCREF(&LabelType);
@@ -156,6 +159,8 @@ void initgui(void)
     if (PyModule_AddObject(module, "Window", (PyObject*) &WindowType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Widget", (PyObject*) &WidgetType) < 0)
+        goto error;
+    if (PyModule_AddObject(module, "Layout", (PyObject*) &LayoutType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Grid", (PyObject*) &GridType) < 0)
         goto error;
