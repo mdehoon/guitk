@@ -89,11 +89,31 @@ Widget_resize(WidgetObject* self, PyObject *args, PyObject *keywords)
     return NULL;
 }
 
+static PyObject*
+Widget_request_layout(WidgetObject* self)
+{
+    NSWindow* window;
+    NSView* view = self->view;
+    if (!view) {
+        PyErr_SetString(PyExc_RuntimeError, "widget does not have a view");
+        return NULL;
+    }
+    window = [view window];
+    view = [window contentView];
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static PyMethodDef Widget_methods[] = {
     {"resize",
      (PyCFunction)Widget_resize,
      METH_KEYWORDS | METH_VARARGS,
      "Resizes the widget."
+    },
+    {"request_layout",
+     (PyCFunction)Widget_request_layout,
+     METH_NOARGS,
+     "Requests that the layout managers recalculates its layout."
     },
     {NULL}  /* Sentinel */
 };

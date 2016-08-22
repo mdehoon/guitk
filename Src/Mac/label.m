@@ -261,6 +261,7 @@ static PyObject* Label_get_text(LabelObject* self, void* closure)
 static int
 Label_set_text(LabelObject* self, PyObject* value, void* closure)
 {
+    PyObject* result;
     CFStringRef text;
     Label* label = self->label;
     text = PyString_AsCFString(value);
@@ -272,6 +273,11 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
         self->minimum_size = NULL;
     }
     label.needsDisplay = YES;
+    result = PyObject_CallMethod((PyObject*)self, "request_layout", NULL);
+    if(result)
+        Py_DECREF(result);
+    else
+        PyErr_Print();
     return 0;
 }
 
