@@ -24,21 +24,36 @@
 #define CGFloat float
 #endif
 
+@interface LayoutView : WidgetView
+- (void)viewWillDraw;
+@end
+
 typedef struct {
     PyObject_HEAD
-    NSView* view;
-    BOOL layout_requested;
+    LayoutView* view;
 } LayoutObject;
 
 PyTypeObject LayoutType;
 
-@interface WidgetView : NSView
+@implementation LayoutView
+- (void)viewWillDraw
 {
-    PyObject* _object;
+    Window* window = (Window*) [self window];
+    WindowObject* object = window.object;
+    if (object->layout_requested) {
+        PyObject* result;
+        PyGILState_STATE gstate = PyGILState_Ensure();
+        result = PyObject_CallMethod(_object, "layout", NULL);
+        if (result)
+            Py_DECREF(result);
+        else
+            PyErr_Print();
+        PyGILState_Release(gstate);
+    }
+    /* Don't call [super viewWillDraw]; we only want the top view to receive
+     * this notification.
+     */
 }
-@property (readonly) PyObject* object;
-- (WidgetView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
-- (BOOL)isFlipped;
 @end
 
 @implementation WidgetView
@@ -98,27 +113,15 @@ Widget_resize(WidgetObject* self, PyObject *args, PyObject *keywords)
     return NULL;
 }
 
+
 static PyObject*
-Widget_request_layout(WidgetObject* self)
+Widget_remove(WidgetObject* self)
 {
     Window* window;
-    WindowObject* object;
-    PyObject* content;
-    LayoutObject* layout;
-    NSView* view = self->view;
-    if (!view) {
-        PyErr_SetString(PyExc_RuntimeError, "widget does not have a view");
-        return NULL;
-    }
+    WidgetView* view = self->view;
+    [view removeFromSuperview];
     window = (Window*) [view window];
-    if (window) {
-        object = (WindowObject*) window.object;
-        content = object->content;
-        if (PyObject_TypeCheck(content, &LayoutType)) {
-            layout = (LayoutObject*)content;
-            layout->layout_requested = true;
-        }
-    }
+    [window requestLayout];
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -129,10 +132,10 @@ static PyMethodDef Widget_methods[] = {
      METH_KEYWORDS | METH_VARARGS,
      "Resizes the widget."
     },
-    {"request_layout",
-     (PyCFunction)Widget_request_layout,
+    {"remove",
+     (PyCFunction)Widget_remove,
      METH_NOARGS,
-     "Requests that the layout managers recalculates its layout."
+     "Removes the widget from its superview."
     },
     {NULL}  /* Sentinel */
 };
@@ -150,12 +153,12 @@ static PyObject* Widget_get_origin(WidgetObject* self, void* closure)
 
 static int Widget_set_origin(WidgetObject* self, PyObject* value, void* closure)
 {
-    int x;
-    int y;
+    CGFloat x;
+    CGFloat y;
     NSPoint point;
     NSView* view = self->view;
     NSWindow* window = [view window];
-    if (!PyArg_ParseTuple(value, "ii", &x, &y)) return -1;
+    if (!PyArg_ParseTuple(value, "ff", &x, &y)) return -1;
     if (view == [window contentView])
     {
         PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be moved.");
@@ -255,11 +258,13 @@ PyTypeObject WidgetType = {
 static PyObject*
 Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+    PyObject* object;
+    NSRect rect = NSZeroRect;
     LayoutObject *self = (LayoutObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
-    self->view = NULL;
-    self->layout_requested = false;
-    return (PyObject*)self;
+    object = (PyObject*)self;
+    self->view = [[LayoutView alloc] initWithFrame:rect withObject:object];
+    return object;
 }
 
 static PyObject*
@@ -283,20 +288,39 @@ Layout_dealloc(WidgetObject* self)
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
+static PyObject*
+Layout_add(LayoutObject* self, PyObject *args)
+{
+    Window* window;
+    WidgetView* view;
+    WidgetObject* widget;
+    LayoutView* layout = self->view;
+    if (!layout) {
+        PyErr_SetString(PyExc_RuntimeError, "layout has not been initialized");
+        return NULL;
+    }
+    if(!PyArg_ParseTuple(args, "O!", &WidgetType, &widget))
+        return NULL;
+
+    view = widget->view;
+    [layout addSubview: view];
+    window = (Window*) [view window];
+    [window requestLayout];
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static PyMethodDef Layout_methods[] = {
+    {"add",
+     (PyCFunction)Layout_add,
+     METH_VARARGS,
+     "Adds a widget to the layout manager."
+    },
     {NULL}  /* Sentinel */
 };
 
-static PyObject* Layout_get_layout_requested(LayoutObject* self, void* closure)
-{
-    if (self->layout_requested) Py_RETURN_TRUE;
-    Py_RETURN_FALSE;
-}
-
-static char Layout_layout_requested__doc__[] = "True if any of the widgets managed by this layout requested the layout to be recalculated";
-
 static PyGetSetDef Layout_getset[] = {
-    {"layout_requested", (getter)Layout_get_layout_requested, (setter)NULL, Layout_layout_requested__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 

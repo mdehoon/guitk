@@ -28,7 +28,6 @@ sources = ["Src/Mac/gui.m",
            "Src/Mac/window.m",
            "Src/Mac/image.m",
            "Src/Mac/widgets.m",
-           "Src/Mac/grid.m",
            "Src/Mac/label.m",
            "Src/Mac/button.m",
           ]

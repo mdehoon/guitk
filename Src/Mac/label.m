@@ -1,5 +1,6 @@
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
+#include "window.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -15,19 +16,15 @@
 #define COMPILING_FOR_10_10
 #endif
 
-@interface Label : NSView
-{
-    PyObject* _object;
-}
-@property (readonly) PyObject* object;
-- (Label*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
+@interface LabelView : WidgetView
+- (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
 - (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
 @end
 
 typedef struct {
     PyObject_HEAD
-    Label* label;
+    LabelView* label;
     CGColorRef background;
     CFStringRef text;
     NSFont* font;
@@ -70,13 +67,13 @@ static PyObject* PyString_FromCFString(const CFStringRef text)
     return object;
 }
 
-@implementation Label
+@implementation LabelView
 - (PyObject*)object
 {
     return (PyObject*)_object;
 }
 
-- (Label*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
+- (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
 {
     self = [super initWithFrame: rect];
     _object = object;
@@ -166,7 +163,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
 {
-    Label *label;
+    LabelView *label;
     const PyObject* argument = NULL;
     CGColorRef background;
     CFStringRef text;
@@ -184,7 +181,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
     rect.origin.y = 0;
     rect.size.width = 100;
     rect.size.height = 100;
-    label = [[Label alloc] initWithFrame: rect withObject: (PyObject*)self];
+    label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
     font = [NSFont systemFontOfSize: 13.0];
     background = CGColorGetConstantColor(kCGColorClear);
     CGColorRetain(background);
@@ -212,7 +209,7 @@ Label_repr(LabelObject* self)
 static void
 Label_dealloc(LabelObject* self)
 {
-    Label* label = self->label;
+    LabelView* label = self->label;
     CFStringRef text = self->text;
     NSFont* font = self->font;
     if (label) [label release];
@@ -228,7 +225,7 @@ Label_set_position(LabelObject* self, PyObject *args)
     float x;
     float y;
     NSPoint position;
-    Label* label = self->label;
+    LabelView* label = self->label;
     if (!label) {
         PyErr_SetString(PyExc_RuntimeError, "label has not been initialized");
         return NULL;
@@ -261,9 +258,9 @@ static PyObject* Label_get_text(LabelObject* self, void* closure)
 static int
 Label_set_text(LabelObject* self, PyObject* value, void* closure)
 {
-    PyObject* result;
     CFStringRef text;
-    Label* label = self->label;
+    Window* window;
+    LabelView* label = self->label;
     text = PyString_AsCFString(value);
     if (!text) return -1;
     if (self->text) CFRelease(self->text);
@@ -273,11 +270,8 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
         self->minimum_size = NULL;
     }
     label.needsDisplay = YES;
-    result = PyObject_CallMethod((PyObject*)self, "request_layout", NULL);
-    if(result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
+    window = (Window*) [label window];
+    [window requestLayout];
     return 0;
 }
 
@@ -302,7 +296,7 @@ Label_set_background(LabelObject* self, PyObject* value, void* closure)
     CGFloat rgba[4];
     CGColorRef background;
     CGColorSpaceRef colorspace;
-    Label* label = self->label;
+    LabelView* label = self->label;
     if (!PyTuple_Check(value)) {
         PyErr_SetString(PyExc_TypeError, "expected a tuple");
         return -1;

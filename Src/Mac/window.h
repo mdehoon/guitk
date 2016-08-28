@@ -2,16 +2,23 @@
 
 extern PyTypeObject WindowType;
 
-@interface Window : NSWindow <NSWindowDelegate>
-{
-    PyObject* object;
-}
-@property PyObject* object;
-- (void)windowWillClose:(NSNotification *)notification;
-@end
+@class Window;
 
 typedef struct {
     PyObject_HEAD
     Window* window;
     PyObject* content;
+    BOOL layout_requested;
 } WindowObject;
+
+@interface Window : NSWindow <NSWindowDelegate>
+{
+    WindowObject* _object;
+}
+@property (readonly) WindowObject* object;
+- (Window*)initWithContentRect: (NSRect)rect
+                     styleMask: (NSUInteger)windowStyle
+                        object: (WindowObject*)object;
+- (void)windowWillClose:(NSNotification *)notification;
+- (void)requestLayout;
+@end
