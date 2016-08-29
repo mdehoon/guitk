@@ -1,8 +1,10 @@
+# Original Tkinter version is available here:
+# http://effbot.org/tkinterbook/tkinter-hello-tkinter.htm
+
 from guitk import gui
 
-window = gui.Window(300,100, 'Hello')
+window = gui.Window()
 label = gui.Label("Hello, world!")
-label.background = (1, 1, 0, 0.5)
-window.contents = label
+window.content = label
+window.size = label.minimum_size
 window.show()
-
