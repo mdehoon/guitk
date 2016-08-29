@@ -24,7 +24,8 @@ typedef struct {
     Button* button;
     NSString* text;
     NSFont* font;
-} PyButton;
+    PyObject* minimum_size;
+} ButtonObject;
 
 @implementation Button
 
@@ -56,13 +57,14 @@ typedef struct {
 static PyObject*
 Button_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    PyButton *self = (PyButton*)type->tp_alloc(type, 0);
+    ButtonObject *self = (ButtonObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
+    self->minimum_size = NULL;
     return (PyObject*)self;
 }
 
 static int
-Button_init(PyButton *self, PyObject *args, PyObject *kwds)
+Button_init(ButtonObject *self, PyObject *args, PyObject *kwds)
 {
     Button *button;
     const char* title = "";
@@ -80,7 +82,7 @@ Button_init(PyButton *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject*
-Button_repr(PyButton* self)
+Button_repr(ButtonObject* self)
 {
 #if PY3K
     return PyUnicode_FromFormat("Button object %p wrapping NSButton %p",
@@ -92,7 +94,7 @@ Button_repr(PyButton* self)
 }
 
 static void
-Button_dealloc(PyButton* self)
+Button_dealloc(ButtonObject* self)
 {
     Button* button = self->button;
     if (button)
@@ -105,7 +107,7 @@ Button_dealloc(PyButton* self)
 }
 
 static PyObject*
-Button_set_frame(PyButton* self, PyObject *args)
+Button_set_frame(ButtonObject* self, PyObject *args)
 {
     float x0;
     float y0;
@@ -134,7 +136,7 @@ Button_set_frame(PyButton* self, PyObject *args)
 }
 
 static PyObject*
-Button_get_size(PyButton* self, PyObject *args)
+Button_get_size(ButtonObject* self, PyObject *args)
 {
     float width;
     float height;
@@ -151,7 +153,7 @@ Button_get_size(PyButton* self, PyObject *args)
 }
 
 static PyObject*
-Button_set_size(PyButton* self, PyObject *args)
+Button_set_size(ButtonObject* self, PyObject *args)
 {
     float width;
     float height;
@@ -192,7 +194,23 @@ static PyMethodDef Button_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+static PyObject* Button_get_minimum_size(ButtonObject* self, void* closure)
+{
+    PyObject* minimum_size = self->minimum_size;
+    if (minimum_size==NULL) {
+        Button* button = self->button;
+        NSSize size = [[button cell] cellSize];
+        minimum_size = Py_BuildValue("ff", size.width, size.height);
+        self->minimum_size = minimum_size;
+    }
+    Py_INCREF(minimum_size);
+    return minimum_size;
+}
+
+static char Button_minimum_size__doc__[] = "minimum size needed to show the button.";
+
 static PyGetSetDef Button_getseters[] = {
+    {"minimum_size", (getter)Button_get_minimum_size, (setter)NULL, Button_minimum_size__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
@@ -202,7 +220,7 @@ static char Button_doc[] =
 PyTypeObject ButtonType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Button",            /* tp_name */
-    sizeof(PyButton),           /* tp_basicsize */
+    sizeof(ButtonObject),       /* tp_basicsize */
     0,                          /* tp_itemsize */
     (destructor)Button_dealloc, /* tp_dealloc */
     0,                          /* tp_print */

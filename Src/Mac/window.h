@@ -20,5 +20,6 @@ typedef struct {
                      styleMask: (NSUInteger)windowStyle
                         object: (WindowObject*)object;
 - (void)windowWillClose:(NSNotification *)notification;
+- (void)windowDidResize:(NSNotification *)notification;
 - (void)requestLayout;
 @end

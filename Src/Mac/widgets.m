@@ -49,6 +49,7 @@ PyTypeObject LayoutType;
         else
             PyErr_Print();
         PyGILState_Release(gstate);
+        object->layout_requested = NO;
     }
     /* Don't call [super viewWillDraw]; we only want the top view to receive
      * this notification.
