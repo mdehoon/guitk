@@ -28,18 +28,18 @@ class Grid(gui.Layout):
                 widths[j] = max(widths[j], width)
                 heights[i] = max(heights[i], height)
         width, height = self.size
-        extra_height = (height - sum(heights))/self.ncols
-        extra_width = (width - sum(widths))/self.nrows
+        extra_height = (height - sum(heights))/self.nrows
+        extra_width = (width - sum(widths))/self.ncols
         for i in range(self.nrows):
             heights[i] += extra_height
         for j in range(self.ncols):
             widths[j] += extra_width
         xs = array.array('f', [0]*self.ncols)
         ys = array.array('f', [0]*self.nrows)
-        for i in range(self.nrows-1):
-            ys[i-1] = ys[i] + heights[i]
-        for j in range(self.ncols-1):
-            xs[j-1] = xs[j] + widths[j]
+        for i in range(1,self.nrows):
+            ys[i] = ys[i-1] + heights[i-1]
+        for j in range(1,self.ncols):
+            xs[j] = xs[j-1] + widths[j-1]
         for i in range(self.nrows):
             for j in range(self.ncols):
                 self.objects[i][j].origin = (xs[j], ys[i])
