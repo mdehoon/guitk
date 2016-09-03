@@ -1,6 +1,7 @@
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
 #include "window.h"
+#include "colors.h"
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -291,31 +292,19 @@ static PyObject* Label_get_background(LabelObject* self, void* closure)
 static int
 Label_set_background(LabelObject* self, PyObject* value, void* closure)
 {
-    Py_ssize_t i;
-    PyObject* item;
-    CGFloat rgba[4];
+    short rgba[4];
+    CGFloat components[4];
     CGColorRef background;
     CGColorSpaceRef colorspace;
     LabelView* label = self->label;
-    if (!PyTuple_Check(value)) {
-        PyErr_SetString(PyExc_TypeError, "expected a tuple");
-        return -1;
-    }
-    if (PyTuple_GET_SIZE(value) != 4) {
-        PyErr_SetString(PyExc_RuntimeError, "expected a tuple with 4 components");
-        return -1;
-    }
-    for (i = 0; i < 4; i++) {
-        item = PyTuple_GET_ITEM(value, i);
-        rgba[i] = PyFloat_AsDouble(item);
-        if (PyErr_Occurred()) {
-            PyErr_SetString(PyExc_RuntimeError, "expected a tuple with 4 values");
-            return -1;
-        }
-    }
+    if (!Color_converter(value, rgba)) return -1;
     CGColorRelease(self->background);
     colorspace = CGColorSpaceCreateDeviceRGB();
-    background = CGColorCreate(colorspace, rgba);
+    components[0] = rgba[0] / 255.;
+    components[1] = rgba[1] / 255.;
+    components[2] = rgba[2] / 255.;
+    components[3] = rgba[3] / 255.;
+    background = CGColorCreate(colorspace, components);
     CGColorSpaceRelease(colorspace);
     self->background = background;
     label.needsDisplay = YES;
