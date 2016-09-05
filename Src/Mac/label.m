@@ -24,7 +24,7 @@
 @end
 
 typedef struct {
-    PyObject_HEAD
+    WidgetObject widget;
     LabelView* label;
     CGColorRef background;
     CFStringRef text;
@@ -151,7 +151,7 @@ static PyObject* PyString_FromCFString(const CFStringRef text)
 static PyObject*
 Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    LabelObject *self = (LabelObject*)type->tp_alloc(type, 0);
+    LabelObject *self = (LabelObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     self->label = nil;
     self->background = NULL;

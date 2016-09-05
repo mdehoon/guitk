@@ -20,7 +20,7 @@
 @end
 
 typedef struct {
-    PyObject_HEAD
+    WidgetObject widget;
     Button* button;
     NSString* text;
     NSFont* font;
@@ -57,7 +57,7 @@ typedef struct {
 static PyObject*
 Button_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    ButtonObject *self = (ButtonObject*)type->tp_alloc(type, 0);
+    ButtonObject *self = (ButtonObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     self->minimum_size = NULL;
     return (PyObject*)self;

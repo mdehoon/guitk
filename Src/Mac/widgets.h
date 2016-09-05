@@ -13,6 +13,10 @@
 typedef struct {
     PyObject_HEAD
     WidgetView* view;
+    char halign;
+    char valign;
+    BOOL hexpand;
+    BOOL vexpand;
 } WidgetObject;
 
 extern PyTypeObject WidgetType;

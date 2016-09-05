@@ -1,5 +1,6 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
+#include <string.h>
 #include "widgets.h"
 #include "window.h"
 
@@ -81,6 +82,10 @@ Widget_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     WidgetObject *self = (WidgetObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     self->view = NULL;
+    self->halign = 'f';
+    self->valign = 'f';
+    self->hexpand = NO;
+    self->vexpand = NO;
     return (PyObject*)self;
 }
 
@@ -206,9 +211,111 @@ static int Widget_set_size(WidgetObject* self, PyObject* value, void* closure)
 
 static char Widget_size__doc__[] = "Widget size";
 
+static PyObject* Widget_get_halign(WidgetObject* self, void* closure)
+{
+    const char* s;
+    const char c = self->halign;
+    switch (c) {
+        case 'c': s = "CENTER"; break;
+        case 'l': s = "LEFT"; break;
+        case 'r': s = "RIGHT"; break;
+        case 'f': s = "FILL"; break;
+        default:
+            PyErr_SetString(PyExc_SystemError, "unexpected alignment value.");
+            return NULL;
+    }
+    return PyString_FromString(s);
+}
+
+static int Widget_set_halign(WidgetObject* self, PyObject* value, void* closure)
+{
+    const char* argument = PyString_AsString(value);
+    if (!argument) return -1;
+    if (strcmp(argument, "LEFT")==0) self->halign = 'l';
+    else if (strcmp(argument, "RIGHT")==0) self->halign = 'r';
+    else if (strcmp(argument, "CENTER")==0) self->halign = 'c';
+    else if (strcmp(argument, "FILL")==0) self->halign = 'f';
+    else {
+        PyErr_SetString(PyExc_ValueError, "argument should be 'FILL', 'LEFT', 'CENTER', or 'RIGHT'.");
+        return -1;
+    }
+    return 0;
+}
+
+static char Widget_halign__doc__[] = "Widget horizontal alignment";
+
+static PyObject* Widget_get_valign(WidgetObject* self, void* closure)
+{
+    const char* s;
+    const char c = self->valign;
+    switch (c) {
+        case 'c': s = "CENTER"; break;
+        case 't': s = "TOP"; break;
+        case 'b': s = "BOTTOM"; break;
+        case 'f': s = "FILL"; break;
+        default:
+            PyErr_SetString(PyExc_SystemError, "unexpected alignment value.");
+            return NULL;
+    }
+    return PyString_FromString(s);
+}
+
+static int Widget_set_valign(WidgetObject* self, PyObject* value, void* closure)
+{
+    const char* argument = PyString_AsString(value);
+    if (!argument) return -1;
+    if (strcmp(argument, "TOP")==0) self->valign = 't';
+    else if (strcmp(argument, "BOTTOM")==0) self->valign = 'b';
+    else if (strcmp(argument, "CENTER")==0) self->valign = 'c';
+    else if (strcmp(argument, "FILL")==0) self->valign = 'f';
+    else {
+        PyErr_SetString(PyExc_ValueError, "argument should be 'FILL', 'TOP', 'CENTER', or 'BOTTOM'.");
+        return -1;
+    }
+    return 0;
+}
+
+static char Widget_valign__doc__[] = "Widget vertical alignment";
+
+static PyObject* Widget_get_hexpand(WidgetObject* self, void* closure)
+{
+    if (self->hexpand) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static int Widget_set_hexpand(WidgetObject* self, PyObject* value, void* closure)
+{
+    const int flag = PyObject_IsTrue(value);
+    if (flag) self->hexpand = YES;
+    else self->hexpand = NO;
+    return 0;
+}
+
+static char Widget_hexpand__doc__[] = "Widget should expand horizontally";
+
+static PyObject* Widget_get_vexpand(WidgetObject* self, void* closure)
+{
+    if (self->vexpand) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
+static int Widget_set_vexpand(WidgetObject* self, PyObject* value, void* closure)
+{
+    const int flag = PyObject_IsTrue(value);
+    if (flag) self->vexpand = YES;
+    else self->vexpand = NO;
+    return 0;
+}
+
+static char Widget_vexpand__doc__[] = "Widget should expand vertically";
+
 static PyGetSetDef Widget_getset[] = {
     {"origin", (getter)Widget_get_origin, (setter)Widget_set_origin, Widget_origin__doc__, NULL},
     {"size", (getter)Widget_get_size, (setter)Widget_set_size, Widget_size__doc__, NULL},
+    {"halign", (getter)Widget_get_halign, (setter)Widget_set_halign, Widget_halign__doc__, NULL},
+    {"valign", (getter)Widget_get_valign, (setter)Widget_set_valign, Widget_valign__doc__, NULL},
+    {"hexpand", (getter)Widget_get_hexpand, (setter)Widget_set_hexpand, Widget_hexpand__doc__, NULL},
+    {"vexpand", (getter)Widget_get_vexpand, (setter)Widget_set_vexpand, Widget_vexpand__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
