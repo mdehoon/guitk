@@ -235,30 +235,6 @@ Window_deiconify(WindowObject* self)
 }
 
 static PyObject*
-Window_put(WindowObject* self, PyObject *args, PyObject *kwds)
-{
-    PyObject* object;
-    NSView* view;
-    WidgetObject* widget;
-
-    NSWindow* window = self->window;
-    if (!window) {
-        PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
-        return NULL;
-    }
-
-    if (!PyArg_ParseTuple(args, "O!", &WidgetType, &object))
-        return NULL;
-
-    widget = (WidgetObject*)object;
-    view = widget->view;
-    [window setContentView: view];
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
-static PyObject*
 Window_add_child(WindowObject* self, PyObject *args, PyObject *keywords)
 
 {
@@ -355,11 +331,6 @@ static PyMethodDef Window_methods[] = {
      (PyCFunction)Window_deiconify,
      METH_NOARGS,
      "Attempts to deiconify the window."
-    },
-    {"put",
-     (PyCFunction)Window_put,
-     METH_VARARGS,
-     "Sets the layout manager."
     },
     {"add_child",
      (PyCFunction)Window_add_child,

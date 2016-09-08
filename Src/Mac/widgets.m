@@ -25,7 +25,13 @@
 #define CGFloat float
 #endif
 
-@interface LayoutView : WidgetView
+@interface LayoutView : NSView
+{
+    PyObject* _object;
+}
+@property (readonly) PyObject* object;
+- (LayoutView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
+- (BOOL)isFlipped;
 - (void)viewWillDraw;
 @end
 
@@ -37,6 +43,20 @@ typedef struct {
 PyTypeObject LayoutType;
 
 @implementation LayoutView
+@synthesize object = _object;
+
+- (LayoutView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
+{
+    self = [super initWithFrame: rect];
+    _object = object;
+    return self;
+}
+
+- (BOOL)isFlipped
+{
+    return YES;
+}
+
 - (void)viewWillDraw
 {
     Window* window = (Window*) [self window];
@@ -55,24 +75,6 @@ PyTypeObject LayoutType;
     /* Don't call [super viewWillDraw]; we only want the top view to receive
      * this notification.
      */
-}
-@end
-
-@implementation WidgetView
-
-@synthesize object = _object;
-
-- (WidgetView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
-{
-    self = [super initWithFrame: rect];
-    _object = object;
-    return self;
-}
-
-
-- (BOOL)isFlipped
-{
-    return YES;
 }
 @end
 
@@ -124,7 +126,7 @@ static PyObject*
 Widget_remove(WidgetObject* self)
 {
     Window* window;
-    WidgetView* view = self->view;
+    NSView* view = self->view;
     [view removeFromSuperview];
     window = (Window*) [view window];
     [window requestLayout];
@@ -400,7 +402,7 @@ static PyObject*
 Layout_add(LayoutObject* self, PyObject *args)
 {
     Window* window;
-    WidgetView* view;
+    NSView* view;
     WidgetObject* widget;
     LayoutView* layout = self->view;
     if (!layout) {

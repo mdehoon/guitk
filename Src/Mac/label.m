@@ -17,14 +17,18 @@
 #define COMPILING_FOR_10_10
 #endif
 
-@interface LabelView : WidgetView
+@interface LabelView : NSView
+{
+    PyObject* _object;
+}
+@property (readonly) PyObject* object;
 - (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
 - (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
 @end
 
 typedef struct {
-    WidgetObject widget;
+    PyObject_HEAD
     LabelView* label;
     CGColorRef background;
     CFStringRef text;
@@ -105,8 +109,6 @@ static PyObject* PyString_FromCFString(const CFStringRef text)
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
-    const CGFloat* components = CGColorGetComponents(object->background);
-    printf("In drawRect for label %f, %f\n", components[0], components[1]);
     CGContextSetFillColorWithColor(cr, object->background);
     rect = NSRectToCGRect(dirtyRect);
     CGContextFillRect(cr, rect);

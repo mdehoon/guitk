@@ -24,7 +24,10 @@ class Grid(gui.Layout):
         widths = array.array('f', [0]*self.ncols)
         for i in range(self.nrows):
             for j in range(self.ncols):
-                width, height = self.objects[i][j].minimum_size
+                object = self.objects[i][j]
+                if object is None:
+                    continue
+                width, height = object.minimum_size
                 widths[j] = max(widths[j], width)
                 heights[i] = max(heights[i], height)
         width, height = self.size
@@ -42,5 +45,8 @@ class Grid(gui.Layout):
             xs[j] = xs[j-1] + widths[j-1]
         for i in range(self.nrows):
             for j in range(self.ncols):
-                self.objects[i][j].origin = (xs[j], ys[i])
-                self.objects[i][j].size = (widths[j], heights[i])
+                object = self.objects[i][j]
+                if object is None:
+                    continue
+                object.origin = (xs[j], ys[i])
+                object.size = (widths[j], heights[i])

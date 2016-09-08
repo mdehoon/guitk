@@ -20,7 +20,7 @@
 @end
 
 typedef struct {
-    WidgetObject widget;
+    PyObject_HEAD
     Button* button;
     NSString* text;
     NSFont* font;

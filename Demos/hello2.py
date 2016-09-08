@@ -6,6 +6,6 @@ def say_hi():
 window = gui.Window(300,100, 'Hello')
 # button = guitk._guitk.Button(text="Hello", command=say_hi)
 button = gui.Button("Hello")
-window.contents = button
+window.content = button
 window.show()
 
