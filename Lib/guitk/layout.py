@@ -50,3 +50,19 @@ class Grid(gui.Layout):
                     continue
                 object.origin = (xs[j], ys[i])
                 object.size = (widths[j], heights[i])
+    @property
+    def minimum_size(self):
+        heights = array.array('f', [0]*self.nrows)
+        widths = array.array('f', [0]*self.ncols)
+        for i in range(self.nrows):
+            for j in range(self.ncols):
+                object = self.objects[i][j]
+                if object is None:
+                    continue
+                width, height = object.minimum_size
+                widths[j] = max(widths[j], width)
+                heights[i] = max(heights[i], height)
+        width = sum(widths)
+        height = sum(heights)
+        size = (width, height)
+        return size

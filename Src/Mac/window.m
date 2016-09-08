@@ -369,7 +369,7 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
     PyTypeObject* type;
     WidgetObject* widget;
     NSView* view;
-    NSWindow* window = self->window;
+    Window* window = self->window;
     if (!window) {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return -1;
@@ -382,6 +382,7 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
     widget = (WidgetObject*)value;
     view = widget->view;
     [window setContentView: view];
+    [window requestLayout];
     Py_DECREF(self->content);
     Py_INCREF(value);
     self->content = value;
