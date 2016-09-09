@@ -66,3 +66,10 @@ class Grid(gui.Layout):
         height = sum(heights)
         size = (width, height)
         return size
+    @property
+    def size(self):
+        return gui.Layout.size.__get__(self)
+    @size.setter
+    def size(self, size):
+        gui.Layout.size.__set__(self, size)
+        self.layout()

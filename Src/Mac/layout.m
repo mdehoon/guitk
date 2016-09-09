@@ -1,6 +1,5 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
-#include <string.h>
 #include "widgets.h"
 #include "window.h"
 
