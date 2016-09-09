@@ -142,7 +142,51 @@ static PyMethodDef Layout_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+static PyObject* Layout_get_size(WidgetObject* self, void* closure)
+{
+    CGFloat width;
+    CGFloat height;
+    NSRect frame;
+    NSView* view = self->view;
+    frame = [view frame];
+    width = frame.size.width;
+    height = frame.size.height;
+    return Py_BuildValue("dd", width, height);
+}
+
+static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
+{
+    PyObject* result;
+    PyGILState_STATE gstate;
+    double width;
+    double height;
+    NSSize size;
+    NSView* view = self->view;
+    NSWindow* window = [view window];
+    if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
+    if (view == [window contentView])
+    {
+        PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be resized.");
+        return -1;
+    }
+    size.width = width;
+    size.height = height;
+    [view setFrameSize: size];
+    gstate = PyGILState_Ensure();
+    result = PyObject_CallMethod((PyObject*)self, "layout", NULL);
+    if (result)
+        Py_DECREF(result);
+    else
+        PyErr_Print();
+    PyGILState_Release(gstate);
+    return 0;
+}
+
+static char Layout_size__doc__[] = "Layout size";
+
+
 static PyGetSetDef Layout_getset[] = {
+    {"size", (getter)Layout_get_size, (setter)Layout_set_size, Layout_size__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
