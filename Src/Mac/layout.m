@@ -133,11 +133,22 @@ Layout_add(LayoutObject* self, PyObject *args)
     return Py_None;
 }
 
+static PyObject* Layout_layout(LayoutObject* self)
+{
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static PyMethodDef Layout_methods[] = {
     {"add",
      (PyCFunction)Layout_add,
      METH_VARARGS,
      "Adds a widget to the layout manager."
+    },
+    {"layout",
+     (PyCFunction)Layout_layout,
+     METH_NOARGS,
+     "Default method (no-op)."
     },
     {NULL}  /* Sentinel */
 };
