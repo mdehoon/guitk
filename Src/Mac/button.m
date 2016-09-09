@@ -1,5 +1,7 @@
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
+#include "colors.h"
+
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -48,7 +50,6 @@ typedef struct {
                              | NSViewMinYMargin
                              | NSViewHeightSizable
                              | NSViewMaxYMargin];
-    [[self cell] setBackgroundColor:[NSColor redColor]];
     _object = object;
     return self;
 }
@@ -209,8 +210,52 @@ static PyObject* Button_get_minimum_size(ButtonObject* self, void* closure)
 
 static char Button_minimum_size__doc__[] = "minimum size needed to show the button.";
 
+static PyObject* Button_get_background(ButtonObject* self, void* closure)
+{
+    short rgba[4];
+    CGFloat red;
+    CGFloat green;
+    CGFloat blue;
+    CGFloat alpha;
+    Button* button = self->button;
+    NSColor* color = [[button cell] backgroundColor];
+    [color getRed: &red green: &green blue: &blue alpha: &alpha];
+    rgba[0] = (short)round(red*255);
+    rgba[1] = (short)round(green*255);
+    rgba[2] = (short)round(blue*255);
+    rgba[3] = (short)round(alpha*255);
+    return Color_create(rgba);
+}
+
+static int
+Button_set_background(ButtonObject* self, PyObject* value, void* closure)
+{
+    short rgba[4];
+    CGFloat red;
+    CGFloat green;
+    CGFloat blue;
+    CGFloat alpha;
+    NSColor* color;
+    Button* button = self->button;
+    if (!Color_converter(value, rgba)) return -1;
+    red = rgba[0] / 255.;
+    green = rgba[1] / 255.;
+    blue = rgba[2] / 255.;
+    alpha = rgba[3] / 255.;
+    color = [NSColor colorWithCalibratedRed: red
+                                      green: green
+                                       blue: blue
+                                      alpha: alpha];
+    [[button cell] setBackgroundColor: color];
+    button.needsDisplay = YES;
+    return 0;
+}
+
+static char Button_background__doc__[] = "background color.";
+
 static PyGetSetDef Button_getseters[] = {
     {"minimum_size", (getter)Button_get_minimum_size, (setter)NULL, Button_minimum_size__doc__, NULL},
+    {"background", (getter)Button_get_background, (setter)Button_set_background, Button_background__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 

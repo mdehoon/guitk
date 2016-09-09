@@ -240,6 +240,17 @@ int Color_converter(PyObject* argument, void* address)
     return 0;
 }
 
+PyObject* Color_create(short rgba[4])
+{
+    ColorObject *self = (ColorObject*)(ColorType.tp_alloc(&ColorType, 0));
+    if (!self) return NULL;
+    self->rgba[0] = rgba[0];
+    self->rgba[1] = rgba[1];
+    self->rgba[2] = rgba[2];
+    self->rgba[3] = rgba[3];
+    return (PyObject*)self;
+}
+
 static PyObject*
 Color_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
