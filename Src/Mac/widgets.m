@@ -234,9 +234,21 @@ static PyObject* Widget_get_hexpand(WidgetObject* self, void* closure)
 
 static int Widget_set_hexpand(WidgetObject* self, PyObject* value, void* closure)
 {
+    NSView* view;
+    Window* window;
     const int flag = PyObject_IsTrue(value);
-    if (flag) self->hexpand = YES;
-    else self->hexpand = NO;
+    if (flag) {
+        if (self->hexpand) return 0;
+        self->hexpand = YES;
+    }
+    else {
+        if (!self->hexpand) return 0;
+        self->hexpand = NO;
+    }
+    view = self->view;
+    window = (Window*) [view window];
+    [window requestLayout];
+    view.needsDisplay = YES;
     return 0;
 }
 
@@ -250,9 +262,21 @@ static PyObject* Widget_get_vexpand(WidgetObject* self, void* closure)
 
 static int Widget_set_vexpand(WidgetObject* self, PyObject* value, void* closure)
 {
+    NSView* view;
+    Window* window;
     const int flag = PyObject_IsTrue(value);
-    if (flag) self->vexpand = YES;
-    else self->vexpand = NO;
+    if (flag) {
+        if (self->vexpand) return 0;
+        self->vexpand = YES;
+    }
+    else {
+        if (!self->vexpand) return 0;
+        self->vexpand = NO;
+    }
+    view = self->view;
+    window = (Window*) [view window];
+    [window requestLayout];
+    view.needsDisplay = YES;
     return 0;
 }
 
