@@ -56,8 +56,33 @@ class Grid(gui.Layout):
                 object = self.objects[i][j]
                 if object is None:
                     continue
-                object.origin = (xs[j], ys[i])
-                object.size = (widths[j], heights[i])
+                width, height = object.minimum_size
+                halign = object.halign
+                valign = object.valign
+                if halign=='FILL':
+                    width = widths[j]
+                    x = xs[j]
+                elif halign=='LEFT':
+                    x = xs[j]
+                elif halign=='CENTER':
+                    x = xs[j] + 0.5 * (widths[j] - width)
+                elif halign=='RIGHT':
+                    x = xs[j] + widths[j] - width
+                else:
+                    raise SystemError('Unknown value for halign: %s' % vhlign)
+                if valign=='FILL':
+                    height = heights[i]
+                    y = ys[i]
+                elif valign=='TOP':
+                    y = ys[i]
+                elif valign=='CENTER':
+                    y = ys[i] + 0.5 * (heights[i] - height)
+                elif valign=='BOTTOM':
+                    y = ys[i] + heights[i] - height
+                else:
+                    raise SystemError('Unknown value for valign: %s' % valign)
+                object.origin = (x, y)
+                object.size = (width, height)
     @property
     def minimum_size(self):
         heights = array.array('f', [0]*self.nrows)
