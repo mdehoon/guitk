@@ -253,9 +253,64 @@ Button_set_background(ButtonObject* self, PyObject* value, void* closure)
 
 static char Button_background__doc__[] = "background color.";
 
+static PyObject* Button_get_foreground(ButtonObject* self, void* closure)
+{
+    short rgba[4];
+    CGFloat red;
+    CGFloat green;
+    CGFloat blue;
+    CGFloat alpha;
+    Button* button = self->button;
+    NSAttributedString* title = [button attributedTitle];
+    NSColor* color = [title attribute: NSForegroundColorAttributeName
+                              atIndex: 0
+                       effectiveRange: NULL];
+    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
+    [color getRed: &red green: &green blue: &blue alpha: &alpha];
+    rgba[0] = (short)round(red*255);
+    rgba[1] = (short)round(green*255);
+    rgba[2] = (short)round(blue*255);
+    rgba[3] = (short)round(alpha*255);
+    return Color_create(rgba);
+}
+
+static int
+Button_set_foreground(ButtonObject* self, PyObject* value, void* closure)
+{
+    short rgba[4];
+    CGFloat red;
+    CGFloat green;
+    CGFloat blue;
+    CGFloat alpha;
+    NSColor* color;
+    NSRange range;
+    Button* button = self->button;
+    NSMutableAttributedString *title;
+    if (!Color_converter(value, rgba)) return -1;
+    red = rgba[0] / 255.;
+    green = rgba[1] / 255.;
+    blue = rgba[2] / 255.;
+    alpha = rgba[3] / 255.;
+    color = [NSColor colorWithCalibratedRed: red
+                                      green: green
+                                       blue: blue
+                                      alpha: alpha];
+    title = [[NSMutableAttributedString alloc] initWithAttributedString:[button attributedTitle]];
+    range = NSMakeRange(0, [title length]);
+    [title addAttribute: NSForegroundColorAttributeName
+                  value: color
+                  range: range];
+    [button setAttributedTitle:title];
+    button.needsDisplay = YES;
+    return 0;
+}
+
+static char Button_foreground__doc__[] = "foreground color.";
+
 static PyGetSetDef Button_getseters[] = {
     {"minimum_size", (getter)Button_get_minimum_size, (setter)NULL, Button_minimum_size__doc__, NULL},
     {"background", (getter)Button_get_background, (setter)Button_set_background, Button_background__doc__, NULL},
+    {"foreground", (getter)Button_get_foreground, (setter)Button_set_foreground, Button_foreground__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
