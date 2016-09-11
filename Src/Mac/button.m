@@ -70,10 +70,13 @@ Button_init(ButtonObject *self, PyObject *args, PyObject *kwds)
     Button *button;
     const char* title = "";
     NSString* text;
+    NSColor* color;
 
     if(!PyArg_ParseTuple(args, "|s", &title)) return -1;
 
     button = [[Button alloc] initWithObject: (PyObject*)self];
+    color = [NSColor lightGrayColor];
+    [[button cell] setBackgroundColor: color];
     text = [[NSString alloc] initWithCString: title encoding: NSUTF8StringEncoding];
     [button setTitle: text];
     [text release];

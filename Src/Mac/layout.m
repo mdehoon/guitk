@@ -2,6 +2,8 @@
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
 #include "window.h"
+#include "colors.h"
+
 
 #if PY_MAJOR_VERSION >= 3
 #define PY3K 1
@@ -20,10 +22,6 @@
 #define COMPILING_FOR_10_7
 #endif
 
-#ifndef CGFloat
-#define CGFloat float
-#endif
-
 @interface LayoutView : NSView
 {
     PyObject* _object;
@@ -32,11 +30,13 @@
 - (LayoutView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
 - (BOOL)isFlipped;
 - (void)viewWillDraw;
+- (void)drawRect:(NSRect)rect;
 @end
 
 typedef struct {
     PyObject_HEAD
     LayoutView* view;
+    CGColorRef background;
 } LayoutObject;
 
 PyTypeObject LayoutType;
@@ -75,6 +75,24 @@ PyTypeObject LayoutType;
      * this notification.
      */
 }
+
+- (void)drawRect:(NSRect)dirtyRect
+{
+    CGContextRef cr;
+    NSGraphicsContext* gc;
+    CGRect rect;
+    LayoutObject* object = (LayoutObject*)_object;
+    gc = [NSGraphicsContext currentContext];
+#ifdef COMPILING_FOR_10_10
+    cr = [gc CGContext];
+#else
+    cr = (CGContextRef) [gc graphicsPort];
+#endif
+    CGContextSetFillColorWithColor(cr, object->background);
+    rect = NSRectToCGRect(dirtyRect);
+    CGContextFillRect(cr, rect);
+    [super drawRect:dirtyRect];
+}
 @end
 
 static PyObject*
@@ -82,10 +100,15 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
     NSRect rect = NSZeroRect;
+    NSColor* color = [NSColor lightGrayColor];
+    CGFloat gray;
+    CGFloat alpha;
+    [color getWhite: &gray alpha: &alpha];
     LayoutObject *self = (LayoutObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     object = (PyObject*)self;
     self->view = [[LayoutView alloc] initWithFrame:rect withObject:object];
+    self->background = CGColorCreateGenericGray(gray, alpha);
     return object;
 }
 
@@ -103,10 +126,11 @@ Layout_repr(LayoutObject* self)
 }
 
 static void
-Layout_dealloc(WidgetObject* self)
+Layout_dealloc(LayoutObject* self)
 {
     NSView* view = self->view;
     if (view) [view release];
+    CGColorRelease(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -195,9 +219,44 @@ static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
 
 static char Layout_size__doc__[] = "Layout size";
 
+static PyObject* Layout_get_background(LayoutObject* self, void* closure)
+{
+    const CGFloat* components = CGColorGetComponents(self->background);
+    double red, green, blue, alpha;
+    red = components[0];
+    green = components[1];
+    blue = components[2];
+    alpha = components[3];
+    return Py_BuildValue("ffff", red, green, blue, alpha);
+}
+
+static int
+Layout_set_background(LayoutObject* self, PyObject* value, void* closure)
+{
+    short rgba[4];
+    CGFloat components[4];
+    CGColorRef background;
+    CGColorSpaceRef colorspace;
+    LayoutView* layout = self->view;
+    if (!Color_converter(value, rgba)) return -1;
+    CGColorRelease(self->background);
+    colorspace = CGColorSpaceCreateDeviceRGB();
+    components[0] = rgba[0] / 255.;
+    components[1] = rgba[1] / 255.;
+    components[2] = rgba[2] / 255.;
+    components[3] = rgba[3] / 255.;
+    background = CGColorCreate(colorspace, components);
+    CGColorSpaceRelease(colorspace);
+    self->background = background;
+    layout.needsDisplay = YES;
+    return 0;
+}
+
+static char Layout_background__doc__[] = "background color.";
 
 static PyGetSetDef Layout_getset[] = {
     {"size", (getter)Layout_get_size, (setter)Layout_set_size, Layout_size__doc__, NULL},
+    {"background", (getter)Layout_get_background, (setter)Layout_set_background, Layout_background__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
