@@ -61,13 +61,111 @@ Widget_dealloc(WidgetObject* self)
 
 static PyObject*
 Widget_resize(WidgetObject* self, PyObject *args, PyObject *keywords)
-
 {
     PyErr_SetString(PyExc_RuntimeError,
                     "derived class should implement resize");
     return NULL;
 }
 
+static PyObject*
+Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
+{
+    double x;
+    double y;
+    double width;
+    double height;
+    NSPoint origin;
+    NSSize size;
+    NSRect frame;
+    NSView* view = self->view;
+    static char* kwlist[] = {"x", "y", "width", "height", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "dddd", kwlist,
+                                     &x, &y, &width, &height))
+        return NULL;
+
+    origin.x = x;
+    origin.y = y;
+    size.width = width;
+    size.height = height;
+
+    if (self->halign!='f' || self->valign!='f') {
+        PyObject* item;
+        PyObject* object = (PyObject*)self;
+        PyObject* minimum_size = PyObject_GetAttrString(object, "minimum_size");
+        if (minimum_size == NULL) return NULL;
+        if (!PyTuple_Check(minimum_size)) {
+            PyErr_SetString(PyExc_ValueError,
+                "minimum_size should return a tuple.");
+            return NULL;
+        }
+        if (PyTuple_GET_SIZE(minimum_size) != 2) {
+            PyErr_SetString(PyExc_ValueError,
+                "minimum_size should return a tuple of size 2.");
+            return NULL;
+        }
+        item = PyTuple_GET_ITEM(minimum_size, 0);
+        width = PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                "width returned by minimum_size should be numeric.");
+            return NULL;
+        }
+        item = PyTuple_GET_ITEM(minimum_size, 1);
+        height = PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                "height returned by minimum_size should be numeric.");
+            return NULL;
+        }
+        Py_DECREF(minimum_size);
+
+        switch (self->halign) {
+            case 'f':
+                break;
+            case 'l':
+                size.width = width;
+                break;
+            case 'c':
+                origin.x += 0.5 * (size.width - width);
+                size.width = width;
+                break;
+            case 'r':
+                origin.x += size.width - width;
+                size.width = width;
+                break;
+            default:
+                PyErr_SetString(PyExc_SystemError,
+                                "halign should be 'f', 'l', 'c', or 'r'");
+                return NULL;
+        }
+        switch (self->valign) {
+            case 'f':
+                break;
+            case 't':
+                size.height = height;
+                break;
+            case 'c':
+                origin.y += 0.5 * (size.height - height);
+                size.height = height;
+                break;
+            case 'b':
+                origin.y += size.height - height;
+                size.height = height;
+                break;
+            default:
+                PyErr_SetString(PyExc_SystemError,
+                                "valign should be 'f', 't', 'c', or 'b'");
+                return NULL;
+        }
+    }
+
+    frame.origin = origin;
+    frame.size = size;
+    view.frame = frame;
+
+    Py_INCREF(Py_None);
+    return Py_None;
+}
 
 static PyObject*
 Widget_remove(WidgetObject* self)
@@ -86,6 +184,11 @@ static PyMethodDef Widget_methods[] = {
      (PyCFunction)Widget_resize,
      METH_KEYWORDS | METH_VARARGS,
      "Resizes the widget."
+    },
+    {"place",
+     (PyCFunction)Widget_place,
+     METH_KEYWORDS | METH_VARARGS,
+     "Places the widget within its allocated space, taking halign and valign into account."
     },
     {"remove",
      (PyCFunction)Widget_remove,
