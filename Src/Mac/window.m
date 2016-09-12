@@ -76,6 +76,7 @@ Window_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     WindowObject *self = (WindowObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     self->window = NULL;
+    self->content = NULL;
     self->layout_requested = false;
     return (PyObject*)self;
 }
@@ -157,9 +158,13 @@ Window_repr(WindowObject* self)
 static void
 Window_dealloc(WindowObject* self)
 {
+    /* If Window.__init__ fails, then Window_dealloc is called before
+     * all member objects have been initialized. Some members may therefore
+     * still be NULL.
+     */
     NSWindow* window = self->window;
     if (window) [window release];
-    Py_DECREF(self->content);
+    Py_XDECREF(self->content);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 

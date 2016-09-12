@@ -19,6 +19,7 @@
 }
 @property (readonly) PyObject* object;
 - (Button*)initWithObject:(PyObject*)obj;
+-(void)command:(id)sender;
 @end
 
 typedef struct {
@@ -27,6 +28,7 @@ typedef struct {
     NSString* text;
     NSFont* font;
     PyObject* minimum_size;
+    PyObject* command;
 } ButtonObject;
 
 @implementation Button
@@ -50,8 +52,26 @@ typedef struct {
                              | NSViewMinYMargin
                              | NSViewHeightSizable
                              | NSViewMaxYMargin];
+    [self setTarget: self];
+    [self setAction: @selector(command:)];
     _object = object;
     return self;
+}
+
+-(void)command:(id)sender
+{
+    PyGILState_STATE gstate;
+    PyObject* result;
+    ButtonObject* object = (ButtonObject*)_object;
+    PyObject* command = object->command;
+    if (command==Py_None) return;
+    gstate = PyGILState_Ensure();
+    result = PyObject_CallObject(command, NULL);
+    if(result)
+        Py_DECREF(result);
+    else
+        PyErr_Print(); 
+    PyGILState_Release(gstate);
 }
 @end
 
@@ -60,6 +80,8 @@ Button_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     ButtonObject *self = (ButtonObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
+    Py_INCREF(Py_None);
+    self->command = Py_None;;
     self->minimum_size = NULL;
     return (PyObject*)self;
 }
@@ -213,6 +235,28 @@ static PyObject* Button_get_minimum_size(ButtonObject* self, void* closure)
 
 static char Button_minimum_size__doc__[] = "minimum size needed to show the button.";
 
+static PyObject* Button_get_command(ButtonObject* self, void* closure)
+{
+    PyObject* command = self->command;
+    Py_INCREF(command);
+    return command;
+}
+
+static int
+Button_set_command(ButtonObject* self, PyObject* value, void* closure)
+{
+    if (!PyCallable_Check(value)) {
+        PyErr_SetString(PyExc_ValueError, "command should be callable.");
+        return -1;
+    }
+    Py_INCREF(value);
+    Py_DECREF(self->command);
+    self->command = value;
+    return 0;
+}
+
+static char Button_command__doc__[] = "Python command to be execuated when the button is pressed.";
+
 static PyObject* Button_get_background(ButtonObject* self, void* closure)
 {
     short rgba[4];
@@ -312,6 +356,7 @@ static char Button_foreground__doc__[] = "foreground color.";
 
 static PyGetSetDef Button_getseters[] = {
     {"minimum_size", (getter)Button_get_minimum_size, (setter)NULL, Button_minimum_size__doc__, NULL},
+    {"command", (getter)Button_get_command, (setter)Button_set_command, Button_command__doc__, NULL},
     {"background", (getter)Button_get_background, (setter)Button_set_background, Button_background__doc__, NULL},
     {"foreground", (getter)Button_get_foreground, (setter)Button_set_foreground, Button_foreground__doc__, NULL},
     {NULL}  /* Sentinel */

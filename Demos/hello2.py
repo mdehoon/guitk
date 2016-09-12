@@ -1,20 +1,30 @@
+# Original Tkinter version is available here:
+# http://effbot.org/tkinterbook/tkinter-hello-again.htm
+
 from guitk import gui, layout
 
-def say_hi():
-    print "hi there, everyone"
+class App(gui.Window):
+    def __init__(self):
+        gui.Window.__init__(self)
+        button1 = gui.Button("QUIT")
+        button2 = gui.Button("Hello")
+        button1.hexpand = True
+        button2.hexpand = True
+        button1.vexpand = True
+        button2.vexpand = True
+        button1.halign = 'RIGHT'
+        button2.halign = 'LEFT'
+        button1.foreground = 'Red'
+        grid = layout.Grid(1,2)
+        grid[0,0] = button1
+        grid[0,1] = button2
+        self.content = grid
+        button1.command = self.close
+        button2.command = self.say_hi
 
-window = gui.Window(300,50, 'Hello')
-grid = layout.Grid(1,2)
-button1 = gui.Button("QUIT")
-button2 = gui.Button("Hello")
-button1.hexpand = True
-button2.hexpand = True
-button1.vexpand = True
-button2.vexpand = True
-button1.halign = 'RIGHT'
-button2.halign = 'LEFT'
-button1.foreground = 'Red'
-grid[0,0] = button1
-grid[0,1] = button2
-window.content = grid
+    def say_hi(self):
+        print "hi there, everyone"
+
+window = App()
+window.size = (300, 50)
 window.show()
