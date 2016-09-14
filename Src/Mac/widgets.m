@@ -60,14 +60,6 @@ Widget_dealloc(WidgetObject* self)
 }
 
 static PyObject*
-Widget_resize(WidgetObject* self, PyObject *args, PyObject *keywords)
-{
-    PyErr_SetString(PyExc_RuntimeError,
-                    "derived class should implement resize");
-    return NULL;
-}
-
-static PyObject*
 Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
 {
     double x;
@@ -180,11 +172,6 @@ Widget_remove(WidgetObject* self)
 }
 
 static PyMethodDef Widget_methods[] = {
-    {"resize",
-     (PyCFunction)Widget_resize,
-     METH_KEYWORDS | METH_VARARGS,
-     "Resizes the widget."
-    },
     {"place",
      (PyCFunction)Widget_place,
      METH_KEYWORDS | METH_VARARGS,

@@ -13,32 +13,32 @@
 #endif
 #endif
 
-@interface Button : NSButton
+@interface Checkbox : NSButton
 {
     PyObject* _object;
 }
 @property (readonly) PyObject* object;
-- (Button*)initWithObject:(PyObject*)obj;
+- (Checkbox*)initWithObject:(PyObject*)obj;
 -(void)command:(id)sender;
 @end
 
 typedef struct {
     PyObject_HEAD
-    Button* button;
+    Checkbox* checkbox;
     NSString* text;
     NSFont* font;
     PyObject* minimum_size;
     PyObject* command;
-} ButtonObject;
+} CheckboxObject;
 
-@implementation Button
+@implementation Checkbox
 
 - (PyObject*)object
 {
     return (PyObject*)_object;
 }
 
-- (Button*)initWithObject:(PyObject*)object
+- (Checkbox*)initWithObject:(PyObject*)object
 {
     NSRect rect;
     rect.origin.x = 10;
@@ -62,11 +62,11 @@ typedef struct {
 {
     PyGILState_STATE gstate;
     PyObject* result;
-    ButtonObject* object = (ButtonObject*)_object;
+    CheckboxObject* object = (CheckboxObject*)_object;
     PyObject* command = object->command;
     if (command==Py_None) return;
     gstate = PyGILState_Ensure();
-    result = PyObject_CallObject(command, NULL);
+    result = PyObject_CallFunction(command, "O", object);
     if(result)
         Py_DECREF(result);
     else
@@ -76,9 +76,9 @@ typedef struct {
 @end
 
 static PyObject*
-Button_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+Checkbox_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    ButtonObject *self = (ButtonObject*) WidgetType.tp_new(type, args, kwds);
+    CheckboxObject *self = (CheckboxObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     Py_INCREF(Py_None);
     self->command = Py_None;;
@@ -87,55 +87,56 @@ Button_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 static int
-Button_init(ButtonObject *self, PyObject *args, PyObject *keywords)
+Checkbox_init(CheckboxObject *self, PyObject *args, PyObject *keywords)
 {
-    Button *button;
+    Checkbox *checkbox;
     const char* text = "";
     NSString* s;
     NSColor* color;
-
     static char* kwlist[] = {"text", NULL};
+
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "|s", kwlist, &text))
         return -1;
 
-    button = [[Button alloc] initWithObject: (PyObject*)self];
+    checkbox = [[Checkbox alloc] initWithObject: (PyObject*)self];
     color = [NSColor lightGrayColor];
-    [[button cell] setBackgroundColor: color];
+    [[checkbox cell] setBackgroundColor: color];
+    [checkbox setButtonType: NSSwitchButton];
     s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
-    [button setTitle: s];
+    [checkbox setTitle: s];
     [s release];
-    self->button = button;
+    self->checkbox = checkbox;
 
     return 0;
 }
 
 static PyObject*
-Button_repr(ButtonObject* self)
+Checkbox_repr(CheckboxObject* self)
 {
 #if PY3K
-    return PyUnicode_FromFormat("Button object %p wrapping NSButton %p",
-                               (void*) self, (void*)(self->button));
+    return PyUnicode_FromFormat("Checkbox object %p wrapping NSButton %p",
+                               (void*) self, (void*)(self->checkbox));
 #else
-    return PyString_FromFormat("Button object %p wrapping NSButton %p",
-                               (void*) self, (void*)(self->button));
+    return PyString_FromFormat("Checkbox object %p wrapping NSButton %p",
+                               (void*) self, (void*)(self->checkbox));
 #endif
 }
 
 static void
-Button_dealloc(ButtonObject* self)
+Checkbox_dealloc(CheckboxObject* self)
 {
-    Button* button = self->button;
-    if (button)
+    Checkbox* checkbox = self->checkbox;
+    if (checkbox)
     {
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
-        [button release];
+        [checkbox release];
         [pool release];
     }
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 static PyObject*
-Button_set_frame(ButtonObject* self, PyObject *args)
+Checkbox_set_frame(CheckboxObject* self, PyObject *args)
 {
     float x0;
     float y0;
@@ -143,9 +144,9 @@ Button_set_frame(ButtonObject* self, PyObject *args)
     float y1;
     NSPoint position;
     NSSize size;
-    Button* button = self->button;
-    if (!button) {
-        PyErr_SetString(PyExc_RuntimeError, "button has not been initialized");
+    Checkbox* checkbox = self->checkbox;
+    if (!checkbox) {
+        PyErr_SetString(PyExc_RuntimeError, "checkbox has not been initialized");
         return NULL;
     }
     if(!PyArg_ParseTuple(args, "ffff", &x0, &y0, &x1, &y1))
@@ -154,41 +155,41 @@ Button_set_frame(ButtonObject* self, PyObject *args)
 
     position.x = x0;
     position.y = y0;
-    [button setFrameOrigin: position];
+    [checkbox setFrameOrigin: position];
     size.width = x1 - x0;
     size.height = y1 - y0;
-    [button setFrameSize: size];
+    [checkbox setFrameSize: size];
 
     Py_INCREF(Py_None);
     return Py_None;
 }
 
 static PyObject*
-Button_get_size(ButtonObject* self, PyObject *args)
+Checkbox_get_size(CheckboxObject* self, PyObject *args)
 {
     float width;
     float height;
     NSRect frame;
-    Button* button = self->button;
-    if (!button) {
-        PyErr_SetString(PyExc_RuntimeError, "button has not been initialized");
+    Checkbox* checkbox = self->checkbox;
+    if (!checkbox) {
+        PyErr_SetString(PyExc_RuntimeError, "checkbox has not been initialized");
         return NULL;
     }
-    frame = [button frame];
+    frame = [checkbox frame];
     width = frame.size.width;
     height = frame.size.height;
     return Py_BuildValue("ff", width, height);
 }
 
 static PyObject*
-Button_set_size(ButtonObject* self, PyObject *args)
+Checkbox_set_size(CheckboxObject* self, PyObject *args)
 {
     float width;
     float height;
     NSSize size;
-    Button* button = self->button;
-    if (!button) {
-        PyErr_SetString(PyExc_RuntimeError, "button has not been initialized");
+    Checkbox* checkbox = self->checkbox;
+    if (!checkbox) {
+        PyErr_SetString(PyExc_RuntimeError, "checkbox has not been initialized");
         return NULL;
     }
     if(!PyArg_ParseTuple(args, "ff", &width, &height)) return NULL;
@@ -198,36 +199,36 @@ Button_set_size(ButtonObject* self, PyObject *args)
     }
     size.width = width;
     size.height = height;
-    [button setFrameSize: size];
+    [checkbox setFrameSize: size];
     Py_INCREF(Py_None);
     return Py_None;
 }
 
-static PyMethodDef Button_methods[] = {
+static PyMethodDef Checkbox_methods[] = {
     {"set_frame",
-     (PyCFunction)Button_set_frame,
+     (PyCFunction)Checkbox_set_frame,
      METH_VARARGS,
-     "Sets the size and position of the button."
+     "Sets the size and position of the checkbox."
     },
     {"get_size",
-     (PyCFunction)Button_get_size,
+     (PyCFunction)Checkbox_get_size,
      METH_NOARGS,
-     "Returns the size of the button."
+     "Returns the size of the checkbox."
     },
     {"set_size",
-     (PyCFunction)Button_set_size,
+     (PyCFunction)Checkbox_set_size,
      METH_VARARGS,
-     "Sets the size of the button."
+     "Sets the size of the checkbox."
     },
     {NULL}  /* Sentinel */
 };
 
-static PyObject* Button_get_minimum_size(ButtonObject* self, void* closure)
+static PyObject* Checkbox_get_minimum_size(CheckboxObject* self, void* closure)
 {
     PyObject* minimum_size = self->minimum_size;
     if (minimum_size==NULL) {
-        Button* button = self->button;
-        NSSize size = [[button cell] cellSize];
+        Checkbox* checkbox = self->checkbox;
+        NSSize size = [[checkbox cell] cellSize];
         minimum_size = Py_BuildValue("ff", size.width, size.height);
         self->minimum_size = minimum_size;
     }
@@ -235,9 +236,9 @@ static PyObject* Button_get_minimum_size(ButtonObject* self, void* closure)
     return minimum_size;
 }
 
-static char Button_minimum_size__doc__[] = "minimum size needed to show the button.";
+static char Checkbox_minimum_size__doc__[] = "minimum size needed to show the checkbox.";
 
-static PyObject* Button_get_command(ButtonObject* self, void* closure)
+static PyObject* Checkbox_get_command(CheckboxObject* self, void* closure)
 {
     PyObject* command = self->command;
     Py_INCREF(command);
@@ -245,7 +246,7 @@ static PyObject* Button_get_command(ButtonObject* self, void* closure)
 }
 
 static int
-Button_set_command(ButtonObject* self, PyObject* value, void* closure)
+Checkbox_set_command(CheckboxObject* self, PyObject* value, void* closure)
 {
     if (!PyCallable_Check(value)) {
         PyErr_SetString(PyExc_ValueError, "command should be callable.");
@@ -257,17 +258,75 @@ Button_set_command(ButtonObject* self, PyObject* value, void* closure)
     return 0;
 }
 
-static char Button_command__doc__[] = "Python command to be executed when the button is pressed.";
+static char Checkbox_command__doc__[] = "Python command to be executed when the checkbox is pressed.";
 
-static PyObject* Button_get_background(ButtonObject* self, void* closure)
+static PyObject* Checkbox_get_state(CheckboxObject* self, void* closure)
+{
+    Checkbox* checkbox = self->checkbox;
+    NSInteger state = [checkbox state];
+    if (state == NSOnState) Py_RETURN_TRUE;
+    if (state == NSOffState) Py_RETURN_FALSE;
+    PyErr_SetString(PyExc_SystemError, "checkbox state is unknown.");
+    return NULL;
+}
+
+static int
+Checkbox_set_state(CheckboxObject* self, PyObject* value, void* closure)
+{
+    Checkbox* checkbox = self->checkbox;
+    int flag = PyObject_IsTrue(value);
+    switch (flag) {
+        case 1: checkbox.state = 1; break;
+        case 0: checkbox.state = 0; break;
+        case -1: return -1;
+    }
+    return 0;
+}
+
+static char Checkbox_state__doc__[] = "checkbox state.";
+
+static PyObject* Checkbox_get_text(CheckboxObject* self, void* closure)
+{
+    PyObject* result = NULL;
+    Checkbox* checkbox = self->checkbox;
+    NSString* text = [checkbox title];
+    if (text) {
+        const char* s = [text UTF8String];
+#if PY3K || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION >= 6)
+        result = PyUnicode_FromString(s);
+#else
+        result = PyString_FromString(s);
+#endif
+    }
+    return result;
+}
+
+static int
+Checkbox_set_text(CheckboxObject* self, PyObject* value, void* closure)
+{
+    NSString* s;
+    const char* text;
+    text = PyString_AsString(value);
+    if (!text) return -1;
+    s = [[NSString alloc] initWithCString: text
+                                 encoding: NSUTF8StringEncoding];
+    [self->checkbox setTitle: s];
+    [s release];
+
+    return 0;
+}
+
+static char Checkbox_text__doc__[] = "checkbox text.";
+
+static PyObject* Checkbox_get_background(CheckboxObject* self, void* closure)
 {
     short rgba[4];
     CGFloat red;
     CGFloat green;
     CGFloat blue;
     CGFloat alpha;
-    Button* button = self->button;
-    NSColor* color = [[button cell] backgroundColor];
+    Checkbox* checkbox = self->checkbox;
+    NSColor* color = [[checkbox cell] backgroundColor];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);
@@ -277,7 +336,7 @@ static PyObject* Button_get_background(ButtonObject* self, void* closure)
 }
 
 static int
-Button_set_background(ButtonObject* self, PyObject* value, void* closure)
+Checkbox_set_background(CheckboxObject* self, PyObject* value, void* closure)
 {
     short rgba[4];
     CGFloat red;
@@ -285,7 +344,7 @@ Button_set_background(ButtonObject* self, PyObject* value, void* closure)
     CGFloat blue;
     CGFloat alpha;
     NSColor* color;
-    Button* button = self->button;
+    Checkbox* checkbox = self->checkbox;
     if (!Color_converter(value, rgba)) return -1;
     red = rgba[0] / 255.;
     green = rgba[1] / 255.;
@@ -295,22 +354,22 @@ Button_set_background(ButtonObject* self, PyObject* value, void* closure)
                                       green: green
                                        blue: blue
                                       alpha: alpha];
-    [[button cell] setBackgroundColor: color];
-    button.needsDisplay = YES;
+    [[checkbox cell] setBackgroundColor: color];
+    checkbox.needsDisplay = YES;
     return 0;
 }
 
-static char Button_background__doc__[] = "background color.";
+static char Checkbox_background__doc__[] = "background color.";
 
-static PyObject* Button_get_foreground(ButtonObject* self, void* closure)
+static PyObject* Checkbox_get_foreground(CheckboxObject* self, void* closure)
 {
     short rgba[4];
     CGFloat red;
     CGFloat green;
     CGFloat blue;
     CGFloat alpha;
-    Button* button = self->button;
-    NSAttributedString* text = [button attributedTitle];
+    Checkbox* checkbox = self->checkbox;
+    NSAttributedString* text = [checkbox attributedTitle];
     NSColor* color = [text attribute: NSForegroundColorAttributeName
                              atIndex: 0
                       effectiveRange: NULL];
@@ -324,7 +383,7 @@ static PyObject* Button_get_foreground(ButtonObject* self, void* closure)
 }
 
 static int
-Button_set_foreground(ButtonObject* self, PyObject* value, void* closure)
+Checkbox_set_foreground(CheckboxObject* self, PyObject* value, void* closure)
 {
     short rgba[4];
     CGFloat red;
@@ -333,7 +392,7 @@ Button_set_foreground(ButtonObject* self, PyObject* value, void* closure)
     CGFloat alpha;
     NSColor* color;
     NSRange range;
-    Button* button = self->button;
+    Checkbox* checkbox = self->checkbox;
     NSMutableAttributedString *text;
     if (!Color_converter(value, rgba)) return -1;
     red = rgba[0] / 255.;
@@ -344,40 +403,42 @@ Button_set_foreground(ButtonObject* self, PyObject* value, void* closure)
                                       green: green
                                        blue: blue
                                       alpha: alpha];
-    text = [[NSMutableAttributedString alloc] initWithAttributedString:[button attributedTitle]];
+    text = [[NSMutableAttributedString alloc] initWithAttributedString:[checkbox attributedTitle]];
     range = NSMakeRange(0, [text length]);
     [text addAttribute: NSForegroundColorAttributeName
                   value: color
                   range: range];
-    [button setAttributedTitle:text];
-    button.needsDisplay = YES;
+    [checkbox setAttributedTitle:text];
+    checkbox.needsDisplay = YES;
     return 0;
 }
 
-static char Button_foreground__doc__[] = "foreground color.";
+static char Checkbox_foreground__doc__[] = "foreground color.";
 
-static PyGetSetDef Button_getseters[] = {
-    {"minimum_size", (getter)Button_get_minimum_size, (setter)NULL, Button_minimum_size__doc__, NULL},
-    {"command", (getter)Button_get_command, (setter)Button_set_command, Button_command__doc__, NULL},
-    {"background", (getter)Button_get_background, (setter)Button_set_background, Button_background__doc__, NULL},
-    {"foreground", (getter)Button_get_foreground, (setter)Button_set_foreground, Button_foreground__doc__, NULL},
+static PyGetSetDef Checkbox_getseters[] = {
+    {"minimum_size", (getter)Checkbox_get_minimum_size, (setter)NULL, Checkbox_minimum_size__doc__, NULL},
+    {"state", (getter)Checkbox_get_state, (setter)Checkbox_set_state, Checkbox_state__doc__, NULL},
+    {"text", (getter)Checkbox_get_text, (setter)Checkbox_set_text, Checkbox_text__doc__, NULL},
+    {"command", (getter)Checkbox_get_command, (setter)Checkbox_set_command, Checkbox_command__doc__, NULL},
+    {"background", (getter)Checkbox_get_background, (setter)Checkbox_set_background, Checkbox_background__doc__, NULL},
+    {"foreground", (getter)Checkbox_get_foreground, (setter)Checkbox_set_foreground, Checkbox_foreground__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
-static char Button_doc[] =
-"A Button object wraps a Cocoa NSButton object.\n";
+static char Checkbox_doc[] =
+"A Checkbox object wraps a Cocoa NSButton object of type NSSwitchButton.\n";
 
-PyTypeObject ButtonType = {
+PyTypeObject CheckboxType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_guitk.Button",            /* tp_name */
-    sizeof(ButtonObject),       /* tp_basicsize */
+    "_guitk.Checkbox",            /* tp_name */
+    sizeof(CheckboxObject),       /* tp_basicsize */
     0,                          /* tp_itemsize */
-    (destructor)Button_dealloc, /* tp_dealloc */
+    (destructor)Checkbox_dealloc, /* tp_dealloc */
     0,                          /* tp_print */
     0,                          /* tp_getattr */
     0,                          /* tp_setattr */
     0,                          /* tp_compare */
-    (reprfunc)Button_repr,      /* tp_repr */
+    (reprfunc)Checkbox_repr,      /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
     0,                          /* tp_as_mapping */
@@ -388,22 +449,22 @@ PyTypeObject ButtonType = {
     0,                          /* tp_setattro */
     0,                          /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /* tp_flags */
-    Button_doc,                 /* tp_doc */
+    Checkbox_doc,                 /* tp_doc */
     0,                          /* tp_traverse */
     0,                          /* tp_clear */
     0,                          /* tp_richcompare */
     0,                          /* tp_weaklistoffset */
     0,                          /* tp_iter */
     0,                          /* tp_iternext */
-    Button_methods,             /* tp_methods */
+    Checkbox_methods,             /* tp_methods */
     0,                          /* tp_members */
-    Button_getseters,           /* tp_getset */
+    Checkbox_getseters,           /* tp_getset */
     &WidgetType,                /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */
     0,                          /* tp_descr_set */
     0,                          /* tp_dictoffset */
-    (initproc)Button_init,      /* tp_init */
+    (initproc)Checkbox_init,      /* tp_init */
     0,                          /* tp_alloc */
-    Button_new,                 /* tp_new */
+    Checkbox_new,                 /* tp_new */
 };
