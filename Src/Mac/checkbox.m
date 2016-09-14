@@ -327,6 +327,7 @@ static PyObject* Checkbox_get_background(CheckboxObject* self, void* closure)
     CGFloat alpha;
     Checkbox* checkbox = self->checkbox;
     NSColor* color = [[checkbox cell] backgroundColor];
+    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);
