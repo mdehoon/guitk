@@ -34,8 +34,7 @@
 @end
 
 typedef struct {
-    PyObject_HEAD
-    LayoutView* view;
+    WidgetObject widget;
     CGColorRef background;
 } LayoutObject;
 
@@ -99,15 +98,17 @@ static PyObject*
 Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     PyObject* object;
+    WidgetObject* widget;
     NSRect rect = NSZeroRect;
     NSColor* color = [NSColor lightGrayColor];
     CGFloat gray;
     CGFloat alpha;
     [color getWhite: &gray alpha: &alpha];
-    LayoutObject *self = (LayoutObject*)type->tp_alloc(type, 0);
+    LayoutObject *self = (LayoutObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     object = (PyObject*)self;
-    self->view = [[LayoutView alloc] initWithFrame:rect withObject:object];
+    widget = (WidgetObject*)self;
+    widget->view = [[LayoutView alloc] initWithFrame:rect withObject:object];
     self->background = CGColorCreateGenericGray(gray, alpha);
     return object;
 }
@@ -115,7 +116,8 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static PyObject*
 Layout_repr(LayoutObject* self)
 {
-    NSView* view = self->view;
+    WidgetObject* widget = (WidgetObject*)self;
+    NSView* view = widget->view;
 #if PY3K
     return PyUnicode_FromFormat("Layout object %p wrapping NSView %p",
                                self, view);
@@ -128,7 +130,8 @@ Layout_repr(LayoutObject* self)
 static void
 Layout_dealloc(LayoutObject* self)
 {
-    NSView* view = self->view;
+    WidgetObject* widget = (WidgetObject*)self;
+    NSView* view = widget->view;
     if (view) [view release];
     CGColorRelease(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
@@ -139,8 +142,8 @@ Layout_add(LayoutObject* self, PyObject *args)
 {
     Window* window;
     NSView* view;
-    WidgetObject* widget;
-    LayoutView* layout = self->view;
+    WidgetObject* widget = (WidgetObject*)self;
+    NSView* layout = widget->view;
     if (!layout) {
         PyErr_SetString(PyExc_RuntimeError, "layout has not been initialized");
         return NULL;
@@ -196,7 +199,8 @@ static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
     double width;
     double height;
     NSSize size;
-    NSView* view = self->view;
+    WidgetObject* widget = (WidgetObject*)self;
+    NSView* view = widget->view;
     NSWindow* window = [view window];
     if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
     if (view == [window contentView])
@@ -237,7 +241,8 @@ Layout_set_background(LayoutObject* self, PyObject* value, void* closure)
     CGFloat components[4];
     CGColorRef background;
     CGColorSpaceRef colorspace;
-    LayoutView* layout = self->view;
+    WidgetObject* widget = (WidgetObject*) self;
+    NSView* layout = widget->view;
     if (!Color_converter(value, rgba)) return -1;
     CGColorRelease(self->background);
     colorspace = CGColorSpaceCreateDeviceRGB();
