@@ -37,14 +37,18 @@ class Grid(gui.Layout):
                 if object.vexpand:
                     vexpand[i] = 1
         width, height = self.size
-        extra_height = (height - sum(heights))/sum(vexpand)
-        extra_width = (width - sum(widths))/sum(hexpand)
-        for i in range(self.nrows):
-            if vexpand[i]:
-                heights[i] += extra_height
-        for j in range(self.ncols):
-            if hexpand[j]:
-                widths[j] += extra_width
+        shexpand = sum(hexpand)
+        svexpand = sum(vexpand)
+        if svexpand > 0:
+            extra_height = (height - sum(heights))/svexpand
+            for i in range(self.nrows):
+                if vexpand[i]:
+                    heights[i] += extra_height
+        if shexpand > 0:
+            extra_width = (width - sum(widths))/shexpand
+            for j in range(self.ncols):
+                if hexpand[j]:
+                    widths[j] += extra_width
         xs = array.array('f', [0]*self.ncols)
         ys = array.array('f', [0]*self.nrows)
         for i in range(1,self.nrows):

@@ -1,6 +1,7 @@
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
 #include "colors.h"
+#include "text.h"
 
 
 #if PY_MAJOR_VERSION >= 3
@@ -24,7 +25,6 @@
 
 typedef struct {
     WidgetObject widget;
-    NSString* text;
     NSFont* font;
     PyObject* minimum_size;
     PyObject* command;
@@ -104,6 +104,8 @@ Textbox_init(TextboxObject *self, PyObject *args, PyObject *keywords)
     s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
     [textbox setStringValue: s];
     [s release];
+    [textbox setBordered: YES];
+    [textbox setBezeled: YES];
     widget = (WidgetObject*)self;
     widget->view = textbox;
 
@@ -245,6 +247,36 @@ static PyObject* Textbox_get_minimum_size(TextboxObject* self, void* closure)
 
 static char Textbox_minimum_size__doc__[] = "minimum size needed to show the textbox.";
 
+static PyObject* Textbox_get_text(TextboxObject* self, void* closure)
+{
+    Textbox* textbox;
+    WidgetObject* widget;
+    NSString* text;
+    widget = (WidgetObject*) self;
+    textbox = (Textbox*)(widget->view);
+    text = [textbox stringValue];
+    return PyString_FromNSString(text);
+}
+
+static int
+Textbox_set_text(TextboxObject* self, PyObject* value, void* closure)
+{
+    Textbox* textbox;
+    WidgetObject* widget;
+    NSString* text;
+    text = PyString_AsNSString(value);
+    if (!text) {
+        PyErr_SetString(PyExc_ValueError, "expected a string.");
+        return -1;
+    }
+    widget = (WidgetObject*) self;
+    textbox = (Textbox*)(widget->view);
+    textbox.stringValue = text;
+    return 0;
+}
+
+static char Textbox_text__doc__[] = "textbox contents.";
+
 static PyObject* Textbox_get_command(TextboxObject* self, void* closure)
 {
     PyObject* command = self->command;
@@ -295,6 +327,7 @@ Textbox_set_background(TextboxObject* self, PyObject* value, void* closure)
     CGFloat blue;
     CGFloat alpha;
     NSColor* color;
+    BOOL editable;
     WidgetObject* widget = (WidgetObject*)self;
     Textbox* textbox = (Textbox*) widget->view;
     if (!Color_converter(value, rgba)) return -1;
@@ -306,8 +339,10 @@ Textbox_set_background(TextboxObject* self, PyObject* value, void* closure)
                                       green: green
                                        blue: blue
                                       alpha: alpha];
+    editable = textbox.editable;
+    if (editable) [textbox setEditable: NO];
     [textbox setBackgroundColor: color];
-    [textbox setDrawsBackground: YES];
+    if (editable) [textbox setEditable: YES];
     textbox.needsDisplay = YES;
     return 0;
 }
@@ -362,6 +397,7 @@ static char Textbox_foreground__doc__[] = "foreground color.";
 
 static PyGetSetDef Textbox_getseters[] = {
     {"minimum_size", (getter)Textbox_get_minimum_size, (setter)NULL, Textbox_minimum_size__doc__, NULL},
+    {"text", (getter)Textbox_get_text, (setter)Textbox_set_text, Textbox_text__doc__, NULL},
     {"command", (getter)Textbox_get_command, (setter)Textbox_set_command, Textbox_command__doc__, NULL},
     {"background", (getter)Textbox_get_background, (setter)Textbox_set_background, Textbox_background__doc__, NULL},
     {"foreground", (getter)Textbox_get_foreground, (setter)Textbox_set_foreground, Textbox_foreground__doc__, NULL},
