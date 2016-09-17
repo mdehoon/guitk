@@ -29,8 +29,7 @@
 @end
 
 typedef struct {
-    PyObject_HEAD
-    LabelView* label;
+    WidgetObject widget;
     CGColorRef background;
     CFStringRef text;
     NSFont* font;
@@ -118,9 +117,11 @@ typedef struct {
 static PyObject*
 Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+    WidgetObject* widget;
     LabelObject *self = (LabelObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
-    self->label = nil;
+    widget = (WidgetObject*)self;
+    widget->view = nil;
     self->background = NULL;
     self->text = NULL;
     self->font = nil;
@@ -131,6 +132,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
 {
+    WidgetObject* widget;
     LabelView *label;
     const PyObject* argument = NULL;
     CGColorRef background;
@@ -145,6 +147,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
         return -1;
     }
 
+    widget = (WidgetObject*)self;
     rect.origin.x = 0;
     rect.origin.y = 0;
     rect.size.width = 100;
@@ -154,8 +157,8 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
     background = CGColorGetConstantColor(kCGColorClear);
     CGColorRetain(background);
     [font retain];
+    widget->view = label;
     self->text = text;
-    self->label = label;
     self->background = background;
     self->font = font;
 
@@ -165,19 +168,21 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
 static PyObject*
 Label_repr(LabelObject* self)
 {
+    WidgetObject* widget = (WidgetObject*)self;
 #if PY3K
     return PyUnicode_FromFormat("Label object %p wrapping NSView %p",
-                               (void*) self, (void*)(self->label));
+                               self, widget->view);
 #else
     return PyString_FromFormat("Label object %p wrapping NSView %p",
-                               (void*) self, (void*)(self->label));
+                               self, widget->view);
 #endif
 }
 
 static void
 Label_dealloc(LabelObject* self)
 {
-    LabelView* label = self->label;
+    WidgetObject* widget = (WidgetObject*)self;
+    LabelView* label = (LabelView*) (widget->view);
     CFStringRef text = self->text;
     NSFont* font = self->font;
     if (label) [label release];
@@ -193,7 +198,8 @@ Label_set_position(LabelObject* self, PyObject *args)
     float x;
     float y;
     NSPoint position;
-    LabelView* label = self->label;
+    WidgetObject* widget = (WidgetObject*)self;
+    LabelView* label = (LabelView*) (widget->view);
     if (!label) {
         PyErr_SetString(PyExc_RuntimeError, "label has not been initialized");
         return NULL;
@@ -228,7 +234,8 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
 {
     CFStringRef text;
     Window* window;
-    LabelView* label = self->label;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
     text = PyString_AsCFString(value);
     if (!text) return -1;
     if (self->text) CFRelease(self->text);
@@ -263,7 +270,8 @@ Label_set_background(LabelObject* self, PyObject* value, void* closure)
     CGFloat components[4];
     CGColorRef background;
     CGColorSpaceRef colorspace;
-    LabelView* label = self->label;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
     if (!Color_converter(value, rgba)) return -1;
     CGColorRelease(self->background);
     colorspace = CGColorSpaceCreateDeviceRGB();
