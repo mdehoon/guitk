@@ -28,13 +28,12 @@
 }
 @property (readonly) PyObject* object;
 - (FrameView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
-- (BOOL)isFlipped;
-- (void)viewWillDraw;
 - (void)drawRect:(NSRect)rect;
 @end
 
 typedef struct {
     WidgetObject widget;
+    PyObject* content;
     CGColorRef background;
 } FrameObject;
 
@@ -48,24 +47,6 @@ PyTypeObject FrameType;
     self = [super initWithFrame: rect];
     _object = object;
     return self;
-}
-
-- (BOOL)isFlipped
-{
-    return YES;
-}
-
-- (void)viewWillDraw
-{
-    Window* window = (Window*) [self window];
-    WindowObject* object = window.object;
-    if (object->layout_requested) {
-        printf("To be implemented: [frame viewWillDraw]\n");
-        object->layout_requested = NO;
-    }
-    /* Don't call [super viewWillDraw]; we only want the top view to receive
-     * this notification.
-     */
 }
 
 - (void)drawRect:(NSRect)dirtyRect
@@ -90,6 +71,7 @@ PyTypeObject FrameType;
 static PyObject*
 Frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+    NSBox* box;
     PyObject* object;
     WidgetObject* widget;
     NSRect rect = NSZeroRect;
@@ -100,9 +82,15 @@ Frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     FrameObject *self = (FrameObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     object = (PyObject*)self;
-    widget = (WidgetObject*)self;
-    widget->view = [[FrameView alloc] initWithFrame:rect withObject:object];
+    box = [[FrameView alloc] initWithFrame:rect withObject:object];
+    box.borderType = NSBezelBorder;
+    box.title = @"";
+    box.titlePosition = NSAtBottom;
+    Py_INCREF(Py_None);
+    self->content = Py_None;
     self->background = CGColorCreateGenericGray(gray, alpha);
+    widget = (WidgetObject*)self;
+    widget->view = box;
     return object;
 }
 
@@ -127,38 +115,11 @@ Frame_dealloc(FrameObject* self)
     NSView* view = widget->view;
     if (view) [view release];
     CGColorRelease(self->background);
+    Py_DECREF(self->content);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-static PyObject*
-Frame_add(FrameObject* self, PyObject *args)
-{
-    Window* window;
-    NSView* view;
-    WidgetObject* widget = (WidgetObject*)self;
-    NSView* frame = widget->view;
-    if (!frame) {
-        PyErr_SetString(PyExc_RuntimeError, "frame has not been initialized");
-        return NULL;
-    }
-    if(!PyArg_ParseTuple(args, "O!", &WidgetType, &widget))
-        return NULL;
-
-    view = widget->view;
-    [frame addSubview: view];
-    window = (Window*) [view window];
-    [window requestLayout];
-
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 static PyMethodDef Frame_methods[] = {
-    {"add",
-     (PyCFunction)Frame_add,
-     METH_VARARGS,
-     "Adds a widget to the layout manager."
-    },
     {NULL}  /* Sentinel */
 };
 
@@ -235,15 +196,91 @@ static char Frame_background__doc__[] = "background color.";
 
 static PyObject* Frame_get_minimum_size(FrameObject* self, void* closure)
 {
-    PyObject* minimum_size = Py_BuildValue("ff", 0, 0);
+    double width;
+    double height;
+    PyObject* minimum_size;
+    PyObject* content;
+    WidgetObject* widget = (WidgetObject*)self;
+    NSBox* box = (NSBox*) (widget->view);
+    NSSize margins = [box contentViewMargins];
+    width = margins.width;
+    height = margins.height;
+    content = self->content;
+    if (content != Py_None) {
+        PyObject* item;
+        minimum_size = PyObject_GetAttrString(content, "minimum_size");
+        if (minimum_size == NULL) return NULL;
+        if (!PyTuple_Check(minimum_size)) {
+            PyErr_SetString(PyExc_ValueError,
+                "minimum_size should return a tuple.");
+            return NULL;
+        }
+        if (PyTuple_GET_SIZE(minimum_size) != 2) {
+            PyErr_SetString(PyExc_ValueError,
+                "minimum_size should return a tuple of size 2.");
+            return NULL;
+        }
+        item = PyTuple_GET_ITEM(minimum_size, 0);
+        width += PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                "width returned by minimum_size should be numeric.");
+            return NULL;
+        }
+        item = PyTuple_GET_ITEM(minimum_size, 1);
+        height += PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                "height returned by minimum_size should be numeric.");
+            return NULL;
+        }
+        Py_DECREF(minimum_size);
+    }
+    minimum_size = Py_BuildValue("dd", width, height);
     return minimum_size;
 }
 
 static char Frame_minimum_size__doc__[] = "minimum size needed to show the frame.";
 
+static PyObject* Frame_get_content(FrameObject* self, void* closure)
+{
+    PyObject* object = self->content;
+    Py_INCREF(object);
+    return object;
+}
+
+static int
+Frame_set_content(FrameObject* self, PyObject* value, void* closure)
+{
+    PyTypeObject* type;
+    WidgetObject* widget;
+    NSBox* box;
+    Window* window;
+    NSView* view;
+    type = Py_TYPE(value);
+    if (!PyType_IsSubtype(type, &WidgetType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a widget or None");
+        return -1;
+    }
+    widget = (WidgetObject*)value;
+    view = widget->view;
+    widget = (WidgetObject*)self;
+    box = (NSBox*) widget->view;
+    box.contentView = view;
+    window = (Window*) [box window];
+    [window requestLayout];
+    Py_DECREF(self->content);
+    Py_INCREF(value);
+    self->content = value;
+    return 0;
+}
+
+static char Frame_content__doc__[] = "frame content";
+
 static PyGetSetDef Frame_getset[] = {
     {"size", (getter)Frame_get_size, (setter)Frame_set_size, Frame_size__doc__, NULL},
     {"minimum_size", (getter)Frame_get_minimum_size, (setter)NULL, Frame_minimum_size__doc__, NULL},
+    {"content", (getter)Frame_get_content, (setter)Frame_set_content, Frame_content__doc__, NULL},
     {"background", (getter)Frame_get_background, (setter)Frame_set_background, Frame_background__doc__, NULL},
     {NULL}  /* Sentinel */
 };

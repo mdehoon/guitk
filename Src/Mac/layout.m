@@ -31,6 +31,7 @@
 - (BOOL)isFlipped;
 - (void)viewWillDraw;
 - (void)drawRect:(NSRect)rect;
+- (void)layoutDidResize:(NSNotification*)notification;
 @end
 
 typedef struct {
@@ -45,7 +46,13 @@ PyTypeObject LayoutType;
 
 - (LayoutView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
 {
+    NSNotificationCenter* center;
     self = [super initWithFrame: rect];
+    center = [NSNotificationCenter defaultCenter];
+    [center addObserver: self
+               selector: @selector(layoutDidResize:) 
+                   name: NSViewFrameDidChangeNotification
+                 object: self];
     _object = object;
     return self;
 }
@@ -92,6 +99,19 @@ PyTypeObject LayoutType;
     CGContextFillRect(cr, rect);
     [super drawRect:dirtyRect];
 }
+
+- (void)layoutDidResize:(NSNotification*)notification
+{
+    PyObject* result;
+    PyGILState_STATE gstate;
+    gstate = PyGILState_Ensure();
+    result = PyObject_CallMethod(_object, "layout", NULL);
+    if (result)
+        Py_DECREF(result);
+    else
+        PyErr_Print();
+    PyGILState_Release(gstate);
+}
 @end
 
 static PyObject*
@@ -110,6 +130,7 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     widget = (WidgetObject*)self;
     widget->view = [[LayoutView alloc] initWithFrame:rect withObject:object];
     self->background = CGColorCreateGenericGray(gray, alpha);
+    
     return object;
 }
 
@@ -194,8 +215,6 @@ static PyObject* Layout_get_size(WidgetObject* self, void* closure)
 
 static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
 {
-    PyObject* result;
-    PyGILState_STATE gstate;
     double width;
     double height;
     NSSize size;
@@ -210,14 +229,9 @@ static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
     }
     size.width = width;
     size.height = height;
+printf("In Layout_set_size for object %p (view %p), calling [view setFrameSize; size]\n", self, view);
     [view setFrameSize: size];
-    gstate = PyGILState_Ensure();
-    result = PyObject_CallMethod((PyObject*)self, "layout", NULL);
-    if (result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
-    PyGILState_Release(gstate);
+printf("In Layout_set_size for object %p (view %p), after calling [view setFrameSize; size]\n", self, view);
     return 0;
 }
 

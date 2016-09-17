@@ -46,10 +46,12 @@
     Py_DECREF(_object);
 }
 
+/*
 - (void)windowDidResize:(NSNotification *)notification
 {
     [self requestLayout];
 }
+*/
 
 - (void)requestLayout
 {
