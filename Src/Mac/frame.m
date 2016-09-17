@@ -86,7 +86,7 @@ Frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     box = [[FrameView alloc] initWithFrame:rect withObject:object];
     box.boxType = NSBoxPrimary;
     box.borderType = NSGrooveBorder;
-    box.title = @"";
+    box.titlePosition = NSNoTitle;
     Py_INCREF(Py_None);
     self->content = Py_None;
     self->background = CGColorCreateGenericGray(gray, alpha);
@@ -295,6 +295,10 @@ static PyObject* Frame_get_title(FrameObject* self, void* closure)
     NSString* text;
     widget = (WidgetObject*) self;
     frame = (FrameView*)(widget->view);
+    if (frame.titlePosition == NSNoTitle) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
     text = frame.title;
     return PyString_FromNSString(text);
 }
@@ -305,14 +309,22 @@ Frame_set_title(FrameObject* self, PyObject* value, void* closure)
     FrameView* frame;
     WidgetObject* widget;
     NSString* text;
-    text = PyString_AsNSString(value);
-    if (!text) {
-        PyErr_SetString(PyExc_ValueError, "expected a string.");
-        return -1;
-    }
+    Window* window;
     widget = (WidgetObject*) self;
     frame = (FrameView*)(widget->view);
-    frame.title = text;
+    if (value == Py_None) {
+        frame.titlePosition = NSNoTitle;
+    } else {
+        text = PyString_AsNSString(value);
+        if (!text) {
+            PyErr_SetString(PyExc_ValueError, "expected a string or None.");
+            return -1;
+        }
+        frame.title = text;
+        frame.titlePosition = NSAtTop;
+    }
+    window = (Window*) [frame window];
+    [window requestLayout];
     return 0;
 }
 
