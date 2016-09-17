@@ -142,6 +142,8 @@ void initgui(void)
         goto error;
     if (PyType_Ready(&FrameType) < 0)
         goto error;
+    if (PyType_Ready(&SeparatorType) < 0)
+        goto error;
     if (PyType_Ready(&ImageType) < 0)
         goto error;
     if (PyType_Ready(&LabelType) < 0)
@@ -159,6 +161,7 @@ void initgui(void)
     Py_INCREF(&WidgetType);
     Py_INCREF(&LayoutType);
     Py_INCREF(&FrameType);
+    Py_INCREF(&SeparatorType);
     Py_INCREF(&ImageType);
     Py_INCREF(&LabelType);
     Py_INCREF(&ButtonType);
@@ -173,6 +176,8 @@ void initgui(void)
     if (PyModule_AddObject(module, "Layout", (PyObject*) &LayoutType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Frame", (PyObject*) &FrameType) < 0)
+        goto error;
+    if (PyModule_AddObject(module, "Separator", (PyObject*) &SeparatorType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Image", (PyObject*) &ImageType) < 0)
         goto error;
