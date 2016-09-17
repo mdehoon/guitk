@@ -60,7 +60,9 @@ class Grid(gui.Layout):
                 object = self.objects[i][j]
                 if object is None:
                     continue
-                object.place(xs[j], ys[i], widths[j], heights[i])
+                x, y, w, h = object.place(xs[j], ys[i], widths[j], heights[i])
+                object.origin = (x, y)
+                object.size = (w, h)
     @property
     def minimum_size(self):
         heights = array.array('f', [0]*self.nrows)

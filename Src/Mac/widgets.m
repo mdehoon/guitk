@@ -68,8 +68,6 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
     double height;
     NSPoint origin;
     NSSize size;
-    NSRect frame;
-    NSView* view = self->view;
     static char* kwlist[] = {"x", "y", "width", "height", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "dddd", kwlist,
                                      &x, &y, &width, &height))
@@ -150,13 +148,11 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
                 return NULL;
         }
     }
-
-    frame.origin = origin;
-    frame.size = size;
-    view.frame = frame;
-
-    Py_INCREF(Py_None);
-    return Py_None;
+    x = origin.x;
+    y = origin.y;
+    width = size.width;
+    height = size.height;
+    return Py_BuildValue("dddd", x, y, width, height);
 }
 
 static PyObject*
