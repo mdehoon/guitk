@@ -60,14 +60,7 @@ PyTypeObject FrameType;
     Window* window = (Window*) [self window];
     WindowObject* object = window.object;
     if (object->layout_requested) {
-        PyObject* result;
-        PyGILState_STATE gstate = PyGILState_Ensure();
-        result = PyObject_CallMethod(_object, "layout", NULL);
-        if (result)
-            Py_DECREF(result);
-        else
-            PyErr_Print();
-        PyGILState_Release(gstate);
+        printf("To be implemented: [frame viewWillDraw]\n");
         object->layout_requested = NO;
     }
     /* Don't call [super viewWillDraw]; we only want the top view to receive
@@ -160,22 +153,11 @@ Frame_add(FrameObject* self, PyObject *args)
     return Py_None;
 }
 
-static PyObject* Frame_layout(FrameObject* self)
-{
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 static PyMethodDef Frame_methods[] = {
     {"add",
      (PyCFunction)Frame_add,
      METH_VARARGS,
      "Adds a widget to the layout manager."
-    },
-    {"layout",
-     (PyCFunction)Frame_layout,
-     METH_NOARGS,
-     "Default method (no-op)."
     },
     {NULL}  /* Sentinel */
 };
@@ -194,8 +176,6 @@ static PyObject* Frame_get_size(WidgetObject* self, void* closure)
 
 static int Frame_set_size(FrameObject* self, PyObject* value, void* closure)
 {
-    PyObject* result;
-    PyGILState_STATE gstate;
     double width;
     double height;
     NSSize size;
@@ -211,13 +191,7 @@ static int Frame_set_size(FrameObject* self, PyObject* value, void* closure)
     size.width = width;
     size.height = height;
     [view setFrameSize: size];
-    gstate = PyGILState_Ensure();
-    result = PyObject_CallMethod((PyObject*)self, "layout", NULL);
-    if (result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
-    PyGILState_Release(gstate);
+    printf("To be implemented: layout in Frame_set_size\n");
     return 0;
 }
 
