@@ -2,6 +2,7 @@
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
 #include "window.h"
+#include "text.h"
 #include "colors.h"
 
 
@@ -83,9 +84,9 @@ Frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!self) return NULL;
     object = (PyObject*)self;
     box = [[FrameView alloc] initWithFrame:rect withObject:object];
-    box.borderType = NSBezelBorder;
+    box.boxType = NSBoxPrimary;
+    box.borderType = NSGrooveBorder;
     box.title = @"";
-    box.titlePosition = NSAtBottom;
     Py_INCREF(Py_None);
     self->content = Py_None;
     self->background = CGColorCreateGenericGray(gray, alpha);
@@ -140,9 +141,11 @@ static int Frame_set_size(FrameObject* self, PyObject* value, void* closure)
     double width;
     double height;
     NSSize size;
+    PyTypeObject* type;
     WidgetObject* widget = (WidgetObject*)self;
     NSView* view = widget->view;
     NSWindow* window = [view window];
+    PyObject* content;
     if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
     if (view == [window contentView])
     {
@@ -152,7 +155,15 @@ static int Frame_set_size(FrameObject* self, PyObject* value, void* closure)
     size.width = width;
     size.height = height;
     [view setFrameSize: size];
-    printf("To be implemented: layout in Frame_set_size\n");
+    content = self->content;
+    type = Py_TYPE(content);
+    if (PyType_IsSubtype(type, &LayoutType)) {
+        PyObject* result = PyObject_CallMethod(content, "layout", NULL);
+        if (result)
+            Py_DECREF(result);
+        else
+            return -1;
+    }
     return 0;
 }
 
@@ -277,10 +288,41 @@ Frame_set_content(FrameObject* self, PyObject* value, void* closure)
 
 static char Frame_content__doc__[] = "frame content";
 
+static PyObject* Frame_get_title(FrameObject* self, void* closure)
+{
+    FrameView* frame;
+    WidgetObject* widget;
+    NSString* text;
+    widget = (WidgetObject*) self;
+    frame = (FrameView*)(widget->view);
+    text = frame.title;
+    return PyString_FromNSString(text);
+}
+
+static int
+Frame_set_title(FrameObject* self, PyObject* value, void* closure)
+{
+    FrameView* frame;
+    WidgetObject* widget;
+    NSString* text;
+    text = PyString_AsNSString(value);
+    if (!text) {
+        PyErr_SetString(PyExc_ValueError, "expected a string.");
+        return -1;
+    }
+    widget = (WidgetObject*) self;
+    frame = (FrameView*)(widget->view);
+    frame.title = text;
+    return 0;
+}
+
+static char Frame_title__doc__[] = "frame title.";
+
 static PyGetSetDef Frame_getset[] = {
     {"size", (getter)Frame_get_size, (setter)Frame_set_size, Frame_size__doc__, NULL},
     {"minimum_size", (getter)Frame_get_minimum_size, (setter)NULL, Frame_minimum_size__doc__, NULL},
     {"content", (getter)Frame_get_content, (setter)Frame_set_content, Frame_content__doc__, NULL},
+    {"title", (getter)Frame_get_title, (setter)Frame_set_title, Frame_title__doc__, NULL},
     {"background", (getter)Frame_get_background, (setter)Frame_set_background, Frame_background__doc__, NULL},
     {NULL}  /* Sentinel */
 };
