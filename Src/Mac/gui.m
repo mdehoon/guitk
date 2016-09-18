@@ -154,6 +154,8 @@ void initgui(void)
         goto error;
     if (PyType_Ready(&TextboxType) < 0)
         goto error;
+    if (PyType_Ready(&ListboxType) < 0)
+        goto error;
     if (PyType_Ready(&ColorType) < 0)
         goto error;
 
@@ -167,6 +169,7 @@ void initgui(void)
     Py_INCREF(&ButtonType);
     Py_INCREF(&CheckboxType);
     Py_INCREF(&TextboxType);
+    Py_INCREF(&ListboxType);
     Py_INCREF(&ColorType);
 
     if (PyModule_AddObject(module, "Window", (PyObject*) &WindowType) < 0)
@@ -188,6 +191,8 @@ void initgui(void)
     if (PyModule_AddObject(module, "Checkbox", (PyObject*) &CheckboxType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Textbox", (PyObject*) &TextboxType) < 0)
+        goto error;
+    if (PyModule_AddObject(module, "Listbox", (PyObject*) &ListboxType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Color", (PyObject*) &ColorType) < 0)
         goto error;

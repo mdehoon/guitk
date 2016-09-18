@@ -229,7 +229,7 @@ static int Widget_set_size(WidgetObject* self, PyObject* value, void* closure)
 {
     double width;
     double height;
-    NSSize size;
+    NSRect rect;
     NSView* view = self->view;
     NSWindow* window = [view window];
     if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
@@ -238,9 +238,11 @@ static int Widget_set_size(WidgetObject* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be resized.");
         return -1;
     }
-    size.width = width;
-    size.height = height;
-    [view setFrameSize: size];
+    rect = view.frame;
+    rect.size.width = width;
+    rect.size.height = height;
+    view.frame = rect;
+    /* Use view.frame instead of [view setSize: size] to avoid listbox glitch */
     return 0;
 }
 

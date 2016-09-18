@@ -31,6 +31,7 @@ sources = ["Src/Mac/gui.m",
            "Src/Mac/button.m",
            "Src/Mac/checkbox.m",
            "Src/Mac/textbox.m",
+           "Src/Mac/listbox.m",
            "Src/Generic/colors.c",
           ]
 

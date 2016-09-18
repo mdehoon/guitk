@@ -46,6 +46,7 @@ PyTypeObject LayoutType;
 - (LayoutView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
 {
     self = [super initWithFrame: rect];
+    self.autoresizesSubviews = NO;
     _object = object;
     return self;
 }

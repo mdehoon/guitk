@@ -18,3 +18,4 @@ extern PyTypeObject LabelType;
 extern PyTypeObject ButtonType;
 extern PyTypeObject CheckboxType;
 extern PyTypeObject TextboxType;
+extern PyTypeObject ListboxType;
