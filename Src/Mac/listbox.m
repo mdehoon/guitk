@@ -1,5 +1,6 @@
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
+#include "window.h"
 #include "colors.h"
 #include "text.h"
 
@@ -29,8 +30,8 @@
 typedef struct {
     WidgetObject widget;
     NSFont* font;
-    PyObject* minimum_size;
     NSColor* foreground;
+    NSMutableArray* array;
 } ListboxObject;
 
 @implementation Listbox
@@ -48,6 +49,7 @@ typedef struct {
     rect.origin.y = 10;
     rect.size.width = 100;
     rect.size.height = 100;
+    _object = object; /* Should come before creating the NSTableView */
     self = [super initWithFrame: rect];
     [self setAutoresizingMask: NSViewMinXMargin
                              | NSViewWidthSizable
@@ -55,7 +57,7 @@ typedef struct {
                              | NSViewMinYMargin
                              | NSViewHeightSizable
                              | NSViewMaxYMargin];
-    column = [[NSTableColumn alloc] initWithIdentifier:@"key1"];
+    column = [[NSTableColumn alloc] initWithIdentifier:@""];
     [[column headerCell] setStringValue:@"Column 1"];
     [self addTableColumn:column];
 
@@ -64,24 +66,19 @@ typedef struct {
     [self setDelegate:self];
     [self setDataSource:self];
     [self setSelectionHighlightStyle:NSTableViewSelectionHighlightStyleRegular];
-    _object = object;
     return self;
-}
-
--(NSArray *)dataArray
-{
-      NSArray *array = [NSArray arrayWithObjects: @"1001", @"2001", @"3001", @"4001", nil];
-      return array;
 }
 
 - (id)tableView:(NSTableView *)aTableView objectValueForTableColumn:(NSTableColumn *)aTableColumn row:(NSInteger)rowIndex {
      NSString *aString;
-     aString = [self.dataArray objectAtIndex:rowIndex];
+     ListboxObject* listbox = (ListboxObject*)_object;
+     aString = [listbox->array objectAtIndex:rowIndex];
      return aString;
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
-   long recordCount = [self.dataArray count];
+   ListboxObject* listbox = (ListboxObject*)_object;
+   long recordCount = [listbox->array count];
    return recordCount;
 }
 
@@ -100,7 +97,6 @@ Listbox_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     ListboxObject *self = (ListboxObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     Py_INCREF(Py_None);
-    self->minimum_size = NULL;
     return (PyObject*)self;
 }
 
@@ -116,9 +112,10 @@ Listbox_init(ListboxObject *self, PyObject *args, PyObject *keywords)
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "|s", kwlist, &text))
         return -1;
 
-    listbox = [[Listbox alloc] initWithObject: (PyObject*)self];
+    self->array = [[NSMutableArray alloc] init];
     self->foreground = [NSColor blackColor];
     [self->foreground retain];
+    listbox = [[Listbox alloc] initWithObject: (PyObject*)self];
     s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
     [listbox setStringValue: s];
     [s release];
@@ -228,6 +225,31 @@ Listbox_set_size(ListboxObject* self, PyObject *args)
     return Py_None;
 }
 
+static PyObject*
+Listbox_append(ListboxObject* self, PyObject *args)
+{
+    NSString* text;
+    WidgetObject* widget = (WidgetObject*)self;
+    Listbox* listbox = (Listbox*) widget->view;
+    Window* window = (Window*) [listbox window];
+    PyObject* value;
+    if (!listbox) {
+        PyErr_SetString(PyExc_RuntimeError, "listbox has not been initialized");
+        return NULL;
+    }
+    if(!PyArg_ParseTuple(args, "O", &value)) return NULL;
+    text = PyString_AsNSString(value);
+    if (!text) {
+        PyErr_SetString(PyExc_ValueError, "expected a string.");
+        return NULL;
+    }
+    [self->array addObject: text];
+    [listbox reloadData];
+    [window requestLayout];
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static PyMethodDef Listbox_methods[] = {
     {"set_frame",
      (PyCFunction)Listbox_set_frame,
@@ -244,21 +266,31 @@ static PyMethodDef Listbox_methods[] = {
      METH_VARARGS,
      "Sets the size of the listbox."
     },
+    {"append",
+     (PyCFunction)Listbox_append,
+     METH_VARARGS,
+     "Appends one item to the list."
+    },
     {NULL}  /* Sentinel */
 };
 
 static PyObject* Listbox_get_minimum_size(ListboxObject* self, void* closure)
 {
-    PyObject* minimum_size = self->minimum_size;
-    if (minimum_size==NULL) {
-        WidgetObject* widget = (WidgetObject*)self;
-        Listbox* listbox = (Listbox*) widget->view;
-        NSSize size = [[listbox cell] cellSize];
-        minimum_size = Py_BuildValue("ff", size.width, size.height);
-        self->minimum_size = minimum_size;
+    NSInteger i;
+    double width = 0.0;
+    double height = 0.0;
+    NSSize size;
+    NSCell* cell;
+    WidgetObject* widget = (WidgetObject*) self;
+    NSView* view = widget->view;
+    NSTableView* listbox = (NSTableView*)view;
+    for (i = 0; i < listbox.numberOfRows; i++) {
+        cell = [listbox preparedCellAtColumn:0 row:i];
+        size = [cell cellSize];
+        if (size.width > width) width = size.width;
+        height += size.height;
     }
-    Py_INCREF(minimum_size);
-    return minimum_size;
+    return Py_BuildValue("dd", width, height);
 }
 
 static char Listbox_minimum_size__doc__[] = "minimum size needed to show the listbox.";
