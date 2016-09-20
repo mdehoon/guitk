@@ -104,21 +104,23 @@ static int
 Listbox_init(ListboxObject *self, PyObject *args, PyObject *keywords)
 {
     Listbox *listbox;
-    const char* text = "";
-    NSString* s;
+    PyObject* multiple = Py_False;
     WidgetObject* widget;
 
-    static char* kwlist[] = {"text", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|s", kwlist, &text))
+    static char* kwlist[] = {"multiple", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O", kwlist,
+                                     &multiple))
         return -1;
 
+    if (multiple!=Py_True && multiple!=Py_False) {
+        PyErr_SetString(PyExc_ValueError, "multiple should be True or False.");
+        return -1;
+    }
     self->array = [[NSMutableArray alloc] init];
     self->foreground = [NSColor blackColor];
     [self->foreground retain];
     listbox = [[Listbox alloc] initWithObject: (PyObject*)self];
-    s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
-    [listbox setStringValue: s];
-    [s release];
+    if (multiple==Py_True) listbox.allowsMultipleSelection = YES;
     widget = (WidgetObject*)self;
     widget->view = listbox;
 
@@ -226,6 +228,39 @@ Listbox_set_size(ListboxObject* self, PyObject *args)
 }
 
 static PyObject*
+Listbox_insert(ListboxObject* self, PyObject *args)
+{
+    NSString* text;
+    WidgetObject* widget = (WidgetObject*)self;
+    Listbox* listbox = (Listbox*) widget->view;
+    Window* window = (Window*) [listbox window];
+    PyObject* value;
+    int index;
+    long n;
+    if (!listbox) {
+        PyErr_SetString(PyExc_RuntimeError, "listbox has not been initialized");
+        return NULL;
+    }
+    if(!PyArg_ParseTuple(args, "iO", &index, &value)) return NULL;
+    n = [self->array count];
+    if (index < 0) index += n;
+    if (index < 0 || index >= n) {
+        PyErr_SetString(PyExc_IndexError, "index out of bounds");
+        return NULL;
+    }
+    text = PyString_AsNSString(value);
+    if (!text) {
+        PyErr_SetString(PyExc_ValueError, "expected a string.");
+        return NULL;
+    }
+    [self->array insertObject: text atIndex: index];
+    [listbox reloadData];
+    [window requestLayout];
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject*
 Listbox_append(ListboxObject* self, PyObject *args)
 {
     NSString* text;
@@ -244,6 +279,32 @@ Listbox_append(ListboxObject* self, PyObject *args)
         return NULL;
     }
     [self->array addObject: text];
+    [listbox reloadData];
+    [window requestLayout];
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
+static PyObject*
+Listbox_delete(ListboxObject* self, PyObject *args)
+{
+    int index;
+    WidgetObject* widget = (WidgetObject*)self;
+    Listbox* listbox = (Listbox*) widget->view;
+    Window* window = (Window*) [listbox window];
+    long n;
+    if (!listbox) {
+        PyErr_SetString(PyExc_RuntimeError, "listbox has not been initialized");
+        return NULL;
+    }
+    if(!PyArg_ParseTuple(args, "i", &index)) return NULL;
+    n = [self->array count];
+    if (index < 0) index += n;
+    if (index < 0 || index >= n) {
+        PyErr_SetString(PyExc_IndexError, "index out of bounds");
+        return NULL;
+    }
+    [self->array removeObjectAtIndex: index];
     [listbox reloadData];
     [window requestLayout];
     Py_INCREF(Py_None);
@@ -271,6 +332,16 @@ static PyMethodDef Listbox_methods[] = {
      METH_VARARGS,
      "Appends one item to the list."
     },
+    {"insert",
+     (PyCFunction)Listbox_insert,
+     METH_VARARGS,
+     "Inserts one item into the list."
+    },
+    {"delete",
+     (PyCFunction)Listbox_delete,
+     METH_VARARGS,
+     "Deletes one item from the list."
+    },
     {NULL}  /* Sentinel */
 };
 
@@ -295,35 +366,81 @@ static PyObject* Listbox_get_minimum_size(ListboxObject* self, void* closure)
 
 static char Listbox_minimum_size__doc__[] = "minimum size needed to show the listbox.";
 
-static PyObject* Listbox_get_text(ListboxObject* self, void* closure)
+static PyObject* Listbox_get_selected(ListboxObject* self, void* closure)
 {
     Listbox* listbox;
     WidgetObject* widget;
-    NSString* text;
+    NSUInteger index;
+    NSUInteger count;
+    NSIndexSet* indices;
+    PyObject* tuple;
+    PyObject* item;
+    Py_ssize_t i = 0;
     widget = (WidgetObject*) self;
     listbox = (Listbox*)(widget->view);
-    text = [listbox stringValue];
-    return PyString_FromNSString(text);
+    indices = [listbox selectedRowIndexes];
+    count = indices.count;
+    index = [indices firstIndex];
+    tuple = PyTuple_New(count);
+    if (!tuple) return NULL;
+    while (index != NSNotFound)
+    {
+        item = PyInt_FromLong(index);
+        if (!item) {
+            while (i > 0) {
+                i--;
+                item = PyTuple_GET_ITEM(tuple, i);
+                Py_DECREF(item);
+            }
+            Py_DECREF(tuple);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(tuple, i, item);
+        index = [indices indexGreaterThanIndex: index];
+        i++;
+    }
+    return tuple;
 }
 
 static int
-Listbox_set_text(ListboxObject* self, PyObject* value, void* closure)
+Listbox_set_selected(ListboxObject* self, PyObject* tuple, void* closure)
 {
     Listbox* listbox;
     WidgetObject* widget;
-    NSString* text;
-    text = PyString_AsNSString(value);
-    if (!text) {
-        PyErr_SetString(PyExc_ValueError, "expected a string.");
+    NSMutableIndexSet* indices;
+    Py_ssize_t i;
+    Py_ssize_t size;
+    PyObject* item;
+    long index;
+    long count;
+    if (!PyTuple_Check(tuple)) {
+        PyErr_SetString(PyExc_ValueError, "expected a tuple.");
         return -1;
     }
     widget = (WidgetObject*) self;
     listbox = (Listbox*)(widget->view);
-    listbox.stringValue = text;
+    indices = [NSMutableIndexSet indexSet];
+    size = PyTuple_GET_SIZE(tuple);
+    count = [self->array count];
+    for (i = 0; i < size; i++) {
+        item = PyTuple_GET_ITEM(tuple, i);
+        index = PyInt_AsLong(item);
+        if (index == -1 && PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError, "expected a tuple of integers.");
+            return -1;
+        }
+        if (index < 0) index += count;
+        if (index < 0 || index >= count) {
+            PyErr_SetString(PyExc_IndexError, "index out of bounds.");
+            return -1;
+        }
+        [indices addIndex: index];
+    }
+    [listbox selectRowIndexes: indices byExtendingSelection: NO];
     return 0;
 }
 
-static char Listbox_text__doc__[] = "listbox contents.";
+static char Listbox_selected__doc__[] = "indices of currently selected items.";
 
 static PyObject* Listbox_get_background(ListboxObject* self, void* closure)
 {
@@ -419,7 +536,7 @@ static char Listbox_foreground__doc__[] = "foreground color.";
 
 static PyGetSetDef Listbox_getseters[] = {
     {"minimum_size", (getter)Listbox_get_minimum_size, (setter)NULL, Listbox_minimum_size__doc__, NULL},
-    {"text", (getter)Listbox_get_text, (setter)Listbox_set_text, Listbox_text__doc__, NULL},
+    {"selected", (getter)Listbox_get_selected, (setter)Listbox_set_selected, Listbox_selected__doc__, NULL},
     {"background", (getter)Listbox_get_background, (setter)Listbox_set_background, Listbox_background__doc__, NULL},
     {"foreground", (getter)Listbox_get_foreground, (setter)Listbox_set_foreground, Listbox_foreground__doc__, NULL},
     {NULL}  /* Sentinel */
