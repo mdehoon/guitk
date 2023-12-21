@@ -45,6 +45,7 @@ extension.extra_link_args.extend(['-framework', 'Cocoa'])
 extensions.append(extension)
 
 setup(
+      name = "guitk",
       packages = ['guitk'],
       package_dir = {'': 'Lib'},
       ext_modules=extensions,
