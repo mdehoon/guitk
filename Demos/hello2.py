@@ -23,7 +23,7 @@ class App(gui.Window):
         button2.command = self.say_hi
 
     def say_hi(self):
-        print "hi there, everyone"
+        print("hi there, everyone")
 
 window = App()
 window.size = (300, 50)

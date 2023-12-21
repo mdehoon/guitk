@@ -88,17 +88,17 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
     NSRect rect;
     NSUInteger windowStyle;
     Window* window;
-    PyObject* title = NULL;
-    const char* string;
+    PyObject* argument = NULL;
+    const char* title = NULL;
     int width = 100;
     int height = 100;
     static char* kwlist[] = {"width", "height", "title", NULL};
 
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "|iiO", kwlist,
-                                     &width, &height, &title))
+                                     &width, &height, &argument))
         return -1;
 
-    if (title == Py_None) {
+    if (argument == Py_None) {
         windowStyle = NSBorderlessWindowMask;
     }
     else  {
@@ -106,9 +106,11 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
                     | NSClosableWindowMask
                     | NSResizableWindowMask
                     | NSMiniaturizableWindowMask;
-        if (title == NULL) string = "";
-        else if (PyString_Check(title)) {
-            string = PyString_AsString(title);
+        if (argument == NULL) title = "";
+        else if (PyUnicode_Check(argument)) {
+            argument = PyUnicode_AsUTF8String(argument);
+            if (!argument) return -1;
+            title = PyBytes_AS_STRING(argument);
         }
         else {
             PyErr_SetString(PyExc_TypeError,
@@ -129,9 +131,11 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
     window = [window initWithContentRect: rect
                                styleMask: windowStyle
                                   object: self];
-    if (string)
-        [window setTitle: [NSString stringWithCString: string
-                                             encoding: NSASCIIStringEncoding]];
+    if (title) {
+        [window setTitle: [NSString stringWithCString: title
+                                             encoding: NSUTF8StringEncoding]];
+        if (argument) Py_DECREF(argument);
+    }
     self->layout_requested = NO;
     self->window = window;
 
@@ -428,7 +432,6 @@ static PyObject* Window_get_title(WindowObject* self, void* closure)
 static int
 Window_set_title(WindowObject* self, PyObject* value, void* closure)
 {
-    char* title;
     NSWindow* window;
     NSAutoreleasePool* pool;
     NSString* s;
@@ -443,7 +446,6 @@ Window_set_title(WindowObject* self, PyObject* value, void* closure)
         return -1;
     }
 
-
     if (value == Py_None) {
         if (! (window.styleMask & mask)) return 0;
 #ifdef COMPILING_FOR_10_6
@@ -454,8 +456,10 @@ Window_set_title(WindowObject* self, PyObject* value, void* closure)
         return -1;
 #endif
     }
-    title = PyString_AsString(value);
-    if (!title) return -1;
+
+    value = PyUnicode_AsUTF8String(value);
+    if (!value) return -1;
+
     if (! (window.styleMask & mask)) {
 #ifdef COMPILING_FOR_10_6
         window.styleMask |= mask;
@@ -465,11 +469,12 @@ Window_set_title(WindowObject* self, PyObject* value, void* closure)
 #endif
     }
     pool = [[NSAutoreleasePool alloc] init];
-    s = [[NSString alloc] initWithCString: title
+    s = [[NSString alloc] initWithCString: PyBytes_AS_STRING(value)
                                  encoding: NSUTF8StringEncoding];
     [window setTitle: s];
     [s release];
     [pool release];
+    Py_DECREF(value);
     return 0;
 }
 
@@ -528,7 +533,7 @@ static PyObject* Window_get_width(WindowObject* self, void* closure)
     }
     frame = [[window contentView] frame];
     width = round(frame.size.width);
-    return PyInt_FromLong(width);
+    return PyLong_FromLong(width);
 }
 
 static int Window_set_width(WindowObject* self, PyObject* value, void* closure)
@@ -563,7 +568,7 @@ static PyObject* Window_get_height(WindowObject* self, void* closure)
     }
     frame = [[window contentView] frame];
     height = round(frame.size.height);
-    return PyInt_FromLong(height);
+    return PyLong_FromLong(height);
 }
 
 static int Window_set_height(WindowObject* self, PyObject* value, void* closure)
@@ -724,7 +729,7 @@ static PyObject* Window_get_min_width(WindowObject* self, void* closure)
         return NULL;
     }
     width = (int) window.minSize.width;
-    return PyInt_FromLong(width);
+    return PyLong_FromLong(width);
 }
 
 static int
@@ -741,7 +746,7 @@ Window_set_min_width(WindowObject* self, PyObject* value, void* closure)
     if (value == Py_None) {
         width = 0;
     } else {
-        width = PyInt_AsLong(value);
+        width = PyLong_AsLong(value);
         if (PyErr_Occurred()) return -1;
     }
     size = window.minSize;
@@ -766,7 +771,7 @@ static PyObject* Window_get_max_width(WindowObject* self, void* closure)
         Py_INCREF(Py_None);
         return Py_None;
     }
-    return PyInt_FromLong((long)width);
+    return PyLong_FromLong((long)width);
 }
 
 static int
@@ -784,7 +789,7 @@ Window_set_max_width(WindowObject* self, PyObject* value, void* closure)
     if (value == Py_None) {
         size.width = FLT_MAX;
     } else {
-        width = PyInt_AsLong(value);
+        width = PyLong_AsLong(value);
         if (PyErr_Occurred()) return -1;
         size.width = width;
     }
@@ -804,7 +809,7 @@ static PyObject* Window_get_min_height(WindowObject* self, void* closure)
         return NULL;
     }
     height = (int) window.minSize.height;
-    return PyInt_FromLong(height);
+    return PyLong_FromLong(height);
 }
 
 static int
@@ -821,7 +826,7 @@ Window_set_min_height(WindowObject* self, PyObject* value, void* closure)
     if (value == Py_None) {
         height = 0;
     } else {
-        height = PyInt_AsLong(value);
+        height = PyLong_AsLong(value);
         if (PyErr_Occurred()) return -1;
     }
     size = window.minSize;
@@ -846,7 +851,7 @@ static PyObject* Window_get_max_height(WindowObject* self, void* closure)
         Py_INCREF(Py_None);
         return Py_None;
     }
-    return PyInt_FromLong((long)height);
+    return PyLong_FromLong((long)height);
 }
 
 static int
@@ -864,7 +869,7 @@ Window_set_max_height(WindowObject* self, PyObject* value, void* closure)
     if (value == Py_None) {
         size.height = FLT_MAX;
     } else {
-        height = PyInt_AsLong(value);
+        height = PyLong_AsLong(value);
         if (PyErr_Occurred()) return -1;
         size.height = height;
     }

@@ -199,7 +199,7 @@ int Color_converter(PyObject* argument, void* address)
             long value;
             PyObject* item;
             item = PyTuple_GET_ITEM(argument, i);
-            value = PyInt_AsLong(item);
+            value = PyLong_AsLong(item);
             if (value==-1 && PyErr_Occurred()) {
                 PyErr_SetString(PyExc_ValueError,
                                 "expected a tuple with 4 values");
@@ -209,16 +209,23 @@ int Color_converter(PyObject* argument, void* address)
         }
         return 1;
     }
-    if (PyString_Check(argument)) {
-        const char* name;
-        long hex;
-        char* s = PyString_AS_STRING(argument);
+    if (PyUnicode_Check(argument)) {
+        char* s;
         char *(*p)[2];
+        const char* name;
+        argument = PyUnicode_AsASCIIString(argument);
+        if (!argument) {
+            PyErr_Clear();
+            PyErr_SetString(PyExc_ValueError, "expected an ASCII string");
+            return 0;
+        }
+        s = PyBytes_AS_STRING(argument);
         rgba[0] = 0;
         rgba[1] = 0;
         rgba[2] = 0;
         rgba[3] = 0;
         for (p = colors; p[0]; p++) {
+            long hex;
             name = (*p)[0];
             if (!name) break;
             if (strcmp(name, s)==0) {
@@ -229,11 +236,15 @@ int Color_converter(PyObject* argument, void* address)
                 hex >>= 8;
                 rgba[0] = hex & 0xff;
                 rgba[3] = 255;
-                return 1;
+                break;
             }
         }
-        PyErr_SetString(PyExc_ValueError, "failed to find color name");
-        return 0;
+        Py_DECREF(argument);
+        if (!name) {
+            PyErr_SetString(PyExc_ValueError, "failed to find color name");
+            return 0;
+        }
+        return 1;
     }
     PyErr_SetString(PyExc_ValueError,
                     "expected a tuple, string, or color object");
@@ -270,10 +281,10 @@ Color_repr(ColorObject* self)
     short *rgba = self->rgba;
     i = (rgba[0] << 24) + (rgba[1] << 16) + (rgba[2] << 8) + rgba[3];
 #if PY3K
-    return PyString_FromFormat("Color object %p with color #%08x",
+    return PyUnicode_FromFormat("Color object %p with color #%08x",
                                 (void*) self, i);
 #else
-    return PyUnicode_FromFormat("Color object %p with color #%08x",
+    return PyString_FromFormat("Color object %p with color #%08x",
                                 (void*) self, i);
 #endif
 }

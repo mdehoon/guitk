@@ -281,7 +281,7 @@ static PyObject*
 Timer_repr(TimerObject* self)
 {
     void* p = self;
-    return PyString_FromFormat("Timer object %p", p);
+    return PyUnicode_FromFormat("Timer object %p", p);
 }
 
 static PyTypeObject TimerType = {
@@ -542,7 +542,7 @@ static PyObject* Notifier_get_fd(NotifierObject* self, void* closure)
         return NULL;
     }
     fd = CFFileDescriptorGetNativeDescriptor(fdref);
-    return PyInt_FromLong(fd);
+    return PyLong_FromLong(fd);
 }
 
 static PyGetSetDef Notifier_getset[] = {
@@ -568,9 +568,9 @@ Notifier_repr(NotifierObject* self)
     void* p = self;
     CFFileDescriptorRef fdref = self->fdref;
     if (!fdref)
-        return PyString_FromFormat("Notifier object %p (not initialized)", p);
+        return PyUnicode_FromFormat("Notifier object %p (not initialized)", p);
     fd = CFFileDescriptorGetNativeDescriptor(fdref);
-    return PyString_FromFormat("Notifier object %p for file descriptor %d", p, fd);
+    return PyUnicode_FromFormat("Notifier object %p for file descriptor %d", p, fd);
 }
 
 static PyTypeObject NotifierType = {

@@ -1,4 +1,4 @@
-import events
+from guitk import events
 
 # class Window(_guitk.Window):
     # def __init__(self, width, height, title):

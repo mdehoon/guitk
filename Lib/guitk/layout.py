@@ -7,7 +7,7 @@ class Grid(gui.Layout):
         assert ncols > 0
         self.nrows = nrows
         self.ncols = ncols
-        self.objects = [[None for j in xrange(ncols)] for i in xrange(nrows)]
+        self.objects = [[None for j in range(ncols)] for i in range(nrows)]
     def __getitem__(self, key):
         i, j = key
         return self.objects[i][j]
@@ -19,7 +19,7 @@ class Grid(gui.Layout):
         self.objects[i][j] = value
         self.add(value)
     def layout(self):
-        print "Performing layout"
+        print("Performing layout")
         heights = array.array('f', [0]*self.nrows)
         widths = array.array('f', [0]*self.ncols)
         hexpand = array.array('b', [0]*self.ncols)

@@ -20,7 +20,7 @@ class App(gui.Window):
         self.content = grid
     def checkbox_command(self, checkbox):
         text = checkbox.text
-        print text, "became", checkbox.state
+        print(text, "became", checkbox.state)
 
 window = App()
 window.show()

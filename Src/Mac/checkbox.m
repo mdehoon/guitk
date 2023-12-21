@@ -306,13 +306,14 @@ Checkbox_set_text(CheckboxObject* self, PyObject* value, void* closure)
 {
     NSString* s;
     const char* text;
-    text = PyString_AsString(value);
-    if (!text) return -1;
+    value = PyUnicode_AsUTF8String(value);
+    if (!value) return -1;
+    text = PyBytes_AS_STRING(value);
     s = [[NSString alloc] initWithCString: text
                                  encoding: NSUTF8StringEncoding];
     [self->checkbox setTitle: s];
     [s release];
-
+    Py_DECREF(value);
     return 0;
 }
 

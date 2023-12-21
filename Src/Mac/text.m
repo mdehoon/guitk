@@ -5,10 +5,6 @@ CFStringRef PyString_AsCFString(const PyObject* object)
     if (object==NULL) {
         return CFSTR("");
     }
-    if (PyString_Check(object)) {
-        const char* text = PyString_AS_STRING(object); 
-        return CFStringCreateWithCString(kCFAllocatorDefault, text, kCFStringEncodingUTF8);
-    }
     if (PyUnicode_Check(object)) {
         const UniChar* text = (const UniChar*)PyUnicode_AS_DATA(object); 
         const Py_ssize_t size = PyUnicode_GET_SIZE(object);
@@ -31,24 +27,23 @@ PyObject* PyString_FromCFString(const CFStringRef text)
     buffer = malloc(size);
     if (!buffer) return PyErr_NoMemory();
     CFStringGetBytes(text, range, kCFStringEncodingUTF8, 0, false, buffer, size, &usedBufLen);
-    object = PyString_FromStringAndSize((const char*)buffer, usedBufLen);
+    object = PyUnicode_FromStringAndSize((const char*)buffer, usedBufLen);
     free(buffer);
     return object;
 }
 
-NSString* PyString_AsNSString(const PyObject* object)
+NSString* PyString_AsNSString(PyObject* object)
 {
     if (object==NULL) {
         return [NSString string];
     }
-    if (PyString_Check(object)) {
-        const char* text = PyString_AS_STRING(object); 
-        return [NSString stringWithCString: text encoding: NSUTF8StringEncoding];
-    }
     if (PyUnicode_Check(object)) {
-        const UniChar* text = (const UniChar*)PyUnicode_AS_DATA(object); 
-        const Py_ssize_t size = PyUnicode_GET_SIZE(object);
-        return [NSString stringWithCharacters: text length: size];
+        object = PyUnicode_AsUTF8String(object); 
+        if (!object) return NULL;
+        const char* text = PyBytes_AS_STRING(object);
+        NSString* s = [NSString stringWithCString: text encoding: NSUTF8StringEncoding];
+        Py_DECREF(object);
+        return s;
     }
     return NULL;
 }
@@ -59,6 +54,6 @@ PyObject* PyString_FromNSString(const NSString* text)
     const char* s;
     NSUInteger n = [text lengthOfBytesUsingEncoding: NSUTF8StringEncoding];
     s = [text cStringUsingEncoding: NSUTF8StringEncoding];
-    object = PyString_FromStringAndSize(s, n);
+    object = PyUnicode_FromStringAndSize(s, n);
     return object;
 }

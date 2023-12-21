@@ -385,7 +385,7 @@ static PyObject* Listbox_get_selected(ListboxObject* self, void* closure)
     if (!tuple) return NULL;
     while (index != NSNotFound)
     {
-        item = PyInt_FromLong(index);
+        item = PyLong_FromLong(index);
         if (!item) {
             while (i > 0) {
                 i--;
@@ -424,7 +424,7 @@ Listbox_set_selected(ListboxObject* self, PyObject* tuple, void* closure)
     count = [self->array count];
     for (i = 0; i < size; i++) {
         item = PyTuple_GET_ITEM(tuple, i);
-        index = PyInt_AsLong(item);
+        index = PyLong_AsLong(item);
         if (index == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError, "expected a tuple of integers.");
             return -1;

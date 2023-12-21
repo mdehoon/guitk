@@ -261,35 +261,29 @@ static PyObject* Widget_get_halign(WidgetObject* self, void* closure)
             PyErr_SetString(PyExc_SystemError, "unexpected alignment value.");
             return NULL;
     }
-    return PyString_FromString(s);
+    return PyUnicode_FromString(s);
 }
 
 static int Widget_set_halign(WidgetObject* self, PyObject* value, void* closure)
 {
     NSView* view;
     Window* window;
-    const char* argument = PyString_AsString(value);
+    char halign = '\0';
+    value = PyUnicode_AsASCIIString(value);
+    if (!value) return -1;
+    const char* argument = PyBytes_AS_STRING(value);
     if (!argument) return -1;
-    if (strcmp(argument, "LEFT")==0) {
-        if (self->halign == 'l') return 0;
-        self->halign = 'l';
-    }
-    else if (strcmp(argument, "RIGHT")==0) {
-        if (self->halign == 'r') return 0;
-        self->halign = 'r';
-    }
-    else if (strcmp(argument, "CENTER")==0) {
-        if (self->halign == 'c') return 0;
-        self->halign = 'c';
-    }
-    else if (strcmp(argument, "FILL")==0) {
-        if (self->halign == 'f') return 0;
-        self->halign = 'f';
-    }
+    if (strcmp(argument, "LEFT")==0) halign = 'l';
+    else if (strcmp(argument, "RIGHT")==0) halign = 'r';
+    else if (strcmp(argument, "CENTER")==0) halign = 'c';
+    else if (strcmp(argument, "FILL")==0) halign = 'f';
     else {
         PyErr_SetString(PyExc_ValueError, "argument should be 'FILL', 'LEFT', 'CENTER', or 'RIGHT'.");
-        return -1;
     }
+    Py_DECREF(argument);
+    if (halign == '\0') return -1;
+    if (self->halign == halign) return 0;
+    self->halign = halign;
     view = self->view;
     window = (Window*) [view window];
     [window requestLayout];
@@ -312,35 +306,29 @@ static PyObject* Widget_get_valign(WidgetObject* self, void* closure)
             PyErr_SetString(PyExc_SystemError, "unexpected alignment value.");
             return NULL;
     }
-    return PyString_FromString(s);
+    return PyUnicode_FromString(s);
 }
 
 static int Widget_set_valign(WidgetObject* self, PyObject* value, void* closure)
 {
     NSView* view;
     Window* window;
-    const char* argument = PyString_AsString(value);
+    char valign = '\0';
+    value = PyUnicode_AsASCIIString(value);
+    if (!value) return -1;
+    const char* argument = PyBytes_AS_STRING(value);
     if (!argument) return -1;
-    if (strcmp(argument, "TOP")==0) {
-        if (self->valign == 't') return 0;
-        self->valign = 't';
-    }
-    else if (strcmp(argument, "BOTTOM")==0) {
-        if (self->valign == 'b') return 0;
-        self->valign = 'b';
-    }
-    else if (strcmp(argument, "CENTER")==0) {
-        if (self->valign == 'c') return 0;
-        self->valign = 'c';
-    }
-    else if (strcmp(argument, "FILL")==0) {
-        if (self->valign == 'f') return 0;
-        self->valign = 'f';
-    }
+    if (strcmp(argument, "TOP")==0) valign = 't';
+    else if (strcmp(argument, "BOTTOM")==0) valign = 'b';
+    else if (strcmp(argument, "CENTER")==0) valign = 'c';
+    else if (strcmp(argument, "FILL")==0) valign = 'f';
     else {
         PyErr_SetString(PyExc_ValueError, "argument should be 'FILL', 'TOP', 'CENTER', or 'BOTTOM'.");
-        return -1;
     }
+    Py_DECREF(argument);
+    if (valign == '\0') return -1;
+    if (self->valign == valign) return 0;
+    self->valign = valign;
     view = self->view;
     window = (Window*) [view window];
     [window requestLayout];

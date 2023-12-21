@@ -1,7 +1,7 @@
 from guitk import gui, layout
 
 def callback():
-    print textbox.text
+    print(textbox.text)
 
 window = gui.Window()
 grid = layout.Grid(2,1)
