@@ -3,16 +3,6 @@
 
 #define PYOSINPUTHOOK_REPETITIVE 1 /* Remove this once Python is fixed */
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
 #define READABLE 1
 #define WRITABLE 2
 
@@ -832,7 +822,6 @@ static struct PyMethodDef methods[] = {
    {NULL,          NULL, 0, NULL} /* sentinel */
 };
 
-#if PY3K
 static void freeevents(void* module)
 {
     PyOS_InputHook = NULL;
@@ -852,24 +841,11 @@ static struct PyModuleDef moduledef = {
 };
 
 PyObject* PyInit_events(void)
-
-#else
-
-void initevents(void)
-#endif
 {
 #ifdef WITH_NEXT_FRAMEWORK
     PyObject *module;
 
-#if PY3K
     module = PyModule_Create(&moduledef);
-#else
-    module = Py_InitModule4("events",
-                            methods,
-                            "Mac OS X native GUI",
-                            NULL,
-                            PYTHON_API_VERSION);
-#endif
     if (module==NULL) goto error;
 
     TimerType.tp_new = PyType_GenericNew;
@@ -894,15 +870,9 @@ void initevents(void)
 
     PyOS_InputHook = wait_for_stdin;
 
-#if PY3K
     return module;
-#endif
 error:
-#if PY3K
     return NULL;
-#else
-    return;
-#endif
 #else
     /* WITH_NEXT_FRAMEWORK is not defined. This means that Python is not
      * installed as a framework, and therefore the Mac OS X GUI will
@@ -913,10 +883,6 @@ error:
         "not be able to function correctly if Python is not installed as a "
         "framework. See the Python documentation for more information on "
         "installing Python as a framework on Mac OS X.");
-#if PY3K
     return NULL;
-#else
-    return;
-#endif
 #endif
 }

@@ -4,15 +4,6 @@
 #include <Python.h>
 #include "events.h"
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
 
 typedef struct TimerObject TimerObject;
 
@@ -462,7 +453,6 @@ static struct PyMethodDef methods[] = {
    {NULL,          NULL, 0, NULL} /* sentinel */
 };
 
-#if PY3K
 static void freeevents(void* module)
 {
     PyOS_InputHook = NULL;
@@ -481,37 +471,18 @@ static struct PyModuleDef moduledef = {
 };
 
 PyObject* PyInit_events(void)
-
-#else
-
-void initevents(void)
-#endif
 {
     PyObject *module;
     if (PyType_Ready(&TimerType) < 0)
         goto error;
     if (PyType_Ready(&SocketType) < 0)
         goto error;
-#if PY3K
     module = PyModule_Create(&moduledef);
-#else
-    module = Py_InitModule4("events",
-                            methods,
-                            "events module",
-                            NULL,
-                            PYTHON_API_VERSION);
-#endif
     if (module==NULL) goto error;
     notifier.firstTimer = NULL;
     notifier.firstSocket = NULL;
     PyOS_InputHook = wait_for_stdin;
-#if PY3K
     return module;
-#endif
 error:
-#if PY3K
     return NULL;
-#else
-    return;
-#endif
 }

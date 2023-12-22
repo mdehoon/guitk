@@ -1,16 +1,6 @@
 #include <Python.h>
 #include "colors.h"
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
 typedef struct {
     PyObject_HEAD
     short rgba[4];
@@ -280,13 +270,8 @@ Color_repr(ColorObject* self)
     int i;
     short *rgba = self->rgba;
     i = (rgba[0] << 24) + (rgba[1] << 16) + (rgba[2] << 8) + rgba[3];
-#if PY3K
     return PyUnicode_FromFormat("Color object %p with color #%08x",
                                 (void*) self, i);
-#else
-    return PyString_FromFormat("Color object %p with color #%08x",
-                                (void*) self, i);
-#endif
 }
 
 static PyObject* Color_get_rgba(ColorObject* self, void* closure)

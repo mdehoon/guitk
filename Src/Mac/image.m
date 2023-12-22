@@ -1,19 +1,6 @@
 #include "image.h"
 
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
-
-
-
 static PyObject*
 Image_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -51,13 +38,8 @@ Image_init(ImageObject *self, PyObject *args, PyObject *kwds)
 static PyObject*
 Image_repr(ImageObject* self)
 {
-#if PY3K
     return PyUnicode_FromFormat("Image object %p wrapping NSImage %p",
                                (void*) self, (void*)(self->image));
-#else
-    return PyString_FromFormat("Image object %p wrapping NSImage %p",
-                               (void*) self, (void*)(self->image));
-#endif
 }
 
 static void

@@ -3,16 +3,6 @@
 #include "widgets.h"
 
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 #define COMPILING_FOR_10_6
 #endif
@@ -151,13 +141,8 @@ static PyObject*
 Window_repr(WindowObject* self)
 {
     Window* window = self->window;
-#if PY3K
     return PyUnicode_FromFormat("Window object %p wrapping NSWindow %p",
                                self, window);
-#else
-    return PyString_FromFormat("Window object %p wrapping NSWindow %p",
-                                self, window);
-#endif
 }
 
 static void
@@ -419,11 +404,7 @@ static PyObject* Window_get_title(WindowObject* self, void* closure)
     title = [window title];
     if (title) {
         const char* cTitle = [title UTF8String];
-#if PY3K || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION >= 6)
         result = PyUnicode_FromString(cTitle);
-#else
-        result = PyString_FromString(cTitle);
-#endif
     }
     [pool release];
     return result;

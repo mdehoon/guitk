@@ -4,16 +4,6 @@
 #include "text.h"
 
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
 @interface Textbox : NSTextField
 {
     PyObject* _object;
@@ -117,13 +107,8 @@ Textbox_repr(TextboxObject* self)
 {
     WidgetObject* widget = (WidgetObject*) self;
     NSView* view = widget->view;
-#if PY3K
     return PyUnicode_FromFormat("Textbox object %p wrapping NSTextField %p",
                                (void*) self, (void*)view);
-#else
-    return PyString_FromFormat("Textbox object %p wrapping NSTextField %p",
-                               (void*) self, (void*)view);
-#endif
 }
 
 static void

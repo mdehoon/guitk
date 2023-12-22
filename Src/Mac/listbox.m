@@ -5,17 +5,6 @@
 #include "text.h"
 
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
-
 @interface Listbox : NSTableView <NSTableViewDelegate, NSTableViewDataSource>
 {
     PyObject* _object;
@@ -132,13 +121,8 @@ Listbox_repr(ListboxObject* self)
 {
     WidgetObject* widget = (WidgetObject*) self;
     NSView* view = widget->view;
-#if PY3K
     return PyUnicode_FromFormat("Listbox object %p wrapping NSTableView %p",
                                (void*) self, (void*)view);
-#else
-    return PyString_FromFormat("Listbox object %p wrapping NSTableView %p",
-                               (void*) self, (void*)view);
-#endif
 }
 
 static void

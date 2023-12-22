@@ -6,16 +6,6 @@
 #include "colors.h"
 
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 #define COMPILING_FOR_10_6
 #endif
@@ -100,7 +90,6 @@ static struct PyMethodDef methods[] = {
     {NULL,          NULL, 0, NULL} /* sentinel */
 };
 
-#if PY3K
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,      /* m_base */
     "gui",                      /* m_name */
@@ -114,24 +103,11 @@ static struct PyModuleDef moduledef = {
 };
 
 PyObject* PyInit_gui(void)
-
-#else
-
-void initgui(void)
-#endif
 {
 #ifdef WITH_NEXT_FRAMEWORK
     PyObject *module;
 
-#if PY3K
     module = PyModule_Create(&moduledef);
-#else
-    module = Py_InitModule4("gui",
-                            methods,
-                            "Mac OS X native GUI",
-                            NULL,
-                            PYTHON_API_VERSION);
-#endif
     if (module==NULL) goto error;
 
     if (PyType_Ready(&WindowType) < 0)
@@ -197,15 +173,9 @@ void initgui(void)
     if (PyModule_AddObject(module, "Color", (PyObject*) &ColorType) < 0)
         goto error;
 
-#if PY3K
     return module;
-#endif
 error:
-#if PY3K
     return NULL;
-#else
-    return;
-#endif
 #else
     /* WITH_NEXT_FRAMEWORK is not defined. This means that Python is not
      * installed as a framework, and therefore the Mac OS X GUI will
@@ -216,10 +186,6 @@ error:
         "not be able to function correctly if Python is not installed as a "
         "framework. See the Python documentation for more information on "
         "installing Python as a framework on Mac OS X.");
-#if PY3K
     return NULL;
-#else
-    return;
-#endif
 #endif
 }

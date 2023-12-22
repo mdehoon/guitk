@@ -4,16 +4,6 @@
 #include "colors.h"
 #include "text.h"
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
 #define COMPILING_FOR_10_10
 #endif
@@ -169,13 +159,8 @@ static PyObject*
 Label_repr(LabelObject* self)
 {
     WidgetObject* widget = (WidgetObject*)self;
-#if PY3K
     return PyUnicode_FromFormat("Label object %p wrapping NSView %p",
                                self, widget->view);
-#else
-    return PyString_FromFormat("Label object %p wrapping NSView %p",
-                               self, widget->view);
-#endif
 }
 
 static void

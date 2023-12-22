@@ -6,16 +6,6 @@
 #include "colors.h"
 
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 #define COMPILING_FOR_10_6
 #endif
@@ -100,13 +90,8 @@ Frame_repr(FrameObject* self)
 {
     WidgetObject* widget = (WidgetObject*)self;
     NSView* view = widget->view;
-#if PY3K
     return PyUnicode_FromFormat("Frame object %p wrapping NSView %p",
                                self, view);
-#else
-    return PyString_FromFormat("Frame object %p wrapping NSView %p",
-                                self, view);
-#endif
 }
 
 static void

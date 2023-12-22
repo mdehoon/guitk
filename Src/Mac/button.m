@@ -3,16 +3,6 @@
 #include "colors.h"
 
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
 @interface Button : NSButton
 {
     PyObject* _object;
@@ -112,13 +102,8 @@ Button_init(ButtonObject *self, PyObject *args, PyObject *keywords)
 static PyObject*
 Button_repr(ButtonObject* self)
 {
-#if PY3K
     return PyUnicode_FromFormat("Button object %p wrapping NSButton %p",
                                (void*) self, (void*)(self->button));
-#else
-    return PyString_FromFormat("Button object %p wrapping NSButton %p",
-                               (void*) self, (void*)(self->button));
-#endif
 }
 
 static void

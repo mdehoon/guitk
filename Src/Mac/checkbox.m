@@ -3,16 +3,6 @@
 #include "colors.h"
 
 
-#if PY_MAJOR_VERSION >= 3
-#define PY3K 1
-#else
-#if PY_MINOR_VERSION < 7
-#error Python version should be 2.7 or newer
-#else
-#define PY3K 0
-#endif
-#endif
-
 @interface Checkbox : NSButton
 {
     PyObject* _object;
@@ -113,13 +103,8 @@ Checkbox_init(CheckboxObject *self, PyObject *args, PyObject *keywords)
 static PyObject*
 Checkbox_repr(CheckboxObject* self)
 {
-#if PY3K
     return PyUnicode_FromFormat("Checkbox object %p wrapping NSButton %p",
                                (void*) self, (void*)(self->checkbox));
-#else
-    return PyString_FromFormat("Checkbox object %p wrapping NSButton %p",
-                               (void*) self, (void*)(self->checkbox));
-#endif
 }
 
 static void
@@ -292,11 +277,7 @@ static PyObject* Checkbox_get_text(CheckboxObject* self, void* closure)
     NSString* text = [checkbox title];
     if (text) {
         const char* s = [text UTF8String];
-#if PY3K || (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION >= 6)
         result = PyUnicode_FromString(s);
-#else
-        result = PyString_FromString(s);
-#endif
     }
     return result;
 }
