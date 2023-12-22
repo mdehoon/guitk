@@ -63,7 +63,7 @@ Application_get_windows(PyObject* unused, PyObject* args)
         window = [NSApp windowWithWindowNumber: number];
         if ([window isKindOfClass: [Window class]]) {
             Window* w = (Window*) window;
-            object = [w object];
+            object = (PyObject*) [w object];
             Py_INCREF(object);
             PyList_SET_ITEM(list, i, object);
             i++;

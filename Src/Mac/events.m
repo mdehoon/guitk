@@ -62,7 +62,7 @@ static void timer_callout(CFRunLoopTimerRef timer, void* info)
     PyErr_Fetch(&exception_type, &exception_value, &exception_traceback);
     arguments = Py_BuildValue("(O)", object);
     if (arguments) {
-        result = PyEval_CallObject(callback, arguments);
+        result = PyObject_CallObject(callback, arguments);
         Py_DECREF(arguments);
     }
     if (result) Py_DECREF(result);
@@ -407,7 +407,7 @@ notifier_callout(CFFileDescriptorRef fdref,
     PyErr_Fetch(&exception_type, &exception_value, &exception_traceback);
     arguments = Py_BuildValue("(O)", object);
     if (arguments) {
-        result = PyEval_CallObject(callback, arguments);
+        result = PyObject_CallObject(callback, arguments);
         Py_DECREF(arguments);
     }
     if (result) Py_DECREF(result);

@@ -6,9 +6,19 @@ CFStringRef PyString_AsCFString(const PyObject* object)
         return CFSTR("");
     }
     if (PyUnicode_Check(object)) {
-        const UniChar* text = (const UniChar*)PyUnicode_AS_DATA(object); 
-        const Py_ssize_t size = PyUnicode_GET_SIZE(object);
-        return CFStringCreateWithCharacters(kCFAllocatorDefault, text, size);
+        CFStringEncoding encoding;
+        const Py_ssize_t length = PyUnicode_GET_LENGTH(object);
+        const int kind = PyUnicode_KIND(object);
+        switch (kind) {
+            case PyUnicode_1BYTE_KIND: encoding = kCFStringEncodingISOLatin1; break;
+            case PyUnicode_2BYTE_KIND: encoding = kCFStringEncodingUTF16LE; break;
+            case PyUnicode_4BYTE_KIND: encoding = kCFStringEncodingUTF32LE; break;
+        }
+        return CFStringCreateWithBytes(kCFAllocatorDefault,
+                                       PyUnicode_DATA(object),
+                                       length * kind,
+                                       encoding,
+                                       false);
     }
     return NULL;
 }
