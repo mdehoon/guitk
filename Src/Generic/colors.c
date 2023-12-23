@@ -180,6 +180,7 @@ int Color_converter(PyObject* argument, void* address)
     }
     if (PyTuple_Check(argument)) {
         int i;
+        unsigned short values[4];
         if (PyTuple_GET_SIZE(argument) != 4) {
             PyErr_SetString(PyExc_ValueError,
                             "expected a tuple with 4 components");
@@ -195,8 +196,13 @@ int Color_converter(PyObject* argument, void* address)
                                 "expected a tuple with 4 values");
                 return 0;
             }
-            rgba[i] = value;
+            if (value < 0 || value >= 256) {
+                PyErr_Format(PyExc_ValueError, "value %d is out of bounds", value);
+                return 0;
+            }
+            values[i] = (unsigned short)value;
         }
+        memcpy(rgba, values, 4 * sizeof(short));
         return 1;
     }
     if (PyUnicode_Check(argument)) {

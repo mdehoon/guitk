@@ -20,7 +20,8 @@
 
 typedef struct {
     WidgetObject widget;
-    CGColorRef background;
+    short foreground[4];
+    short background[4];
     CFStringRef text;
     NSFont* font;
     PyObject* minimum_size;
@@ -44,8 +45,6 @@ typedef struct {
     CTLineRef line;
     CFAttributedStringRef string = NULL;
     CFDictionaryRef attributes = NULL;
-    CFStringRef keys[1];
-    CFTypeRef values[1];
     CGContextRef cr;
     NSGraphicsContext* gc;
     CGFloat x;
@@ -56,22 +55,29 @@ typedef struct {
     CGFloat descent;
     double width;
     CGFloat height;
+    short red, green, blue, alpha;
     LabelObject* object = (LabelObject*)_object;
+    CFStringRef keys[] = { kCTFontAttributeName,
+                           kCTForegroundColorFromContextAttributeName };
+    CFTypeRef values[] = { object->font,
+                           kCFBooleanTrue };
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
     cr = [gc CGContext];
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
-    CGContextSetFillColorWithColor(cr, object->background);
+    red = object->background[0];
+    green = object->background[1];
+    blue = object->background[2];
+    alpha = object->background[3];
+    CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     rect = NSRectToCGRect(dirtyRect);
     CGContextFillRect(cr, rect);
-    keys[0] = kCTFontAttributeName;
-    values[0] = object->font;
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
                                     (const void**)&values,
-                                    1,
+                                    2,
                                     &kCFTypeDictionaryKeyCallBacks,
                                     &kCFTypeDictionaryValueCallBacks);
     if (!attributes) return;
@@ -94,6 +100,11 @@ typedef struct {
     CGAffineTransform transform = CGAffineTransformMakeScale (1.0, -1.0); 
     CGContextSetTextMatrix(cr, transform);
     CGContextSetTextPosition(cr, x, y);
+    red = object->foreground[0];
+    green = object->foreground[1];
+    blue = object->foreground[2];
+    alpha = object->foreground[3];
+    CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     CTLineDraw(line, cr);
     CFRelease(line);
 }
@@ -112,7 +123,14 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!self) return NULL;
     widget = (WidgetObject*)self;
     widget->view = nil;
-    self->background = NULL;
+    self->foreground[0] = 0;
+    self->foreground[1] = 0;
+    self->foreground[2] = 0;
+    self->foreground[3] = 255;
+    self->background[0] = 0;
+    self->background[1] = 0;
+    self->background[2] = 0;
+    self->background[3] = 0;
     self->text = NULL;
     self->font = nil;
     self->minimum_size = NULL;
@@ -125,7 +143,6 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
     WidgetObject* widget;
     LabelView *label;
     const PyObject* argument = NULL;
-    CGColorRef background;
     CFStringRef text;
     NSRect rect;
     NSFont* font;
@@ -144,12 +161,9 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
     rect.size.height = 100;
     label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
     font = [NSFont systemFontOfSize: 0.0];  // 0.0 means "use default size"
-    background = CGColorGetConstantColor(kCGColorClear);
-    CGColorRetain(background);
     [font retain];
     widget->view = label;
     self->text = text;
-    self->background = background;
     self->font = font;
 
     return 0;
@@ -173,7 +187,6 @@ Label_dealloc(LabelObject* self)
     if (label) [label release];
     if (font) [font release];
     if (text) CFRelease(text);
-    CGColorRelease(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -237,38 +250,48 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_text__doc__[] = "label text.";
 
+static PyObject* Label_get_foreground(LabelObject* self, void* closure)
+{
+    const short red = self->foreground[0];
+    const short green = self->foreground[1];
+    const short blue = self->foreground[2];
+    const short alpha = self->foreground[3];
+    return Py_BuildValue("HHHH", red, green, blue, alpha);
+}
+
+static int
+Label_set_foreground(LabelObject* self, PyObject* value, void* closure)
+{
+    if (!Color_converter(value, self->foreground)) return -1;
+    else {
+        WidgetObject* widget = (WidgetObject*) self;
+        LabelView* label = (LabelView*) (widget->view);
+        label.needsDisplay = YES;
+        return 0;
+    }
+}
+
+static char Label_foreground__doc__[] = "foreground color.";
+
 static PyObject* Label_get_background(LabelObject* self, void* closure)
 {
-    const CGFloat* components = CGColorGetComponents(self->background);
-    double red, green, blue, alpha;
-    red = components[0];
-    green = components[1];
-    blue = components[2];
-    alpha = components[3];
-    return Py_BuildValue("ffff", red, green, blue, alpha);
+    const short red = self->background[0];
+    const short green = self->background[1];
+    const short blue = self->background[2];
+    const short alpha = self->background[3];
+    return Py_BuildValue("HHHH", red, green, blue, alpha);
 }
 
 static int
 Label_set_background(LabelObject* self, PyObject* value, void* closure)
 {
-    short rgba[4];
-    CGFloat components[4];
-    CGColorRef background;
-    CGColorSpaceRef colorspace;
-    WidgetObject* widget = (WidgetObject*) self;
-    LabelView* label = (LabelView*) (widget->view);
-    if (!Color_converter(value, rgba)) return -1;
-    CGColorRelease(self->background);
-    colorspace = CGColorSpaceCreateDeviceRGB();
-    components[0] = rgba[0] / 255.;
-    components[1] = rgba[1] / 255.;
-    components[2] = rgba[2] / 255.;
-    components[3] = rgba[3] / 255.;
-    background = CGColorCreate(colorspace, components);
-    CGColorSpaceRelease(colorspace);
-    self->background = background;
-    label.needsDisplay = YES;
-    return 0;
+    if (!Color_converter(value, self->background)) return -1;
+    else {
+        WidgetObject* widget = (WidgetObject*) self;
+        LabelView* label = (LabelView*) (widget->view);
+        label.needsDisplay = YES;
+        return 0;
+    }
 }
 
 static char Label_background__doc__[] = "background color.";
@@ -321,6 +344,7 @@ static char Label_minimum_size__doc__[] = "minimum size needed to show the label
 
 static PyGetSetDef Label_getseters[] = {
     {"text", (getter)Label_get_text, (setter)Label_set_text, Label_text__doc__, NULL},
+    {"foreground", (getter)Label_get_foreground, (setter)Label_set_foreground, Label_foreground__doc__, NULL},
     {"background", (getter)Label_get_background, (setter)Label_set_background, Label_background__doc__, NULL},
     {"minimum_size", (getter)Label_get_minimum_size, (setter)NULL, Label_minimum_size__doc__, NULL},
     {NULL}  /* Sentinel */
