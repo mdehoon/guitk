@@ -4,7 +4,7 @@
 from guitk import gui
 
 window = gui.Window()
-label = gui.Label("Hello, world!")
+label = gui.Label("Hello, world \U0001f30e!")
 window.content = label
 window.size = label.minimum_size
 window.show()

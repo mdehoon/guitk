@@ -143,7 +143,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
     rect.size.width = 100;
     rect.size.height = 100;
     label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
-    font = [NSFont systemFontOfSize: 13.0];
+    font = [NSFont systemFontOfSize: 0.0];  // 0.0 means "use default size"
     background = CGColorGetConstantColor(kCGColorClear);
     CGColorRetain(background);
     [font retain];
