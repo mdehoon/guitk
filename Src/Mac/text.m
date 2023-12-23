@@ -71,13 +71,3 @@ NSString* PyString_AsNSString(PyObject* object)
     }
     return NULL;
 }
-
-PyObject* PyString_FromNSString(const NSString* text)
-{
-    PyObject* object;
-    const char* s;
-    NSUInteger n = [text lengthOfBytesUsingEncoding: NSUTF8StringEncoding];
-    s = [text cStringUsingEncoding: NSUTF8StringEncoding];
-    object = PyUnicode_FromStringAndSize(s, n);
-    return object;
-}

@@ -231,13 +231,10 @@ static char Textbox_minimum_size__doc__[] = "minimum size needed to show the tex
 
 static PyObject* Textbox_get_text(TextboxObject* self, void* closure)
 {
-    Textbox* textbox;
-    WidgetObject* widget;
-    NSString* text;
-    widget = (WidgetObject*) self;
-    textbox = (Textbox*)(widget->view);
-    text = [textbox stringValue];
-    return PyString_FromNSString(text);
+    WidgetObject* widget = (WidgetObject*) self;
+    Textbox* textbox = (Textbox*)(widget->view);
+    CFStringRef text = (CFStringRef) [textbox stringValue];
+    return PyString_FromCFString(text);
 }
 
 static int

@@ -275,17 +275,15 @@ static char Frame_content__doc__[] = "frame content";
 
 static PyObject* Frame_get_title(FrameObject* self, void* closure)
 {
-    FrameView* frame;
-    WidgetObject* widget;
-    NSString* text;
-    widget = (WidgetObject*) self;
-    frame = (FrameView*)(widget->view);
+    CFStringRef text;
+    WidgetObject* widget = (WidgetObject*) self;
+    FrameView* frame = (FrameView*)(widget->view);
     if (frame.titlePosition == NSNoTitle) {
         Py_INCREF(Py_None);
         return Py_None;
     }
-    text = frame.title;
-    return PyString_FromNSString(text);
+    text = (CFStringRef) frame.title;
+    return PyString_FromCFString(text);
 }
 
 static int

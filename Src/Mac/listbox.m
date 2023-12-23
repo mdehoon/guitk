@@ -214,7 +214,7 @@ Listbox_set_size(ListboxObject* self, PyObject *args)
 static PyObject*
 Listbox_insert(ListboxObject* self, PyObject *args)
 {
-    NSString* text;
+    CFStringRef text;
     WidgetObject* widget = (WidgetObject*)self;
     Listbox* listbox = (Listbox*) widget->view;
     Window* window = (Window*) [listbox window];
@@ -232,12 +232,9 @@ Listbox_insert(ListboxObject* self, PyObject *args)
         PyErr_SetString(PyExc_IndexError, "index out of bounds");
         return NULL;
     }
-    text = PyString_AsNSString(value);
-    if (!text) {
-        PyErr_SetString(PyExc_ValueError, "expected a string.");
-        return NULL;
-    }
-    [self->array insertObject: text atIndex: index];
+    text = PyString_AsCFString(value);
+    if (!text) return NULL;
+    [self->array insertObject: (NSString*) text atIndex: index];
     [listbox reloadData];
     [window requestLayout];
     Py_INCREF(Py_None);
@@ -247,7 +244,7 @@ Listbox_insert(ListboxObject* self, PyObject *args)
 static PyObject*
 Listbox_append(ListboxObject* self, PyObject *args)
 {
-    NSString* text;
+    CFStringRef text;
     WidgetObject* widget = (WidgetObject*)self;
     Listbox* listbox = (Listbox*) widget->view;
     Window* window = (Window*) [listbox window];
@@ -257,12 +254,9 @@ Listbox_append(ListboxObject* self, PyObject *args)
         return NULL;
     }
     if(!PyArg_ParseTuple(args, "O", &value)) return NULL;
-    text = PyString_AsNSString(value);
-    if (!text) {
-        PyErr_SetString(PyExc_ValueError, "expected a string.");
-        return NULL;
-    }
-    [self->array addObject: text];
+    text = PyString_AsCFString(value);
+    if (!text) return NULL;
+    [self->array addObject: (NSObject*) text];
     [listbox reloadData];
     [window requestLayout];
     Py_INCREF(Py_None);
@@ -273,6 +267,7 @@ static PyObject*
 Listbox_delete(ListboxObject* self, PyObject *args)
 {
     int index;
+    CFStringRef text;
     WidgetObject* widget = (WidgetObject*)self;
     Listbox* listbox = (Listbox*) widget->view;
     Window* window = (Window*) [listbox window];
@@ -288,6 +283,8 @@ Listbox_delete(ListboxObject* self, PyObject *args)
         PyErr_SetString(PyExc_IndexError, "index out of bounds");
         return NULL;
     }
+    text = (CFStringRef) self->array[index];
+    CFRelease(text);
     [self->array removeObjectAtIndex: index];
     [listbox reloadData];
     [window requestLayout];
