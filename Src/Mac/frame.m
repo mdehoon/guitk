@@ -291,19 +291,16 @@ Frame_set_title(FrameObject* self, PyObject* value, void* closure)
 {
     FrameView* frame;
     WidgetObject* widget;
-    NSString* text;
+    CFStringRef text;
     Window* window;
     widget = (WidgetObject*) self;
     frame = (FrameView*)(widget->view);
     if (value == Py_None) {
         frame.titlePosition = NSNoTitle;
     } else {
-        text = PyString_AsNSString(value);
-        if (!text) {
-            PyErr_SetString(PyExc_ValueError, "expected a string or None.");
-            return -1;
-        }
-        frame.title = text;
+        text = PyString_AsCFString(value);
+        if (!text) return -1;
+        frame.title = (NSString *)text;
         frame.titlePosition = NSAtTop;
     }
     window = (Window*) [frame window];

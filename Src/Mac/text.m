@@ -55,19 +55,3 @@ int string_converter(PyObject* argument, CFStringRef* pointer)
     *pointer = s;
     return Py_CLEANUP_SUPPORTED;
 }
-
-NSString* PyString_AsNSString(PyObject* object)
-{
-    if (object==NULL) {
-        return [NSString string];
-    }
-    if (PyUnicode_Check(object)) {
-        object = PyUnicode_AsUTF8String(object); 
-        if (!object) return NULL;
-        const char* text = PyBytes_AS_STRING(object);
-        NSString* s = [NSString stringWithCString: text encoding: NSUTF8StringEncoding];
-        Py_DECREF(object);
-        return s;
-    }
-    return NULL;
-}
