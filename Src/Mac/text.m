@@ -20,6 +20,7 @@ CFStringRef PyString_AsCFString(const PyObject* object)
                                        encoding,
                                        false);
     }
+    PyErr_Format(PyExc_ValueError, "must be str, not %s", Py_TYPE(object)->tp_name);
     return NULL;
 }
 
@@ -40,6 +41,19 @@ PyObject* PyString_FromCFString(const CFStringRef text)
     object = PyUnicode_FromStringAndSize((const char*)buffer, usedBufLen);
     free(buffer);
     return object;
+}
+
+int string_converter(PyObject* argument, CFStringRef* pointer)
+{
+    CFStringRef s;
+    if (argument == NULL) {
+        CFRelease(*pointer);
+        return 1;
+    }
+    s = PyString_AsCFString(argument);
+    if (s == NULL) return 0;
+    *pointer = s;
+    return Py_CLEANUP_SUPPORTED;
 }
 
 NSString* PyString_AsNSString(PyObject* object)

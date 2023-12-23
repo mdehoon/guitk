@@ -79,21 +79,18 @@ static int
 Textbox_init(TextboxObject *self, PyObject *args, PyObject *keywords)
 {
     Textbox *textbox;
-    const char* text = "";
-    NSString* s;
+    CFStringRef text = CFSTR("");
     NSColor* color;
     WidgetObject* widget;
 
     static char* kwlist[] = {"text", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|s", kwlist, &text))
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O&", kwlist, string_converter, &text))
         return -1;
 
     textbox = [[Textbox alloc] initWithObject: (PyObject*)self];
     color = [NSColor lightGrayColor];
     [[textbox cell] setBackgroundColor: color];
-    s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
-    [textbox setStringValue: s];
-    [s release];
+    [textbox setStringValue: (NSString*)text];
     [textbox setBordered: YES];
     [textbox setBezeled: YES];
     widget = (WidgetObject*)self;
@@ -248,15 +245,12 @@ Textbox_set_text(TextboxObject* self, PyObject* value, void* closure)
 {
     Textbox* textbox;
     WidgetObject* widget;
-    NSString* text;
-    text = PyString_AsNSString(value);
-    if (!text) {
-        PyErr_SetString(PyExc_ValueError, "expected a string.");
-        return -1;
-    }
+    CFStringRef text = PyString_AsCFString(value);
+    if (!text) return -1;
     widget = (WidgetObject*) self;
     textbox = (Textbox*)(widget->view);
-    textbox.stringValue = text;
+    CFRelease(textbox.stringValue);
+    textbox.stringValue = (NSString*) text;
     return 0;
 }
 
