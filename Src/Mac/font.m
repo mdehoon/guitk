@@ -1,111 +1,128 @@
 #include "font.h"
+#include <stdbool.h>
+
+
+typedef struct {
+    FontObject super;
+    CTFontUIFontType uiType;
+    bool default_size;
+} SystemFontObject;
 
 
 struct SystemFontMapEntry {
     const char* name;
     CTFontUIFontType uiType;
-    CFStringRef postscript_name;
-    CGFloat size;
 };
 
 static struct SystemFontMapEntry system_font_map[] = {
-    {"kCTFontUIFontAlertHeader", kCTFontUIFontAlertHeader, NULL, -1},
-    {"kCTFontUIFontApplication", kCTFontUIFontApplication, NULL, -1},
-    {"kCTFontUIFontControlContent", kCTFontUIFontControlContent, NULL, -1},
-    {"kCTFontUIFontEmphasizedSystem", kCTFontUIFontEmphasizedSystem, NULL, -1},
-    {"kCTFontUIFontEmphasizedSystemDetail", kCTFontUIFontEmphasizedSystemDetail, NULL, -1},
-    {"kCTFontUIFontLabel", kCTFontUIFontLabel, NULL, -1},
-    {"kCTFontUIFontMenuItem", kCTFontUIFontMenuItem, NULL, -1},
-    {"kCTFontUIFontMenuItemCmdKey", kCTFontUIFontMenuItemCmdKey, NULL, -1},
-    {"kCTFontUIFontMenuItemMark", kCTFontUIFontMenuItemMark, NULL, -1},
-    {"kCTFontUIFontMenuTitle", kCTFontUIFontMenuTitle, NULL, -1},
-    {"kCTFontUIFontMessage", kCTFontUIFontMessage, NULL, -1},
-    {"kCTFontUIFontMiniEmphasizedSystem", kCTFontUIFontMiniEmphasizedSystem, NULL, -1},
-    {"kCTFontUIFontMiniSystem", kCTFontUIFontMiniSystem, NULL, -1},
-    {"kCTFontUIFontPalette", kCTFontUIFontPalette, NULL, -1},
-    {"kCTFontUIFontPushButton", kCTFontUIFontPushButton, NULL, -1},
-    {"kCTFontUIFontSmallEmphasizedSystem", kCTFontUIFontSmallEmphasizedSystem, NULL, -1},
-    {"kCTFontUIFontSmallSystem", kCTFontUIFontSmallSystem, NULL, -1},
-    {"kCTFontUIFontSmallToolbar", kCTFontUIFontSmallToolbar, NULL, -1},
-    {"kCTFontUIFontSystem", kCTFontUIFontSystem, NULL, -1},
-    {"kCTFontUIFontSystemDetail", kCTFontUIFontSystemDetail, NULL, -1},
-    {"kCTFontUIFontToolTip", kCTFontUIFontToolTip, NULL, -1},
-    {"kCTFontUIFontToolbar", kCTFontUIFontToolbar, NULL, -1},
-    {"kCTFontUIFontUser", kCTFontUIFontUser, NULL, -1},
-    {"kCTFontUIFontUserFixedPitch", kCTFontUIFontUserFixedPitch, NULL, -1},
-    {"kCTFontUIFontUtilityWindowTitle", kCTFontUIFontUtilityWindowTitle, NULL, -1},
-    {"kCTFontUIFontViews", kCTFontUIFontViews, NULL, -1},
-    {"kCTFontUIFontWindowTitle", kCTFontUIFontWindowTitle, NULL, -1},
-    {NULL, -1, NULL, -1},
+    {".kCTFontUIFontAlertHeader", kCTFontUIFontAlertHeader},
+    {".kCTFontUIFontApplication", kCTFontUIFontApplication},
+    {".kCTFontUIFontControlContent", kCTFontUIFontControlContent},
+    {".kCTFontUIFontEmphasizedSystem", kCTFontUIFontEmphasizedSystem},
+    {".kCTFontUIFontEmphasizedSystemDetail", kCTFontUIFontEmphasizedSystemDetail},
+    {".kCTFontUIFontLabel", kCTFontUIFontLabel},
+    {".kCTFontUIFontMenuItem", kCTFontUIFontMenuItem},
+    {".kCTFontUIFontMenuItemCmdKey", kCTFontUIFontMenuItemCmdKey},
+    {".kCTFontUIFontMenuItemMark", kCTFontUIFontMenuItemMark},
+    {".kCTFontUIFontMenuTitle", kCTFontUIFontMenuTitle},
+    {".kCTFontUIFontMessage", kCTFontUIFontMessage},
+    {".kCTFontUIFontMiniEmphasizedSystem", kCTFontUIFontMiniEmphasizedSystem},
+    {".kCTFontUIFontMiniSystem", kCTFontUIFontMiniSystem},
+    {".kCTFontUIFontPalette", kCTFontUIFontPalette},
+    {".kCTFontUIFontPushButton", kCTFontUIFontPushButton},
+    {".kCTFontUIFontSmallEmphasizedSystem", kCTFontUIFontSmallEmphasizedSystem},
+    {".kCTFontUIFontSmallSystem", kCTFontUIFontSmallSystem},
+    {".kCTFontUIFontSmallToolbar", kCTFontUIFontSmallToolbar},
+    {".kCTFontUIFontSystem", kCTFontUIFontSystem},
+    {".kCTFontUIFontSystemDetail", kCTFontUIFontSystemDetail},
+    {".kCTFontUIFontToolTip", kCTFontUIFontToolTip},
+    {".kCTFontUIFontToolbar", kCTFontUIFontToolbar},
+    {".kCTFontUIFontUser", kCTFontUIFontUser},
+    {".kCTFontUIFontUserFixedPitch", kCTFontUIFontUserFixedPitch},
+    {".kCTFontUIFontUtilityWindowTitle", kCTFontUIFontUtilityWindowTitle},
+    {".kCTFontUIFontViews", kCTFontUIFontViews},
+    {".kCTFontUIFontWindowTitle", kCTFontUIFontWindowTitle},
+    {NULL, -1},
 };
 
 static PyObject*
 Font_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    FontObject *self = (FontObject*)type->tp_alloc(type, 0);
-    if (!self) return NULL;
-    self->font = NULL;
-    return (PyObject*)self;
-}
-
-static int
-Font_init(FontObject *self, PyObject *args, PyObject *kwds)
-{
     CTFontRef font;
-    CGFloat fontSize;
     CFStringRef fontName;
     float size = 0.0;
     const char* name;
+    FontObject *self;
 
-    if (!PyArg_ParseTuple(args, "s|f", &name, &size)) return -1;
+    if (!PyArg_ParseTuple(args, "s|f", &name, &size)) return NULL;
 
     if (name[0] == '.') {
         PyErr_SetString(PyExc_ValueError, "cannot create system UI font");
-        return -1;
+        return NULL;
     }
-    if (strncmp(name, "kCTFontUIFont", strlen("kCTFontUIFont")) == 0) {
-        const char* system_font_name;
-        struct SystemFontMapEntry* system_font;
-        for (system_font = system_font_map; ; system_font++) {
-            system_font_name = system_font->name;
-            if (strcmp(name, system_font_name) == 0) break;
-        }
-        if (!system_font_name) {
-            PyErr_Format(PyExc_ValueError, "failed to find system font %s", name);
-            return -1;
-        }
-        font = CTFontCreateUIFontForLanguage(system_font->uiType, size, NULL);
-        if (font) {
-            if (!system_font->postscript_name) {
-                CFStringRef postscript_name = CTFontCopyPostScriptName(font);
-                CFRetain(postscript_name);
-                system_font->postscript_name = postscript_name;
-            }
-            if (system_font->size < 0 && size == 0.0)
-                system_font->size = CTFontGetSize(font);
-        }
-    }
-    else {
-        fontName = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault,
-                                                   name,
-                                                   kCFStringEncodingUTF8,
-                                                   kCFAllocatorNull);
-        if (!fontName) {
-            PyErr_Format(PyExc_RuntimeError, "failed to create CFString for '%s'", name);
-            return -1;
-        }
-        fontSize = size;
 
-        font = CTFontCreateWithName(fontName, fontSize, NULL);
-        CFRelease(fontName);
+    fontName = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault,
+                                               name,
+                                               kCFStringEncodingUTF8,
+                                               kCFAllocatorNull);
+    if (!fontName) {
+        return PyErr_Format(PyExc_RuntimeError,
+                            "failed to create CFString for '%s'", name);
     }
+    font = CTFontCreateWithName(fontName, size, NULL);
+    CFRelease(fontName);
     if (!font) {
         PyErr_SetString(PyExc_ValueError, "failed to initialize font");
-        return -1;
+        return NULL;
+    }
+
+    self = (FontObject*)type->tp_alloc(type, 0);
+    if (!self) {
+        CFRelease(font);
+        return NULL;
     }
     self->font = font;
 
-    return 0;
+    return (PyObject*)self;
+}
+
+static PyObject*
+SystemFont_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    CTFontRef font;
+    float size = 0.0;
+    const char* name;
+    SystemFontObject *self;
+
+    const char* system_font_name;
+    struct SystemFontMapEntry* system_font;
+
+    if (!PyArg_ParseTuple(args, "s|f", &name, &size)) return NULL;
+
+    for (system_font = system_font_map; ; system_font++) {
+        system_font_name = system_font->name;
+        if (!system_font_name) {
+            return PyErr_Format(PyExc_ValueError,
+                                "failed to find system font '%s'", name);
+        }
+        if (strcmp(name, system_font_name) == 0) break;
+    }
+    font = CTFontCreateUIFontForLanguage(system_font->uiType, size, NULL);
+    if (!font) {
+        PyErr_SetString(PyExc_ValueError, "failed to initialize font");
+        return NULL;
+    }
+
+    self = (SystemFontObject*)type->tp_alloc(type, 0);
+    if (!self) {
+        CFRelease(font);
+        return NULL;
+    }
+    ((FontObject*)self)->font = font;
+    self->uiType = system_font->uiType;
+    self->default_size = (size == 0.0) ? true : false;
+
+    return (PyObject*)self;
 }
 
 static PyObject*
@@ -200,18 +217,50 @@ Font_str(FontObject* self)
             display_name_cstr = "";
     }
 
-    text = PyUnicode_FromFormat("Font object %p wrapping CTFontRef %p\n"
-                                " PostScript name : %s\n"
-                                " family name     : %s\n"
-                                " full name       : %s\n"
-                                " display name    : %s\n"
-                                " size            : %s\n",
-                                (void*) self, (void*) font,
-                                postscript_name_cstr,
-                                family_name_cstr,
-                                full_name_cstr,
-                                display_name_cstr,
-                                size_buffer);
+    if (Py_TYPE(self) == &SystemFontType) {
+        const char* name;
+        struct SystemFontMapEntry* system_font;
+        CTFontUIFontType uiType = ((SystemFontObject*)self)->uiType;
+        const char* default_size = ((SystemFontObject*)self)->default_size ?
+                                 " (default)" : "";
+        for (system_font = system_font_map; system_font->name; system_font++) {
+            if (system_font->uiType == uiType) break;
+        }
+        name = system_font->name;
+        if (!name) {
+            PyErr_SetString(PyExc_RuntimeError,
+                            "failed to find system font");
+            goto exit;
+        }
+        text = PyUnicode_FromFormat("Font object %p wrapping CTFontRef %p\n"
+                                    " user-interface font %s\n"
+                                    " PostScript name : %s\n"
+                                    " family name     : %s\n"
+                                    " full name       : %s\n"
+                                    " display name    : %s\n"
+                                    " size            : %s%s\n",
+                                    (void*) self, (void*) font,
+                                    name,
+                                    postscript_name_cstr,
+                                    family_name_cstr,
+                                    full_name_cstr,
+                                    display_name_cstr,
+                                    size_buffer, default_size);
+    }
+    else {
+        text = PyUnicode_FromFormat("Font object %p wrapping CTFontRef %p\n"
+                                    " PostScript name : %s\n"
+                                    " family name     : %s\n"
+                                    " full name       : %s\n"
+                                    " display name    : %s\n"
+                                    " size            : %s\n",
+                                    (void*) self, (void*) font,
+                                    postscript_name_cstr,
+                                    family_name_cstr,
+                                    full_name_cstr,
+                                    display_name_cstr,
+                                    size_buffer);
+    }
 exit:
     if (postscript_name) CFRelease(postscript_name);
     if (family_name) CFRelease(family_name);
@@ -240,45 +289,22 @@ Font_repr(FontObject* self)
     PyObject* text = NULL;
 
     name = CTFontCopyPostScriptName(font);
-    if (CFStringHasPrefix(name, CFSTR("."))) {
-        struct SystemFontMapEntry* system_font;
-        CFStringRef ps_name = NULL;
-        for (system_font = system_font_map; system_font->name; system_font++) {
-            ps_name = system_font->postscript_name;
-            if (ps_name &&
-                CFStringCompare(name, ps_name, 0) == kCFCompareEqualTo) {
-                if (system_font->size == size) {
-                    text = PyUnicode_FromFormat("Font('%s')",
-                                                system_font->name);
-                    goto exit;
-                }
-                if (!name_cstr) name_cstr = system_font->name;
-            }
+    name_cstr = CFStringGetCStringPtr(name, kCFStringEncodingUTF8);
+    if (!name_cstr) {
+        CFIndex length = CFStringGetLength(name) + 1;
+        name_buffer = PyMem_Malloc(length);
+        if (!name_buffer) {
+            PyErr_SetString(PyExc_MemoryError,
+                            "failed to copy PostScript name");
+            goto exit;
         }
-        if (!name_cstr) {
-            PyErr_SetString(PyExc_RuntimeError,
-                            "failed to find font name in system fonts");
-            return NULL;
-        }
-    }
-    else {
-        name_cstr = CFStringGetCStringPtr(name, kCFStringEncodingUTF8);
-        if (!name_cstr) {
-            CFIndex length = CFStringGetLength(name) + 1;
-            name_buffer = PyMem_Malloc(length);
-            if (!name_buffer) {
-                PyErr_SetString(PyExc_MemoryError,
-                                "failed to copy PostScript name");
-                goto exit;
-            }
-            if (CFStringGetCString(name,
-                                   name_buffer,
-                                   length,
-                                   kCFStringEncodingUTF8) == true)
-                name_cstr = name_buffer;
-            else
-                name_cstr = "";
-        }
+        if (CFStringGetCString(name,
+                               name_buffer,
+                               length,
+                               kCFStringEncodingUTF8) == true)
+            name_cstr = name_buffer;
+        else
+            name_cstr = "";
     }
 
     size_buffer = PyOS_double_to_string(size, 'r', 0, Py_DTSF_ADD_DOT_0, NULL);
@@ -292,6 +318,45 @@ exit:
     if (name) CFRelease(name);
     if (name_buffer) PyMem_Free(name_buffer);
     if (size_buffer) PyMem_Free(size_buffer);
+    return text;
+}
+
+static PyObject*
+SystemFont_repr(SystemFontObject* self)
+{
+    CTFontRef font = ((FontObject*)self)->font;
+    CTFontUIFontType uiType = self->uiType;
+
+    const char* name = NULL;
+    const CGFloat size = CTFontGetSize(font);
+    char* buffer = NULL;
+
+    PyObject* text = NULL;
+
+    struct SystemFontMapEntry* system_font;
+    for (system_font = system_font_map; ; system_font++) {
+        name = system_font->name;
+        if (!name) break;
+        if (system_font->uiType == uiType) {
+            if (self->default_size == true) {
+                return PyUnicode_FromFormat("SystemFont('%s')", name);
+            }
+            break;
+        }
+    }
+    if (!name) {
+        PyErr_SetString(PyExc_RuntimeError, "failed to find system font");
+        return NULL;
+    }
+
+    buffer = PyOS_double_to_string(size, 'r', 0, Py_DTSF_ADD_DOT_0, NULL);
+    if (!buffer) {
+        PyErr_SetString(PyExc_MemoryError, "failed to format font size");
+        return NULL;
+    }
+    text = PyUnicode_FromFormat("SystemFont('%s', %s)", name, buffer);
+
+    PyMem_Free(buffer);
     return text;
 }
 
@@ -350,7 +415,48 @@ PyTypeObject FontType = {
     0,                          /* tp_descr_get */
     0,                          /* tp_descr_set */
     0,                          /* tp_dictoffset */
-    (initproc)Font_init,        /* tp_init */
+    0,                          /* tp_init */
     0,                          /* tp_alloc */
     Font_new,                   /* tp_new */
+};
+
+PyTypeObject SystemFontType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "SystemFont",               /* tp_name */
+    sizeof(SystemFontObject),   /* tp_basicsize */
+    0,                          /* tp_itemsize */
+    (destructor)Font_dealloc,   /* tp_dealloc */
+    0,                          /* tp_print */
+    0,                          /* tp_getattr */
+    0,                          /* tp_setattr */
+    0,                          /* tp_compare */
+    (reprfunc)SystemFont_repr,  /* tp_repr */
+    0,                          /* tp_as_number */
+    0,                          /* tp_as_sequence */
+    0,                          /* tp_as_mapping */
+    0,                          /* tp_hash */
+    0,                          /* tp_call */
+    (reprfunc)Font_str,         /* tp_str */
+    0,                          /* tp_getattro */
+    0,                          /* tp_setattro */
+    0,                          /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /* tp_flags */
+    Font_doc,                   /* tp_doc */
+    0,                          /* tp_traverse */
+    0,                          /* tp_clear */
+    0,                          /* tp_richcompare */
+    0,                          /* tp_weaklistoffset */
+    0,                          /* tp_iter */
+    0,                          /* tp_iternext */
+    Font_methods,               /* tp_methods */
+    0,                          /* tp_members */
+    Font_getset,                /* tp_getset */
+    &FontType,                  /* tp_base */
+    0,                          /* tp_dict */
+    0,                          /* tp_descr_get */
+    0,                          /* tp_descr_set */
+    0,                          /* tp_dictoffset */
+    0,                          /* tp_init */
+    0,                          /* tp_alloc */
+    SystemFont_new,             /* tp_new */
 };

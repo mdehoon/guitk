@@ -7,3 +7,4 @@ typedef struct {
 } FontObject;
 
 extern PyTypeObject FontType;
+extern PyTypeObject SystemFontType;
