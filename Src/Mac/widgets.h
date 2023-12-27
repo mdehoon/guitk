@@ -12,6 +12,7 @@ typedef struct {
 
 extern PyTypeObject WidgetType;
 extern PyTypeObject LayoutType;
+extern PyTypeObject FontType;
 extern PyTypeObject FrameType;
 extern PyTypeObject SeparatorType;
 extern PyTypeObject LabelType;

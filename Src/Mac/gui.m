@@ -116,6 +116,8 @@ PyObject* PyInit_gui(void)
         goto error;
     if (PyType_Ready(&LayoutType) < 0)
         goto error;
+    if (PyType_Ready(&FontType) < 0)
+        goto error;
     if (PyType_Ready(&FrameType) < 0)
         goto error;
     if (PyType_Ready(&SeparatorType) < 0)
@@ -138,6 +140,7 @@ PyObject* PyInit_gui(void)
     Py_INCREF(&WindowType);
     Py_INCREF(&WidgetType);
     Py_INCREF(&LayoutType);
+    Py_INCREF(&FontType);
     Py_INCREF(&FrameType);
     Py_INCREF(&SeparatorType);
     Py_INCREF(&ImageType);
@@ -153,6 +156,8 @@ PyObject* PyInit_gui(void)
     if (PyModule_AddObject(module, "Widget", (PyObject*) &WidgetType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Layout", (PyObject*) &LayoutType) < 0)
+        goto error;
+    if (PyModule_AddObject(module, "Font", (PyObject*) &FontType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Frame", (PyObject*) &FrameType) < 0)
         goto error;

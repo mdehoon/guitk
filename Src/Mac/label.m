@@ -4,6 +4,7 @@
 #include "colors.h"
 #include "text.h"
 
+
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
 #define COMPILING_FOR_10_10
 #endif
@@ -23,7 +24,7 @@ typedef struct {
     short foreground[4];
     short background[4];
     CFStringRef text;
-    NSFont* font;
+    CTFontRef font;
     PyObject* minimum_size;
 } LabelObject;
 
@@ -132,27 +133,23 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->background[2] = 0;
     self->background[3] = 0;
     self->text = NULL;
-    self->font = nil;
+    self->font = NULL;
     self->minimum_size = NULL;
     return (PyObject*)self;
 }
 
 static int
-Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
+Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
 {
     WidgetObject* widget;
     LabelView *label;
-    const PyObject* argument = NULL;
     CFStringRef text;
     NSRect rect;
-    NSFont* font;
+    CTFontRef font;
 
-    if(!PyArg_ParseTuple(args, "|O", &argument)) return -1;
-    text = PyString_AsCFString(argument);
-    if (!text) {
-        PyErr_SetString(PyExc_TypeError, "string or unicode string expected");
+    static char* kwlist[] = {"text", "font", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O&O!", kwlist, string_converter, &text, &FontType, &font))
         return -1;
-    }
 
     widget = (WidgetObject*)self;
     rect.origin.x = 0;
@@ -160,8 +157,9 @@ Label_init(LabelObject *self, PyObject *args, PyObject *kwds)
     rect.size.width = 100;
     rect.size.height = 100;
     label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
-    font = [NSFont systemFontOfSize: 0.0];  // 0.0 means "use default size"
-    [font retain];
+
+    // This is TkDefaultFont:
+    font = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, 0, NULL);
     widget->view = label;
     self->text = text;
     self->font = font;
@@ -183,9 +181,9 @@ Label_dealloc(LabelObject* self)
     WidgetObject* widget = (WidgetObject*)self;
     LabelView* label = (LabelView*) (widget->view);
     CFStringRef text = self->text;
-    NSFont* font = self->font;
+    CTFontRef font = self->font;
     if (label) [label release];
-    if (font) [font release];
+    if (font) CFRelease(font);
     if (text) CFRelease(text);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }

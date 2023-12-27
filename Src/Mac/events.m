@@ -486,6 +486,7 @@ Notifier_start(NotifierObject *self, PyObject *args, PyObject *kwds)
         CFRelease(self->fdref);
         self->fdref = fdref;
     }
+    if (fdref == 0) {fprintf(stderr, "fdref = 0\n"); fflush(stderr); }
     CFFileDescriptorEnableCallBacks(fdref, kCFFileDescriptorReadCallBack);
     source = CFFileDescriptorCreateRunLoopSource(kCFAllocatorDefault, fdref, 0);
     CFRunLoopAddSource(runloop, source, kCFRunLoopDefaultMode);
