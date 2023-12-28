@@ -469,6 +469,17 @@ static PyMethodDef Font_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+static char Font_name__doc__[] = "name of the font (to be used when creating the font)";
+
+static PyObject*
+SystemFont_get_name(SystemFontObject* self, void* closure)
+{
+    const CTFontUIFontType uiType = self->uiType;
+    const struct SystemFontMapEntry* entry = _get_system_font_entry(uiType);
+    if (!entry) return NULL;
+    return PyUnicode_FromString(entry->name);
+}
+
 static char Font_postscript_name__doc__[] = "PostScript name of the font";
 
 static PyObject*
@@ -544,6 +555,38 @@ Font_get_size(FontObject* self, void* closure)
 }
 
 static PyGetSetDef Font_getset[] = {
+    {"name",
+     (getter)Font_get_postscript_name,
+     (setter)NULL,
+     Font_name__doc__, NULL},
+    {"postscript_name",
+     (getter)Font_get_postscript_name,
+     (setter)NULL,
+     Font_postscript_name__doc__, NULL},
+    {"family_name",
+     (getter)Font_get_family_name,
+     (setter)NULL,
+     Font_family_name__doc__, NULL},
+    {"full_name",
+     (getter)Font_get_full_name,
+     (setter)NULL,
+     Font_full_name__doc__, NULL},
+    {"display_name",
+     (getter)Font_get_display_name,
+     (setter)NULL,
+     Font_display_name__doc__, NULL},
+    {"size",
+     (getter)Font_get_size,
+     (setter)NULL,
+     Font_size__doc__, NULL},
+    {NULL, NULL, NULL, NULL, NULL}  /* Sentinel */
+};
+
+static PyGetSetDef SystemFont_getset[] = {
+    {"name",
+     (getter)SystemFont_get_name,
+     (setter)NULL,
+     Font_name__doc__, NULL},
     {"postscript_name",
      (getter)Font_get_postscript_name,
      (setter)NULL,
@@ -641,7 +684,7 @@ PyTypeObject SystemFontType = {
     0,                          /* tp_iternext */
     Font_methods,               /* tp_methods */
     0,                          /* tp_members */
-    Font_getset,                /* tp_getset */
+    SystemFont_getset,          /* tp_getset */
     &FontType,                  /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */
