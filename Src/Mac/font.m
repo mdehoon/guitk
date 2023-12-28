@@ -164,7 +164,10 @@ Font_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     const char* name;
     FontObject *self;
 
-    if (!PyArg_ParseTuple(args, "s|f", &name, &size)) return NULL;
+    static char *kwlist[] = {"name", "size", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s|f", kwlist, &name, &size))
+        return NULL;
 
     if (name[0] == '.') {
         PyErr_SetString(PyExc_ValueError, "cannot create system UI font");
@@ -207,7 +210,10 @@ SystemFont_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     const char* system_font_name;
     struct SystemFontMapEntry* system_font;
 
-    if (!PyArg_ParseTuple(args, "s|f", &name, &size)) return NULL;
+    static char *kwlist[] = {"name", "size", NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "s|f", kwlist, &name, &size))
+        return NULL;
 
     for (system_font = system_font_map; ; system_font++) {
         system_font_name = system_font->name;
@@ -463,8 +469,22 @@ static PyMethodDef Font_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+static char Font_size__doc__[] = "font size in points";
+
+static PyObject*
+Font_getsize(FontObject* self, void* closure)
+{
+    CTFontRef font = self->font;
+    CGFloat size = CTFontGetSize(font);
+    return PyFloat_FromDouble(size);
+}
+
 static PyGetSetDef Font_getset[] = {
-    {NULL}  /* Sentinel */
+    {"size",
+     (getter)Font_getsize,
+     (setter)NULL,
+     Font_size__doc__, NULL},
+    {NULL, NULL, NULL, NULL, NULL}  /* Sentinel */
 };
 
 static char Font_doc[] =
