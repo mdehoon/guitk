@@ -3,6 +3,7 @@
 #include "window.h"
 #include "colors.h"
 #include "text.h"
+#include "font.h"
 
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
@@ -145,7 +146,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     LabelView *label;
     CFStringRef text;
     NSRect rect;
-    CTFontRef font;
+    FontObject* font = default_font_object;
 
     static char* kwlist[] = {"text", "font", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O&O!", kwlist, string_converter, &text, &FontType, &font))
@@ -158,11 +159,10 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     rect.size.height = 100;
     label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
 
-    // This is TkDefaultFont:
-    font = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, 0, NULL);
+    CFRetain(font->font);
     widget->view = label;
     self->text = text;
-    self->font = font;
+    self->font = font->font;
 
     return 0;
 }

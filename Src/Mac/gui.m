@@ -4,11 +4,13 @@
 #include "widgets.h"
 #include "image.h"
 #include "colors.h"
+#include "font.h"
 
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 #define COMPILING_FOR_10_6
 #endif
+
 
 static PyObject*
 Application_set_icon(PyObject* unused, PyObject* args, PyObject* keywords)
@@ -154,6 +156,8 @@ PyObject* PyInit_gui(void)
     Py_INCREF(&ListboxType);
     Py_INCREF(&ColorType);
 
+    _init_system_fonts();
+
     if (PyModule_AddObject(module, "Window", (PyObject*) &WindowType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Widget", (PyObject*) &WidgetType) < 0)
@@ -181,6 +185,10 @@ PyObject* PyInit_gui(void)
     if (PyModule_AddObject(module, "Listbox", (PyObject*) &ListboxType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Color", (PyObject*) &ColorType) < 0)
+        goto error;
+
+    Py_INCREF(default_font_object);
+    if (PyModule_AddObject(module, "default_font", (PyObject*) default_font_object) < 0)
         goto error;
 
     return module;

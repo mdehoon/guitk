@@ -3,13 +3,6 @@
 #include <stdbool.h>
 
 
-typedef struct {
-    FontObject super;
-    CTFontUIFontType uiType;
-    Boolean default_size;
-} SystemFontObject;
-
-
 struct SystemFontMapEntry {
     const char* name;
     CTFontUIFontType uiType;
@@ -556,3 +549,27 @@ PyTypeObject SystemFontType = {
     0,                          /* tp_alloc */
     SystemFont_new,             /* tp_new */
 };
+
+FontObject* default_font_object = NULL;
+
+Boolean _init_system_fonts(void)
+{
+    CTFontRef font;
+
+    font = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, 0.0, NULL);
+    if (!font) {
+        PyErr_SetString(PyExc_RuntimeError, "failed to initialize font");
+        return false;
+    }
+
+    default_font_object = (FontObject*) SystemFontType.tp_alloc(&SystemFontType, 0);
+    if (!default_font_object) {
+        CFRelease(font);
+        return false;
+    }
+    default_font_object->font = font;
+    ((SystemFontObject*)default_font_object)->uiType = kCTFontUIFontSystem;
+    ((SystemFontObject*)default_font_object)->default_size = true;
+
+    return true;
+}
