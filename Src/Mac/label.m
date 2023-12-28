@@ -25,7 +25,7 @@ typedef struct {
     short foreground[4];
     short background[4];
     CFStringRef text;
-    CTFontRef font;
+    FontObject* font;
     PyObject* minimum_size;
 } LabelObject;
 
@@ -61,7 +61,7 @@ typedef struct {
     LabelObject* object = (LabelObject*)_object;
     CFStringRef keys[] = { kCTFontAttributeName,
                            kCTForegroundColorFromContextAttributeName };
-    CFTypeRef values[] = { object->font,
+    CFTypeRef values[] = { object->font->font,
                            kCFBooleanTrue };
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
@@ -159,10 +159,10 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     rect.size.height = 100;
     label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
 
-    CFRetain(font->font);
+    Py_INCREF(font);
     widget->view = label;
     self->text = text;
-    self->font = font->font;
+    self->font = font;
 
     return 0;
 }
@@ -181,9 +181,9 @@ Label_dealloc(LabelObject* self)
     WidgetObject* widget = (WidgetObject*)self;
     LabelView* label = (LabelView*) (widget->view);
     CFStringRef text = self->text;
-    CTFontRef font = self->font;
+    FontObject* font = self->font;
     if (label) [label release];
-    if (font) CFRelease(font);
+    if (font) Py_DECREF(font);
     if (text) CFRelease(text);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
@@ -248,6 +248,38 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_text__doc__[] = "label text.";
 
+static PyObject* Label_get_font(LabelObject* self, void* closure)
+{
+    PyObject* font = (PyObject*) self->font;
+    Py_INCREF(font);
+    return font;
+}
+
+static int
+Label_set_font(LabelObject* self, PyObject* value, void* closure)
+{
+    Window* window;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (!PyObject_IsInstance(value, (PyObject *)&FontType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Font object");
+        return -1;
+    }
+    Py_INCREF(value);
+    Py_DECREF(self->font);
+    self->font = (FontObject*) value;
+    if (self->minimum_size) {
+        Py_DECREF(self->minimum_size);
+        self->minimum_size = NULL;
+    }
+    label.needsDisplay = YES;
+    window = (Window*) [label window];
+    [window requestLayout];
+    return 0;
+}
+
+static char Label_font__doc__[] = "font for label";
+
 static PyObject* Label_get_foreground(LabelObject* self, void* closure)
 {
     const short red = self->foreground[0];
@@ -306,7 +338,7 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self)
     CFStringRef keys[1];
     CFTypeRef values[1];
     keys[0] = kCTFontAttributeName;
-    values[0] = self->font;
+    values[0] = self->font->font;
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
                                     (const void**)&values,
@@ -342,6 +374,7 @@ static char Label_minimum_size__doc__[] = "minimum size needed to show the label
 
 static PyGetSetDef Label_getseters[] = {
     {"text", (getter)Label_get_text, (setter)Label_set_text, Label_text__doc__, NULL},
+    {"font", (getter)Label_get_font, (setter)Label_set_font, Label_font__doc__, NULL},
     {"foreground", (getter)Label_get_foreground, (setter)Label_set_foreground, Label_foreground__doc__, NULL},
     {"background", (getter)Label_get_background, (setter)Label_set_background, Label_background__doc__, NULL},
     {"minimum_size", (getter)Label_get_minimum_size, (setter)NULL, Label_minimum_size__doc__, NULL},
