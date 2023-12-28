@@ -469,10 +469,74 @@ static PyMethodDef Font_methods[] = {
     {NULL}  /* Sentinel */
 };
 
+static char Font_postscript_name__doc__[] = "PostScript name of the font";
+
+static PyObject*
+Font_get_postscript_name(FontObject* self, void* closure)
+{
+    PyObject* object;
+    CTFontRef font = self->font;
+    CFStringRef name = NULL;
+    char* name_string = _get_postscript_name(font, &name);
+    if (!name_string) return NULL;
+    object = PyUnicode_FromString(name_string);
+    if (name) CFRelease(name);
+    else PyMem_Free(name_string);
+    return object;
+}
+
+static char Font_family_name__doc__[] = "family name of the font";
+
+static PyObject*
+Font_get_family_name(FontObject* self, void* closure)
+{
+    PyObject* object;
+    CTFontRef font = self->font;
+    CFStringRef name = NULL;
+    char* name_string = _get_family_name(font, &name);
+    if (!name_string) return NULL;
+    object = PyUnicode_FromString(name_string);
+    if (name) CFRelease(name);
+    else PyMem_Free(name_string);
+    return object;
+}
+
+static char Font_full_name__doc__[] = "full name of the font";
+
+static PyObject*
+Font_get_full_name(FontObject* self, void* closure)
+{
+    PyObject* object;
+    CTFontRef font = self->font;
+    CFStringRef name = NULL;
+    char* name_string = _get_full_name(font, &name);
+    if (!name_string) return NULL;
+    object = PyUnicode_FromString(name_string);
+    if (name) CFRelease(name);
+    else PyMem_Free(name_string);
+    return object;
+}
+
+static char Font_display_name__doc__[] = "display name of the font";
+
+static PyObject*
+Font_get_display_name(FontObject* self, void* closure)
+{
+    PyObject* object;
+    CTFontRef font = self->font;
+    CFStringRef name = NULL;
+    char* name_string = _get_display_name(font, &name);
+    if (!name_string) return NULL;
+    object = PyUnicode_FromString(name_string);
+    if (name) CFRelease(name);
+    else PyMem_Free(name_string);
+    return object;
+}
+
 static char Font_size__doc__[] = "font size in points";
 
 static PyObject*
-Font_getsize(FontObject* self, void* closure)
+Font_get_size(FontObject* self, void* closure)
 {
     CTFontRef font = self->font;
     CGFloat size = CTFontGetSize(font);
@@ -480,8 +544,24 @@ Font_getsize(FontObject* self, void* closure)
 }
 
 static PyGetSetDef Font_getset[] = {
+    {"postscript_name",
+     (getter)Font_get_postscript_name,
+     (setter)NULL,
+     Font_postscript_name__doc__, NULL},
+    {"family_name",
+     (getter)Font_get_family_name,
+     (setter)NULL,
+     Font_family_name__doc__, NULL},
+    {"full_name",
+     (getter)Font_get_full_name,
+     (setter)NULL,
+     Font_full_name__doc__, NULL},
+    {"display_name",
+     (getter)Font_get_display_name,
+     (setter)NULL,
+     Font_display_name__doc__, NULL},
     {"size",
-     (getter)Font_getsize,
+     (getter)Font_get_size,
      (setter)NULL,
      Font_size__doc__, NULL},
     {NULL, NULL, NULL, NULL, NULL}  /* Sentinel */
