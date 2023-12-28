@@ -109,6 +109,8 @@ PyObject* PyInit_gui(void)
 #ifdef WITH_NEXT_FRAMEWORK
     PyObject *module;
 
+    PyObject* system_font_names;
+
     module = PyModule_Create(&moduledef);
     if (module==NULL) goto error;
 
@@ -189,6 +191,10 @@ PyObject* PyInit_gui(void)
 
     Py_INCREF(default_font_object);
     if (PyModule_AddObject(module, "default_font", (PyObject*) default_font_object) < 0)
+        goto error;
+
+    system_font_names = _create_system_font_name_tuple();
+    if (PyModule_AddObject(module, "system_font_names", (PyObject*) system_font_names) < 0)
         goto error;
 
     return module;

@@ -18,3 +18,4 @@ extern PyTypeObject SystemFontType;
 extern FontObject* default_font_object;
 
 Boolean _init_system_fonts(void);
+PyObject* _create_system_font_name_tuple(void);

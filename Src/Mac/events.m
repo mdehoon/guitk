@@ -9,7 +9,7 @@
 static CFMachPortRef receivePort = NULL;
 static mach_port_t rawReceivePort = 0;
 
-static void connect(void) {
+static void application_connect(void) {
     NSEvent *event;
     [NSApplication sharedApplication];
     while (true) {
@@ -867,7 +867,7 @@ PyObject* PyInit_events(void)
     if (PyModule_AddIntConstant(module, "WRITABLE", WRITABLE) < -1)
         goto error;
 
-    connect();
+    application_connect();
 
     PyOS_InputHook = wait_for_stdin;
 

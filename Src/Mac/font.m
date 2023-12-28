@@ -6,44 +6,46 @@
 struct SystemFontMapEntry {
     const char* name;
     CTFontUIFontType uiType;
+    const char* uiType_string;
 };
 
 static struct SystemFontMapEntry system_font_map[] = {
-    {".kCTFontUIFontAlertHeader", kCTFontUIFontAlertHeader},
-    {".kCTFontUIFontApplication", kCTFontUIFontApplication},
-    {".kCTFontUIFontControlContent", kCTFontUIFontControlContent},
-    {".kCTFontUIFontEmphasizedSystem", kCTFontUIFontEmphasizedSystem},
-    {".kCTFontUIFontEmphasizedSystemDetail", kCTFontUIFontEmphasizedSystemDetail},
-    {".kCTFontUIFontLabel", kCTFontUIFontLabel},
-    {".kCTFontUIFontMenuItem", kCTFontUIFontMenuItem},
-    {".kCTFontUIFontMenuItemCmdKey", kCTFontUIFontMenuItemCmdKey},
-    {".kCTFontUIFontMenuItemMark", kCTFontUIFontMenuItemMark},
-    {".kCTFontUIFontMenuTitle", kCTFontUIFontMenuTitle},
-    {".kCTFontUIFontMessage", kCTFontUIFontMessage},
-    {".kCTFontUIFontMiniEmphasizedSystem", kCTFontUIFontMiniEmphasizedSystem},
-    {".kCTFontUIFontMiniSystem", kCTFontUIFontMiniSystem},
-    {".kCTFontUIFontPalette", kCTFontUIFontPalette},
-    {".kCTFontUIFontPushButton", kCTFontUIFontPushButton},
-    {".kCTFontUIFontSmallEmphasizedSystem", kCTFontUIFontSmallEmphasizedSystem},
-    {".kCTFontUIFontSmallSystem", kCTFontUIFontSmallSystem},
-    {".kCTFontUIFontSmallToolbar", kCTFontUIFontSmallToolbar},
-    {".kCTFontUIFontSystem", kCTFontUIFontSystem},
-    {".kCTFontUIFontSystemDetail", kCTFontUIFontSystemDetail},
-    {".kCTFontUIFontToolTip", kCTFontUIFontToolTip},
-    {".kCTFontUIFontToolbar", kCTFontUIFontToolbar},
-    {".kCTFontUIFontUser", kCTFontUIFontUser},
-    {".kCTFontUIFontUserFixedPitch", kCTFontUIFontUserFixedPitch},
-    {".kCTFontUIFontUtilityWindowTitle", kCTFontUIFontUtilityWindowTitle},
-    {".kCTFontUIFontViews", kCTFontUIFontViews},
-    {".kCTFontUIFontWindowTitle", kCTFontUIFontWindowTitle},
+    {"AlertHeaderFont", kCTFontUIFontAlertHeader, "kCTFontUIFontAlertHeader"},
+    {"ApplicationFont", kCTFontUIFontApplication, "kCTFontUIFontApplication"},
+    {"ControlContentFont", kCTFontUIFontControlContent, "kCTFontUIFontControlContent"},
+    {"EmphasizedSystemFont", kCTFontUIFontEmphasizedSystem, "kCTFontUIFontEmphasizedSystem"},
+    {"EmphasizedSystemDetailFont", kCTFontUIFontEmphasizedSystemDetail, "kCTFontUIFontEmphasizedSystemDetail"},
+    {"LabelFont", kCTFontUIFontLabel, "kCTFontUIFontLabel"},
+    {"MenuItemFont", kCTFontUIFontMenuItem, "kCTFontUIFontMenuItem"},
+    {"MenuItemCmdKeyFont", kCTFontUIFontMenuItemCmdKey, "kCTFontUIFontMenuItemCmdKey"},
+    {"MenuItemMarkFont", kCTFontUIFontMenuItemMark, "kCTFontUIFontMenuItemMark"},
+    {"MenuTitleFont", kCTFontUIFontMenuTitle, "kCTFontUIFontMenuTitle"},
+    {"MessageFont", kCTFontUIFontMessage, "kCTFontUIFontMessage"},
+    {"MiniEmphasizedSystemFont", kCTFontUIFontMiniEmphasizedSystem, "kCTFontUIFontMiniEmphasizedSystem"},
+    {"MiniSystemFont", kCTFontUIFontMiniSystem, "kCTFontUIFontMiniSystem"},
+    {"PaletteFont", kCTFontUIFontPalette, "kCTFontUIFontPalette"},
+    {"PushButtonFont", kCTFontUIFontPushButton, "kCTFontUIFontPushButton"},
+    {"SmallEmphasizedSystemFont", kCTFontUIFontSmallEmphasizedSystem, "kCTFontUIFontSmallEmphasizedSystem"},
+    {"SmallSystemFont", kCTFontUIFontSmallSystem, "kCTFontUIFontSmallSystem"},
+    {"SmallToolbarFont", kCTFontUIFontSmallToolbar, "kCTFontUIFontSmallToolbar"},
+    {"SystemFont", kCTFontUIFontSystem, "kCTFontUIFontSystem"},
+    {"SystemDetailFont", kCTFontUIFontSystemDetail, "kCTFontUIFontSystemDetail"},
+    {"ToolTipFont", kCTFontUIFontToolTip, "kCTFontUIFontToolTip"},
+    {"ToolbarFont", kCTFontUIFontToolbar, "kCTFontUIFontToolbar"},
+    {"UserFont", kCTFontUIFontUser, "kCTFontUIFontUser"},
+    {"UserFixedPitchFont", kCTFontUIFontUserFixedPitch, "kCTFontUIFontUserFixedPitch"},
+    {"UtilityWindowTitleFont", kCTFontUIFontUtilityWindowTitle, "kCTFontUIFontUtilityWindowTitle"},
+    {"ViewsFont", kCTFontUIFontViews, "kCTFontUIFontViews"},
+    {"WindowTitleFont", kCTFontUIFontWindowTitle, "kCTFontUIFontWindowTitle"},
     {NULL, -1},
 };
 
-static const char* _get_system_font_name(CTFontUIFontType uiType)
+static const struct SystemFontMapEntry*
+_get_system_font_entry(CTFontUIFontType uiType)
 {
     struct SystemFontMapEntry* font;
     for (font = system_font_map; font->name; font++) {
-        if (font->uiType == uiType) return font->name;
+        if (font->uiType == uiType) return font;
     }
     PyErr_SetString(PyExc_RuntimeError, "failed to find system font");
     return NULL;
@@ -318,11 +320,11 @@ SystemFont_str(SystemFontObject* self)
 
     const CTFontUIFontType uiType = self->uiType;
     const char* default_size = self->default_size ?  " (default)" : "";
-    const char* name = _get_system_font_name(uiType);
-    if (!name) goto exit;
+    const struct SystemFontMapEntry* entry = _get_system_font_entry(uiType);
+    if (!entry) return NULL;
 
     size_string = _get_font_size_string(font);
-    if (!size_string) goto exit;
+    if (!size_string) return NULL;
 
     postscript_name_string = _get_postscript_name(font, &postscript_name);
     if (!postscript_name_string) goto exit;
@@ -337,14 +339,14 @@ SystemFont_str(SystemFontObject* self)
     if (!display_name_string) goto exit;
 
     text = PyUnicode_FromFormat("SystemFont object %p wrapping CTFontRef %p\n"
-                                " user-interface font %s = %d\n"
+                                " %s (%s = %d)\n"
                                 " PostScript name : %s\n"
                                 " family name     : %s\n"
                                 " full name       : %s\n"
                                 " display name    : %s\n"
                                 " size            : %s%s\n",
                                 (void*) self, (void*) font,
-                                name, uiType,
+                                entry->name, entry->uiType_string, uiType,
                                 postscript_name_string,
                                 family_name_string,
                                 full_name_string,
@@ -572,4 +574,24 @@ Boolean _init_system_fonts(void)
     ((SystemFontObject*)default_font_object)->default_size = true;
 
     return true;
+}
+
+PyObject* _create_system_font_name_tuple(void)
+{
+    struct SystemFontMapEntry* font;
+    PyObject* tuple;
+    Py_ssize_t pos = 0;
+    for (font = system_font_map; font->name; font++) pos++;
+    tuple = PyTuple_New(pos);
+    if (!tuple) return NULL;
+    pos = 0;
+    for (font = system_font_map; font->name; font++, pos++) {
+        PyObject* name = PyUnicode_FromString(font->name);
+        if (!name) {
+            Py_DECREF(tuple);
+            return NULL;
+        }
+        PyTuple_SET_ITEM(tuple, pos, name);
+    }
+    return tuple;
 }
