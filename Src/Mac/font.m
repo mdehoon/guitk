@@ -1,11 +1,12 @@
 #include "font.h"
+#include <CoreFoundation/CFBase.h>
 #include <stdbool.h>
 
 
 typedef struct {
     FontObject super;
     CTFontUIFontType uiType;
-    bool default_size;
+    Boolean default_size;
 } SystemFontObject;
 
 
@@ -44,6 +45,120 @@ static struct SystemFontMapEntry system_font_map[] = {
     {".kCTFontUIFontWindowTitle", kCTFontUIFontWindowTitle},
     {NULL, -1},
 };
+
+static const char* _get_system_font_name(CTFontUIFontType uiType)
+{
+    struct SystemFontMapEntry* font;
+    for (font = system_font_map; font->name; font++) {
+        if (font->uiType == uiType) return font->name;
+    }
+    PyErr_SetString(PyExc_RuntimeError, "failed to find system font");
+    return NULL;
+}
+
+static char* _get_font_size_string(CTFontRef font) {
+    const CGFloat size = CTFontGetSize(font);
+    char* s = PyOS_double_to_string(size, 'r', 0, Py_DTSF_ADD_DOT_0, NULL);
+    if (!s)
+        PyErr_SetString(PyExc_MemoryError, "failed to format font size");
+    return s;
+}
+
+static char* _get_postscript_name(CTFontRef font, CFStringRef* namePtr) {
+    char* buffer;
+    CFIndex length;
+    CFStringRef name = CTFontCopyPostScriptName(font);
+    buffer = (char*) CFStringGetCStringPtr(name, kCFStringEncodingUTF8);
+    if (buffer) {
+        *namePtr = name;
+        return buffer;
+    }
+    *namePtr = NULL;
+    length = CFStringGetLength(name) + 1;
+    buffer = PyMem_Malloc(length);
+    if (buffer) {
+        if (!CFStringGetCString(name, buffer, length, kCFStringEncodingUTF8)) {
+            PyMem_Free(buffer);
+            buffer = NULL;
+        }
+    }
+    CFRelease(name);
+    if (!buffer)
+        PyErr_SetString(PyExc_MemoryError, "failed to copy PostScript name");
+    return buffer;
+}
+
+static char* _get_family_name(CTFontRef font, CFStringRef* namePtr) {
+    char* buffer;
+    CFIndex length;
+    CFStringRef name = CTFontCopyFamilyName(font);
+    buffer = (char*) CFStringGetCStringPtr(name, kCFStringEncodingUTF8);
+    if (buffer) {
+        *namePtr = name;
+        return buffer;
+    }
+    *namePtr = NULL;
+    length = CFStringGetLength(name) + 1;
+    buffer = PyMem_Malloc(length);
+    if (buffer) {
+        if (!CFStringGetCString(name, buffer, length, kCFStringEncodingUTF8)) {
+            PyMem_Free(buffer);
+            buffer = NULL;
+        }
+    }
+    CFRelease(name);
+    if (!buffer)
+        PyErr_SetString(PyExc_MemoryError, "failed to copy PostScript name");
+    return buffer;
+}
+
+static char* _get_full_name(CTFontRef font, CFStringRef* namePtr) {
+    char* buffer;
+    CFIndex length;
+    CFStringRef name = CTFontCopyFullName(font);
+    buffer = (char*) CFStringGetCStringPtr(name, kCFStringEncodingUTF8);
+    if (buffer) {
+        *namePtr = name;
+        return buffer;
+    }
+    *namePtr = NULL;
+    length = CFStringGetLength(name) + 1;
+    buffer = PyMem_Malloc(length);
+    if (buffer) {
+        if (!CFStringGetCString(name, buffer, length, kCFStringEncodingUTF8)) {
+            PyMem_Free(buffer);
+            buffer = NULL;
+        }
+    }
+    CFRelease(name);
+    if (!buffer)
+        PyErr_SetString(PyExc_MemoryError, "failed to copy PostScript name");
+    return buffer;
+}
+
+static char* _get_display_name(CTFontRef font, CFStringRef* namePtr) {
+    char* buffer;
+    CFIndex length;
+    CFStringRef name = CTFontCopyDisplayName(font);
+    buffer = (char*) CFStringGetCStringPtr(name, kCFStringEncodingUTF8);
+    if (buffer) {
+        *namePtr = name;
+        return buffer;
+    }
+    *namePtr = NULL;
+    length = CFStringGetLength(name) + 1;
+    buffer = PyMem_Malloc(length);
+    if (buffer) {
+        if (!CFStringGetCString(name, buffer, length, kCFStringEncodingUTF8)) {
+            PyMem_Free(buffer);
+            buffer = NULL;
+        }
+    }
+    CFRelease(name);
+    if (!buffer)
+        PyErr_SetString(PyExc_MemoryError, "failed to copy PostScript name");
+    return buffer;
+}
 
 static PyObject*
 Font_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -130,147 +245,128 @@ Font_str(FontObject* self)
 {
     CTFontRef font = self->font;
 
-    const CGFloat size = CTFontGetSize(font);
-    char* size_buffer;
+    char* size_string;
 
     CFStringRef postscript_name = NULL;
-    const char* postscript_name_cstr;
-    char* postscript_name_buffer = NULL;
+    char* postscript_name_string = NULL;
 
     CFStringRef family_name = NULL;
-    const char* family_name_cstr;
-    char* family_name_buffer = NULL;
+    char* family_name_string = NULL;
 
     CFStringRef full_name = NULL;
-    const char* full_name_cstr;
-    char* full_name_buffer = NULL;
+    char* full_name_string = NULL;
 
     CFStringRef display_name = NULL;
-    const char* display_name_cstr;
-    char* display_name_buffer = NULL;
+    char* display_name_string = NULL;
 
     PyObject* text = NULL;
 
-    size_buffer = PyOS_double_to_string(size, 'r', 0, Py_DTSF_ADD_DOT_0, NULL);
-    if (!size_buffer) {
-        PyErr_SetString(PyExc_MemoryError, "failed to format font size");
-        goto exit;
-    }
+    size_string = _get_font_size_string(font);
+    if (!size_string) goto exit;
 
-    postscript_name = CTFontCopyPostScriptName(font);
-    postscript_name_cstr = CFStringGetCStringPtr(postscript_name, kCFStringEncodingUTF8);
-    if (!postscript_name_cstr) {
-        CFIndex length = CFStringGetLength(postscript_name) + 1;
-        postscript_name_buffer = PyMem_Malloc(length);
-        if (!postscript_name_buffer) {
-            PyErr_SetString(PyExc_MemoryError, "failed to copy PostScript name");
-            goto exit;
-        }
-        if (CFStringGetCString(postscript_name, postscript_name_buffer, length, kCFStringEncodingUTF8) == true)
-            postscript_name_cstr = postscript_name_buffer;
-        else
-            postscript_name_cstr = "";
-    }
+    postscript_name_string = _get_postscript_name(font, &postscript_name);
+    if (!postscript_name_string) goto exit;
 
-    family_name = CTFontCopyFamilyName(font);
-    family_name_cstr = CFStringGetCStringPtr(family_name, kCFStringEncodingUTF8);
-    if (!family_name_cstr) {
-        CFIndex length = CFStringGetLength(family_name) + 1;
-        family_name_buffer = PyMem_Malloc(length);
-        if (!family_name_buffer) {
-            PyErr_SetString(PyExc_MemoryError, "failed to copy family name");
-            goto exit;
-        }
-        if (CFStringGetCString(family_name, family_name_buffer, length, kCFStringEncodingUTF8) == true)
-            family_name_cstr = family_name_buffer;
-        else
-            family_name_cstr = "";
-    }
+    family_name_string = _get_family_name(font, &family_name);
+    if (!family_name_string) goto exit;
 
-    full_name = CTFontCopyFullName(font);
-    full_name_cstr = CFStringGetCStringPtr(full_name, kCFStringEncodingUTF8);
-    if (!full_name_cstr) {
-        CFIndex length = CFStringGetLength(full_name) + 1;
-        full_name_buffer = PyMem_Malloc(length);
-        if (!full_name_buffer) {
-            PyErr_SetString(PyExc_MemoryError, "failed to copy full name");
-            goto exit;
-        }
-        if (CFStringGetCString(full_name, full_name_buffer, length, kCFStringEncodingUTF8) == true)
-            full_name_cstr = full_name_buffer;
-        else
-            full_name_cstr = "";
-    }
+    full_name_string = _get_full_name(font, &full_name);
+    if (!full_name_string) goto exit;
 
-    display_name = CTFontCopyDisplayName(font);
-    display_name_cstr = CFStringGetCStringPtr(display_name, kCFStringEncodingUTF8);
-    if (!display_name_cstr) {
-        CFIndex length = CFStringGetLength(display_name) + 1;
-        display_name_buffer = PyMem_Malloc(length);
-        if (!display_name_buffer) {
-            PyErr_SetString(PyExc_MemoryError, "failed to copy display name");
-            goto exit;
-        }
-        if (CFStringGetCString(display_name, display_name_buffer, length, kCFStringEncodingUTF8) == true)
-            display_name_cstr = display_name_buffer;
-        else
-            display_name_cstr = "";
-    }
+    display_name_string = _get_display_name(font, &display_name);
+    if (!display_name_string) goto exit;
 
-    if (Py_TYPE(self) == &SystemFontType) {
-        const char* name;
-        struct SystemFontMapEntry* system_font;
-        CTFontUIFontType uiType = ((SystemFontObject*)self)->uiType;
-        const char* default_size = ((SystemFontObject*)self)->default_size ?
-                                 " (default)" : "";
-        for (system_font = system_font_map; system_font->name; system_font++) {
-            if (system_font->uiType == uiType) break;
-        }
-        name = system_font->name;
-        if (!name) {
-            PyErr_SetString(PyExc_RuntimeError,
-                            "failed to find system font");
-            goto exit;
-        }
-        text = PyUnicode_FromFormat("Font object %p wrapping CTFontRef %p\n"
-                                    " user-interface font %s\n"
-                                    " PostScript name : %s\n"
-                                    " family name     : %s\n"
-                                    " full name       : %s\n"
-                                    " display name    : %s\n"
-                                    " size            : %s%s\n",
-                                    (void*) self, (void*) font,
-                                    name,
-                                    postscript_name_cstr,
-                                    family_name_cstr,
-                                    full_name_cstr,
-                                    display_name_cstr,
-                                    size_buffer, default_size);
-    }
-    else {
-        text = PyUnicode_FromFormat("Font object %p wrapping CTFontRef %p\n"
-                                    " PostScript name : %s\n"
-                                    " family name     : %s\n"
-                                    " full name       : %s\n"
-                                    " display name    : %s\n"
-                                    " size            : %s\n",
-                                    (void*) self, (void*) font,
-                                    postscript_name_cstr,
-                                    family_name_cstr,
-                                    full_name_cstr,
-                                    display_name_cstr,
-                                    size_buffer);
-    }
+    text = PyUnicode_FromFormat("Font object %p wrapping CTFontRef %p\n"
+                                " PostScript name : %s\n"
+                                " family name     : %s\n"
+                                " full name       : %s\n"
+                                " display name    : %s\n"
+                                " size            : %s\n",
+                                (void*) self, (void*) font,
+                                postscript_name_string,
+                                family_name_string,
+                                full_name_string,
+                                display_name_string,
+                                size_string);
+
 exit:
+    if (size_string) PyMem_Free(size_string);
     if (postscript_name) CFRelease(postscript_name);
+    else if (postscript_name_string) PyMem_Free(postscript_name_string);
     if (family_name) CFRelease(family_name);
+    else if (family_name_string) PyMem_Free(family_name_string);
     if (full_name) CFRelease(full_name);
+    else if (full_name_string) PyMem_Free(full_name_string);
     if (display_name) CFRelease(display_name);
-    if (postscript_name_buffer) PyMem_Free(postscript_name_buffer);
-    if (family_name_buffer) PyMem_Free(family_name_buffer);
-    if (full_name_buffer) PyMem_Free(full_name_buffer);
-    if (display_name_buffer) PyMem_Free(display_name_buffer);
-    if (size_buffer) PyMem_Free(size_buffer);
+    else if (display_name_string) PyMem_Free(display_name_string);
+    return text;
+}
+
+static PyObject*
+SystemFont_str(SystemFontObject* self)
+{
+    CTFontRef font = ((FontObject*)self)->font;
+
+    char* size_string = NULL;
+
+    CFStringRef postscript_name = NULL;
+    char* postscript_name_string = NULL;
+
+    CFStringRef family_name = NULL;
+    char* family_name_string = NULL;
+
+    CFStringRef full_name = NULL;
+    char* full_name_string = NULL;
+
+    CFStringRef display_name = NULL;
+    char* display_name_string = NULL;
+
+    PyObject* text = NULL;
+
+    const CTFontUIFontType uiType = self->uiType;
+    const char* default_size = self->default_size ?  " (default)" : "";
+    const char* name = _get_system_font_name(uiType);
+    if (!name) goto exit;
+
+    size_string = _get_font_size_string(font);
+    if (!size_string) goto exit;
+
+    postscript_name_string = _get_postscript_name(font, &postscript_name);
+    if (!postscript_name_string) goto exit;
+
+    family_name_string = _get_family_name(font, &family_name);
+    if (!family_name_string) goto exit;
+
+    full_name_string = _get_full_name(font, &full_name);
+    if (!full_name_string) goto exit;
+
+    display_name_string = _get_display_name(font, &display_name);
+    if (!display_name_string) goto exit;
+
+    text = PyUnicode_FromFormat("SystemFont object %p wrapping CTFontRef %p\n"
+                                " user-interface font %s = %d\n"
+                                " PostScript name : %s\n"
+                                " family name     : %s\n"
+                                " full name       : %s\n"
+                                " display name    : %s\n"
+                                " size            : %s%s\n",
+                                (void*) self, (void*) font,
+                                name, uiType,
+                                postscript_name_string,
+                                family_name_string,
+                                full_name_string,
+                                display_name_string,
+                                size_string, default_size);
+exit:
+    if (size_string) PyMem_Free(size_string);
+    if (postscript_name) CFRelease(postscript_name);
+    else if (postscript_name_string) PyMem_Free(postscript_name_string);
+    if (family_name) CFRelease(family_name);
+    else if (family_name_string) PyMem_Free(family_name_string);
+    if (full_name) CFRelease(full_name);
+    else if (full_name_string) PyMem_Free(full_name_string);
+    if (display_name) CFRelease(display_name);
+    else if (display_name_string) PyMem_Free(display_name_string);
     return text;
 }
 
@@ -436,7 +532,7 @@ PyTypeObject SystemFontType = {
     0,                          /* tp_as_mapping */
     0,                          /* tp_hash */
     0,                          /* tp_call */
-    (reprfunc)Font_str,         /* tp_str */
+    (reprfunc)SystemFont_str,   /* tp_str */
     0,                          /* tp_getattro */
     0,                          /* tp_setattro */
     0,                          /* tp_as_buffer */
