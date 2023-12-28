@@ -10,34 +10,34 @@ struct SystemFontMapEntry {
 };
 
 static struct SystemFontMapEntry system_font_map[] = {
-    {"AlertHeaderFont", kCTFontUIFontAlertHeader, "kCTFontUIFontAlertHeader"},
-    {"ApplicationFont", kCTFontUIFontApplication, "kCTFontUIFontApplication"},
-    {"ControlContentFont", kCTFontUIFontControlContent, "kCTFontUIFontControlContent"},
-    {"EmphasizedSystemFont", kCTFontUIFontEmphasizedSystem, "kCTFontUIFontEmphasizedSystem"},
-    {"EmphasizedSystemDetailFont", kCTFontUIFontEmphasizedSystemDetail, "kCTFontUIFontEmphasizedSystemDetail"},
-    {"LabelFont", kCTFontUIFontLabel, "kCTFontUIFontLabel"},
-    {"MenuItemFont", kCTFontUIFontMenuItem, "kCTFontUIFontMenuItem"},
-    {"MenuItemCmdKeyFont", kCTFontUIFontMenuItemCmdKey, "kCTFontUIFontMenuItemCmdKey"},
-    {"MenuItemMarkFont", kCTFontUIFontMenuItemMark, "kCTFontUIFontMenuItemMark"},
-    {"MenuTitleFont", kCTFontUIFontMenuTitle, "kCTFontUIFontMenuTitle"},
-    {"MessageFont", kCTFontUIFontMessage, "kCTFontUIFontMessage"},
-    {"MiniEmphasizedSystemFont", kCTFontUIFontMiniEmphasizedSystem, "kCTFontUIFontMiniEmphasizedSystem"},
-    {"MiniSystemFont", kCTFontUIFontMiniSystem, "kCTFontUIFontMiniSystem"},
-    {"PaletteFont", kCTFontUIFontPalette, "kCTFontUIFontPalette"},
-    {"PushButtonFont", kCTFontUIFontPushButton, "kCTFontUIFontPushButton"},
-    {"SmallEmphasizedSystemFont", kCTFontUIFontSmallEmphasizedSystem, "kCTFontUIFontSmallEmphasizedSystem"},
-    {"SmallSystemFont", kCTFontUIFontSmallSystem, "kCTFontUIFontSmallSystem"},
-    {"SmallToolbarFont", kCTFontUIFontSmallToolbar, "kCTFontUIFontSmallToolbar"},
-    {"SystemFont", kCTFontUIFontSystem, "kCTFontUIFontSystem"},
-    {"SystemDetailFont", kCTFontUIFontSystemDetail, "kCTFontUIFontSystemDetail"},
-    {"ToolTipFont", kCTFontUIFontToolTip, "kCTFontUIFontToolTip"},
-    {"ToolbarFont", kCTFontUIFontToolbar, "kCTFontUIFontToolbar"},
     {"UserFont", kCTFontUIFontUser, "kCTFontUIFontUser"},
     {"UserFixedPitchFont", kCTFontUIFontUserFixedPitch, "kCTFontUIFontUserFixedPitch"},
-    {"UtilityWindowTitleFont", kCTFontUIFontUtilityWindowTitle, "kCTFontUIFontUtilityWindowTitle"},
+    {"SystemFont", kCTFontUIFontSystem, "kCTFontUIFontSystem"},
+    {"EmphasizedSystemFont", kCTFontUIFontEmphasizedSystem, "kCTFontUIFontEmphasizedSystem"},
+    {"SmallSystemFont", kCTFontUIFontSmallSystem, "kCTFontUIFontSmallSystem"},
+    {"SmallEmphasizedSystemFont", kCTFontUIFontSmallEmphasizedSystem, "kCTFontUIFontSmallEmphasizedSystem"},
+    {"MiniSystemFont", kCTFontUIFontMiniSystem, "kCTFontUIFontMiniSystem"},
+    {"MiniEmphasizedSystemFont", kCTFontUIFontMiniEmphasizedSystem, "kCTFontUIFontMiniEmphasizedSystem"},
     {"ViewsFont", kCTFontUIFontViews, "kCTFontUIFontViews"},
+    {"ApplicationFont", kCTFontUIFontApplication, "kCTFontUIFontApplication"},
+    {"LabelFont", kCTFontUIFontLabel, "kCTFontUIFontLabel"},
+    {"MenuTitleFont", kCTFontUIFontMenuTitle, "kCTFontUIFontMenuTitle"},
+    {"MenuItemFont", kCTFontUIFontMenuItem, "kCTFontUIFontMenuItem"},
+    {"MenuItemMarkFont", kCTFontUIFontMenuItemMark, "kCTFontUIFontMenuItemMark"},
+    {"MenuItemCmdKeyFont", kCTFontUIFontMenuItemCmdKey, "kCTFontUIFontMenuItemCmdKey"},
     {"WindowTitleFont", kCTFontUIFontWindowTitle, "kCTFontUIFontWindowTitle"},
-    {NULL, -1},
+    {"PushButtonFont", kCTFontUIFontPushButton, "kCTFontUIFontPushButton"},
+    {"UtilityWindowTitleFont", kCTFontUIFontUtilityWindowTitle, "kCTFontUIFontUtilityWindowTitle"},
+    {"AlertHeaderFont", kCTFontUIFontAlertHeader, "kCTFontUIFontAlertHeader"},
+    {"SystemDetailFont", kCTFontUIFontSystemDetail, "kCTFontUIFontSystemDetail"},
+    {"EmphasizedSystemDetailFont", kCTFontUIFontEmphasizedSystemDetail, "kCTFontUIFontEmphasizedSystemDetail"},
+    {"ToolbarFont", kCTFontUIFontToolbar, "kCTFontUIFontToolbar"},
+    {"SmallToolbarFont", kCTFontUIFontSmallToolbar, "kCTFontUIFontSmallToolbar"},
+    {"MessageFont", kCTFontUIFontMessage, "kCTFontUIFontMessage"},
+    {"PaletteFont", kCTFontUIFontPalette, "kCTFontUIFontPalette"},
+    {"ToolTipFont", kCTFontUIFontToolTip, "kCTFontUIFontToolTip"},
+    {"ControlContentFont", kCTFontUIFontControlContent, "kCTFontUIFontControlContent"},
+    {NULL, -1, NULL},
 };
 
 static const struct SystemFontMapEntry*
@@ -552,26 +552,68 @@ PyTypeObject SystemFontType = {
     SystemFont_new,             /* tp_new */
 };
 
+FontObject* fixed_font_object = NULL;
 FontObject* default_font_object = NULL;
+FontObject* icon_font_object = NULL;
+FontObject* caption_font_object = NULL;
+FontObject* heading_font_object = NULL;
+FontObject* tooltip_font_object = NULL;
+FontObject* text_font_object = NULL;
+FontObject* small_caption_font_object = NULL;
+FontObject* menu_font_object = NULL;
 
-Boolean _init_system_fonts(void)
+static Boolean
+_init_default_font(FontObject** font_object_pointer, CTFontUIFontType uiType)
 {
-    CTFontRef font;
-
-    font = CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, 0.0, NULL);
+    SystemFontObject* font_object;
+    CTFontRef font = CTFontCreateUIFontForLanguage(uiType, 0.0, NULL);
     if (!font) {
         PyErr_SetString(PyExc_RuntimeError, "failed to initialize font");
         return false;
     }
 
-    default_font_object = (FontObject*) SystemFontType.tp_alloc(&SystemFontType, 0);
-    if (!default_font_object) {
+    font_object = (SystemFontObject*) SystemFontType.tp_alloc(&SystemFontType, 0);
+    if (!font_object) {
         CFRelease(font);
         return false;
     }
-    default_font_object->font = font;
-    ((SystemFontObject*)default_font_object)->uiType = kCTFontUIFontSystem;
-    ((SystemFontObject*)default_font_object)->default_size = true;
+
+    ((FontObject*)font_object)->font = font;
+    font_object->uiType = uiType;
+    font_object->default_size = true;
+
+    *font_object_pointer = (FontObject*) font_object;
+    return true;
+}
+
+Boolean _init_default_fonts(void)
+{
+    if (!_init_default_font(&fixed_font_object, kCTFontUIFontUserFixedPitch))
+        return false;
+
+    if (!_init_default_font(&default_font_object, kCTFontUIFontSystem))
+        return false;
+
+    if (!_init_default_font(&icon_font_object, kCTFontUIFontSystem))
+        return false;
+
+    if (!_init_default_font(&caption_font_object, kCTFontUIFontEmphasizedSystem))
+        return false;
+
+    if (!_init_default_font(&heading_font_object, kCTFontUIFontSmallSystem))
+        return false;
+
+    if (!_init_default_font(&tooltip_font_object, kCTFontUIFontSmallSystem))
+        return false;
+
+    if (!_init_default_font(&text_font_object, kCTFontUIFontApplication))
+        return false;
+
+    if (!_init_default_font(&small_caption_font_object, kCTFontUIFontLabel))
+        return false;
+
+    if (!_init_default_font(&menu_font_object, kCTFontUIFontMenuItem))
+        return false;
 
     return true;
 }

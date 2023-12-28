@@ -158,7 +158,7 @@ PyObject* PyInit_gui(void)
     Py_INCREF(&ListboxType);
     Py_INCREF(&ColorType);
 
-    _init_system_fonts();
+    _init_default_fonts();
 
     if (PyModule_AddObject(module, "Window", (PyObject*) &WindowType) < 0)
         goto error;
@@ -191,6 +191,38 @@ PyObject* PyInit_gui(void)
 
     Py_INCREF(default_font_object);
     if (PyModule_AddObject(module, "default_font", (PyObject*) default_font_object) < 0)
+        goto error;
+
+    Py_INCREF(icon_font_object);
+    if (PyModule_AddObject(module, "icon_font", (PyObject*) icon_font_object) < 0)
+        goto error;
+
+    Py_INCREF(caption_font_object);
+    if (PyModule_AddObject(module, "caption_font", (PyObject*) caption_font_object) < 0)
+        goto error;
+
+    Py_INCREF(heading_font_object);
+    if (PyModule_AddObject(module, "heading_font", (PyObject*) heading_font_object) < 0)
+        goto error;
+
+    Py_INCREF(tooltip_font_object);
+    if (PyModule_AddObject(module, "tooltip_font", (PyObject*) tooltip_font_object) < 0)
+        goto error;
+
+    Py_INCREF(text_font_object);
+    if (PyModule_AddObject(module, "text_font", (PyObject*) text_font_object) < 0)
+        goto error;
+
+    Py_INCREF(small_caption_font_object);
+    if (PyModule_AddObject(module, "small_caption_font", (PyObject*) small_caption_font_object) < 0)
+        goto error;
+
+    Py_INCREF(menu_font_object);
+    if (PyModule_AddObject(module, "menu_font", (PyObject*) menu_font_object) < 0)
+        goto error;
+
+    Py_INCREF(fixed_font_object);
+    if (PyModule_AddObject(module, "fixed_font", (PyObject*) fixed_font_object) < 0)
         goto error;
 
     system_font_names = _create_system_font_name_tuple();
