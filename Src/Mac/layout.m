@@ -5,12 +5,10 @@
 #include "colors.h"
 
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
-#define COMPILING_FOR_10_6
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
+#define COMPILING_FOR_10_10
 #endif
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-#define COMPILING_FOR_10_7
-#endif
+
 
 @interface LayoutView : NSView
 {
@@ -74,7 +72,7 @@ PyTypeObject LayoutType;
     LayoutObject* object = (LayoutObject*)_object;
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
-    cr = [gc CGContext];
+    cr = gc.CGContext;
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
