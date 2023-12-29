@@ -144,7 +144,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
 {
     WidgetObject* widget;
     LabelView *label;
-    CFStringRef text;
+    CFStringRef text = CFSTR("");
     NSRect rect;
     FontObject* font = default_font_object;
 

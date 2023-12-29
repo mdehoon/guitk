@@ -3,6 +3,15 @@
 #include "colors.h"
 
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10120
+#define COMPILING_FOR_10_12
+#endif
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10130
+#define COMPILING_FOR_10_13
+#endif
+
+
 @interface Checkbox : NSButton
 {
     PyObject* _object;
@@ -91,7 +100,11 @@ Checkbox_init(CheckboxObject *self, PyObject *args, PyObject *keywords)
     checkbox = [[Checkbox alloc] initWithObject: (PyObject*)self];
     color = [NSColor lightGrayColor];
     [[checkbox cell] setBackgroundColor: color];
+#ifdef COMPILING_FOR_10_12
+    [checkbox setButtonType: NSButtonTypeSwitch];
+#else
     [checkbox setButtonType: NSSwitchButton];
+#endif
     s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
     [checkbox setTitle: s];
     [s release];
@@ -249,8 +262,13 @@ static PyObject* Checkbox_get_state(CheckboxObject* self, void* closure)
 {
     Checkbox* checkbox = self->checkbox;
     NSInteger state = [checkbox state];
+#ifdef COMPILING_FOR_10_13
+    if (state == NSControlStateValueOn) Py_RETURN_TRUE;
+    if (state == NSControlStateValueOff) Py_RETURN_FALSE;
+#else
     if (state == NSOnState) Py_RETURN_TRUE;
     if (state == NSOffState) Py_RETURN_FALSE;
+#endif
     PyErr_SetString(PyExc_SystemError, "checkbox state is unknown.");
     return NULL;
 }
@@ -309,7 +327,7 @@ static PyObject* Checkbox_get_background(CheckboxObject* self, void* closure)
     CGFloat alpha;
     Checkbox* checkbox = self->checkbox;
     NSColor* color = [[checkbox cell] backgroundColor];
-    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
+    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);
@@ -356,7 +374,7 @@ static PyObject* Checkbox_get_foreground(CheckboxObject* self, void* closure)
     NSColor* color = [text attribute: NSForegroundColorAttributeName
                              atIndex: 0
                       effectiveRange: NULL];
-    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
+    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);
@@ -409,7 +427,7 @@ static PyGetSetDef Checkbox_getseters[] = {
 };
 
 static char Checkbox_doc[] =
-"A Checkbox object wraps a Cocoa NSButton object of type NSSwitchButton.\n";
+"A Checkbox object wraps a Cocoa NSButton object of type NSButtonTypeSwitch.";
 
 PyTypeObject CheckboxType = {
     PyVarObject_HEAD_INIT(NULL, 0)

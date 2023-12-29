@@ -6,8 +6,17 @@
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
 #define COMPILING_FOR_10_6
 #endif
+
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 #define COMPILING_FOR_10_7
+#endif
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10120
+#define COMPILING_FOR_10_12
+#endif
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10130
+#define COMPILING_FOR_10_13
 #endif
 
 #ifndef CGFloat
@@ -89,13 +98,24 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
         return -1;
 
     if (argument == Py_None) {
+#ifdef COMPILING_FOR_10_12
+        windowStyle = NSWindowStyleMaskBorderless;
+#else
         windowStyle = NSBorderlessWindowMask;
+#endif
     }
     else  {
+#ifdef COMPILING_FOR_10_12
+        windowStyle = NSWindowStyleMaskTitled
+                    | NSWindowStyleMaskClosable
+                    | NSWindowStyleMaskResizable
+                    | NSWindowStyleMaskMiniaturizable;
+#else
         windowStyle = NSTitledWindowMask
                     | NSClosableWindowMask
                     | NSResizableWindowMask
                     | NSMiniaturizableWindowMask;
+#endif
         if (argument == NULL) title = "";
         else if (PyUnicode_Check(argument)) {
             argument = PyUnicode_AsUTF8String(argument);
@@ -396,7 +416,11 @@ static PyObject* Window_get_title(WindowObject* self, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
+#ifdef COMPILING_FOR_10_12
+    if (! (window.styleMask & NSWindowStyleMaskTitled)) {
+#else
     if (! (window.styleMask & NSTitledWindowMask)) {
+#endif
         Py_INCREF(Py_None);
         return Py_None;
     }
@@ -416,11 +440,18 @@ Window_set_title(WindowObject* self, PyObject* value, void* closure)
     NSWindow* window;
     NSAutoreleasePool* pool;
     NSString* s;
+
+#ifdef COMPILING_FOR_10_12
+    const NSUInteger mask = NSWindowStyleMaskTitled
+                          | NSWindowStyleMaskClosable
+                          | NSWindowStyleMaskResizable
+                          | NSWindowStyleMaskMiniaturizable;
+#else
     const NSUInteger mask = NSTitledWindowMask
                           | NSClosableWindowMask
                           | NSResizableWindowMask
                           | NSMiniaturizableWindowMask;
-
+#endif
     window = self->window;
     if (!window) {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
@@ -675,7 +706,11 @@ static PyObject* Window_get_resizable(WindowObject* self, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
+#ifdef COMPILING_FOR_10_12
+    if (window.styleMask & NSWindowStyleMaskResizable) Py_RETURN_TRUE;
+#else
     if (window.styleMask & NSResizableWindowMask) Py_RETURN_TRUE;
+#endif
     Py_RETURN_FALSE;
 }
 
@@ -691,8 +726,13 @@ Window_set_resizable(WindowObject* self, PyObject* value, void* closure)
     }
     flag = PyObject_IsTrue(value);
     switch (flag) {
+#ifdef COMPILING_FOR_10_12
+        case 1: window.styleMask |= NSWindowStyleMaskResizable; break;
+        case 0: window.styleMask &= ~NSWindowStyleMaskResizable; break;
+#else
         case 1: window.styleMask |= NSResizableWindowMask; break;
         case 0: window.styleMask &= ~NSResizableWindowMask; break;
+#endif
         case -1: return -1;
     }
     return 0;
@@ -873,7 +913,11 @@ static PyObject* Window_get_fullscreen(WindowObject* self, void* closure)
     }
 #ifdef COMPILING_FOR_10_7
     styleMask = [window styleMask];
+#ifdef COMPILING_FOR_10_12
+    if (styleMask & NSWindowStyleMaskFullScreen) Py_RETURN_TRUE;
+#else
     if (styleMask & NSFullScreenWindowMask) Py_RETURN_TRUE;
+#endif
 #endif
     Py_RETURN_FALSE;
 }
@@ -893,7 +937,11 @@ Window_set_fullscreen(WindowObject* self, PyObject* value, void* closure)
     }
 #ifdef COMPILING_FOR_10_7
     styleMask = [window styleMask];
+#ifdef COMPILING_FOR_10_12
+    fullscreen = (styleMask & NSWindowStyleMaskFullScreen) ? true : false;
+#else
     fullscreen = (styleMask & NSFullScreenWindowMask) ? true : false;
+#endif
     if (value==Py_False) {
         if (!fullscreen) return 0;
     }
@@ -988,7 +1036,9 @@ static PyObject* Window_get_topmost(WindowObject* self, void* closure)
     else if (level== NSModalPanelWindowLevel) s = "NSModalPanelWindowLevel";
     else if (level== NSPopUpMenuWindowLevel) s = "NSPopUpMenuWindowLevel";
     else if (level== NSScreenSaverWindowLevel) s = "NSScreenSaverWindowLevel";
+#ifndef COMPILING_FOR_10_13
     else if (level== NSDockWindowLevel) s = "NSDockWindowLevel";
+#endif
     PyErr_Format(PyExc_RuntimeError, "unexpected window level %s", s);
     return NULL;
 }

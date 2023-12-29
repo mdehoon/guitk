@@ -285,7 +285,7 @@ static PyObject* Textbox_get_background(TextboxObject* self, void* closure)
     WidgetObject* widget = (WidgetObject*)self;
     Textbox* textbox = (Textbox*) widget->view;
     NSColor* color = [[textbox cell] backgroundColor];
-    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
+    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);
@@ -335,7 +335,7 @@ static PyObject* Textbox_get_foreground(TextboxObject* self, void* closure)
     WidgetObject* widget = (WidgetObject*)self;
     Textbox* textbox = (Textbox*) widget->view;
     NSColor* color = [textbox textColor];
-    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
+    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);

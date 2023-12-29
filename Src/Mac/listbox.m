@@ -332,13 +332,13 @@ static PyObject* Listbox_get_minimum_size(ListboxObject* self, void* closure)
     double width = 0.0;
     double height = 0.0;
     NSSize size;
-    NSCell* cell;
+    NSView* cell;
     WidgetObject* widget = (WidgetObject*) self;
     NSView* view = widget->view;
     NSTableView* listbox = (NSTableView*)view;
     for (i = 0; i < listbox.numberOfRows; i++) {
-        cell = [listbox preparedCellAtColumn:0 row:i];
-        size = [cell cellSize];
+        cell = [listbox viewAtColumn:0 row:i makeIfNecessary:YES];
+        size = cell.frame.size;
         if (size.width > width) width = size.width;
         height += size.height;
     }
@@ -433,7 +433,7 @@ static PyObject* Listbox_get_background(ListboxObject* self, void* closure)
     WidgetObject* widget = (WidgetObject*)self;
     Listbox* listbox = (Listbox*) widget->view;
     NSColor* color = [[listbox cell] backgroundColor];
-    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
+    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);
@@ -477,7 +477,7 @@ static PyObject* Listbox_get_foreground(ListboxObject* self, void* closure)
     CGFloat blue;
     CGFloat alpha;
     NSColor* color = self->foreground;
-    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
+    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);

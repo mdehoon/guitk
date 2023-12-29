@@ -253,7 +253,7 @@ static PyObject* Button_get_background(ButtonObject* self, void* closure)
     CGFloat alpha;
     Button* button = self->button;
     NSColor* color = [[button cell] backgroundColor];
-    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
+    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);
@@ -300,7 +300,7 @@ static PyObject* Button_get_foreground(ButtonObject* self, void* closure)
     NSColor* color = [text attribute: NSForegroundColorAttributeName
                              atIndex: 0
                       effectiveRange: NULL];
-    color = [color colorUsingColorSpaceName: NSCalibratedRGBColorSpace];
+    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);

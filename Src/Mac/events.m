@@ -6,6 +6,12 @@
 #define READABLE 1
 #define WRITABLE 2
 
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10120
+#define COMPILING_FOR_10_12
+#endif
+
+
 static CFMachPortRef receivePort = NULL;
 static mach_port_t rawReceivePort = 0;
 
@@ -13,10 +19,17 @@ static void application_connect(void) {
     NSEvent *event;
     [NSApplication sharedApplication];
     while (true) {
+#ifdef COMPILING_FOR_10_12
+        event = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                   untilDate:[NSDate distantPast]
+                                      inMode:NSDefaultRunLoopMode
+                                     dequeue:YES];
+#else
         event = [NSApp nextEventMatchingMask:NSAnyEventMask
                                    untilDate:[NSDate distantPast]
                                       inMode:NSDefaultRunLoopMode
                                      dequeue:YES];
+#endif
         if (!event) break;
         [NSApp sendEvent:event];
     }
@@ -657,6 +670,18 @@ static void _stop(void)
 {
     if ([NSApp isRunning]) {
         NSEvent* event;
+#ifdef COMPILING_FOR_10_12
+        event = [NSEvent otherEventWithType: NSEventTypeApplicationDefined
+                                   location: NSZeroPoint
+                              modifierFlags: 0
+                                  timestamp: 0
+                               windowNumber: 0
+                                    context: nil
+                                    subtype: 0
+                                      data1: 0
+                                      data2: 0
+                 ];
+#else
         event = [NSEvent otherEventWithType: NSApplicationDefined
                                    location: NSZeroPoint
                               modifierFlags: 0
@@ -667,6 +692,7 @@ static void _stop(void)
                                       data1: 0
                                       data2: 0
                  ];
+#endif
         [NSApp stop:nil];
         [NSApp postEvent: event atStart: NO];
     }
