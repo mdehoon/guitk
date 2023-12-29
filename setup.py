@@ -1,9 +1,17 @@
 #!/usr/bin/env python
 
-from distutils.core import setup, Extension, Command
-import sys
 import os.path
 import sys
+
+try:
+    from setuptools import setup
+    from setuptools import Command
+    from setuptools import Extension
+except ImportError:
+    sys.exit(
+        "We need the Python library setuptools to be installed. "
+        "Try running: python -m ensurepip"
+    )
 
 extensions = []
 
