@@ -3,13 +3,19 @@
 #include "colors.h"
 
 
-@interface Button : NSButton
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
+#define COMPILING_FOR_10_10
+#endif
+
+
+@interface Button : NSControl
 {
     PyObject* _object;
 }
 @property (readonly) PyObject* object;
 - (Button*)initWithObject:(PyObject*)obj;
--(void)command:(id)sender;
+- (void)command:(id)sender;
+- (void)drawRect:(NSRect)rect;
 @end
 
 typedef struct {
@@ -63,6 +69,38 @@ typedef struct {
         PyErr_Print(); 
     PyGILState_Release(gstate);
 }
+
+- (void)drawRect:(NSRect)dirtyRect
+{
+    CGContextRef cr;
+    NSGraphicsContext* gc;
+/*
+    short red, green, blue, alpha;
+    CGRect rect;
+    ButtonObject* object = (ButtonObject*)_object;
+*/
+    gc = [NSGraphicsContext currentContext];
+#ifdef COMPILING_FOR_10_10
+    cr = gc.CGContext;
+#else
+    cr = (CGContextRef) [gc graphicsPort];
+#endif
+/*
+            Tk_Fill3DRectangle(tkwin, pixmap, butPtr->highlightBorder, 0, 0,
+                    Tk_Width(tkwin), Tk_Height(tkwin), 0, TK_RELIEF_FLAT);
+        DrawButtonImageAndText(butPtr);
+        GC gc = NULL;
+        if ((butPtr->flags & GOT_FOCUS) && butPtr->highlightColorPtr) {
+            gc = Tk_GCForColor(butPtr->highlightColorPtr, pixmap);
+        } else if (butPtr->type == TYPE_LABEL) {
+            gc = Tk_GCForColor(Tk_3DBorderColor(butPtr->highlightBorder), pixmap);
+        }
+        if (gc) {
+            TkMacOSXDrawSolidBorder(tkwin, gc, 0, butPtr->highlightWidth);
+        }
+*/
+    fprintf(stderr, "In drawRect\n"); fflush(stderr);
+}
 @end
 
 static PyObject*
@@ -92,7 +130,10 @@ Button_init(ButtonObject *self, PyObject *args, PyObject *keywords)
     color = [NSColor lightGrayColor];
     [[button cell] setBackgroundColor: color];
     s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
+    fprintf(stderr, "Should call [button setTitle: s]\n"); fflush(stderr);
+/*
     [button setTitle: s];
+*/
     [s release];
     self->button = button;
 
@@ -213,6 +254,8 @@ static PyObject* Button_get_minimum_size(ButtonObject* self, void* closure)
     if (minimum_size==NULL) {
         Button* button = self->button;
         NSSize size = [[button cell] cellSize];
+        size.width = 100;
+        size.height = 100;
         minimum_size = Py_BuildValue("ff", size.width, size.height);
         self->minimum_size = minimum_size;
     }
@@ -295,6 +338,12 @@ static PyObject* Button_get_foreground(ButtonObject* self, void* closure)
     CGFloat green;
     CGFloat blue;
     CGFloat alpha;
+    fprintf(stderr, "Should call [button attributedTitle]\n"); fflush(stderr);
+    red = 0.0;
+    green = 0.0;
+    blue = 0.0;
+    alpha = 0.0;
+/*
     Button* button = self->button;
     NSAttributedString* text = [button attributedTitle];
     NSColor* color = [text attribute: NSForegroundColorAttributeName
@@ -302,6 +351,7 @@ static PyObject* Button_get_foreground(ButtonObject* self, void* closure)
                       effectiveRange: NULL];
     color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
     [color getRed: &red green: &green blue: &blue alpha: &alpha];
+*/
     rgba[0] = (short)round(red*255);
     rgba[1] = (short)round(green*255);
     rgba[2] = (short)round(blue*255);
@@ -317,15 +367,21 @@ Button_set_foreground(ButtonObject* self, PyObject* value, void* closure)
     CGFloat green;
     CGFloat blue;
     CGFloat alpha;
+/*
     NSColor* color;
     NSRange range;
+*/
     Button* button = self->button;
+/*
     NSMutableAttributedString *text;
+*/
     if (!Color_converter(value, rgba)) return -1;
     red = rgba[0] / 255.;
     green = rgba[1] / 255.;
     blue = rgba[2] / 255.;
     alpha = rgba[3] / 255.;
+    fprintf(stderr, "Should call [button attributedTitle]\n"); fflush(stderr);
+/*
     color = [NSColor colorWithCalibratedRed: red
                                       green: green
                                        blue: blue
@@ -336,6 +392,7 @@ Button_set_foreground(ButtonObject* self, PyObject* value, void* closure)
                   value: color
                   range: range];
     [button setAttributedTitle:text];
+*/
     button.needsDisplay = YES;
     return 0;
 }
