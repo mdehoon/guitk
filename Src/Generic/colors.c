@@ -1,10 +1,7 @@
 #include <Python.h>
+#include <stdbool.h>
 #include "colors.h"
 
-typedef struct {
-    PyObject_HEAD
-    unsigned short rgba[4];
-} ColorObject;
 
 static char* colors[][2] = {
     {"AliceBlue", "#F0F8FF"},
@@ -377,3 +374,31 @@ PyTypeObject ColorType = {
     0,                          /* tp_alloc */
     Color_new,                  /* tp_new */
 };
+
+
+ColorObject* transparent = NULL;
+ColorObject* black = NULL;
+
+bool _init_default_colors(void)
+{
+    transparent = (ColorObject*)ColorType.tp_alloc(&ColorType, 0);
+    if (!transparent) goto error;
+    transparent->rgba[0] = 0;
+    transparent->rgba[1] = 0;
+    transparent->rgba[2] = 0;
+    transparent->rgba[3] = 0;
+
+    black = (ColorObject*)ColorType.tp_alloc(&ColorType, 0);
+    if (!black) goto error;
+    black->rgba[0] = 0;
+    black->rgba[1] = 0;
+    black->rgba[2] = 0;
+    black->rgba[3] = 255;
+
+    return true;
+
+error:
+    Py_XDECREF(transparent);
+    Py_XDECREF(black);
+    return false;
+}

@@ -22,8 +22,8 @@
 
 typedef struct {
     WidgetObject widget;
-    short foreground[4];
-    short background[4];
+    ColorObject* foreground;
+    ColorObject* background;
     CFStringRef text;
     FontObject* font;
     PyObject* minimum_size;
@@ -69,10 +69,10 @@ typedef struct {
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
-    red = object->background[0];
-    green = object->background[1];
-    blue = object->background[2];
-    alpha = object->background[3];
+    red = object->background->rgba[0];
+    green = object->background->rgba[1];
+    blue = object->background->rgba[2];
+    alpha = object->background->rgba[3];
     CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     rect = NSRectToCGRect(dirtyRect);
     CGContextFillRect(cr, rect);
@@ -102,10 +102,10 @@ typedef struct {
     CGAffineTransform transform = CGAffineTransformMakeScale (1.0, -1.0); 
     CGContextSetTextMatrix(cr, transform);
     CGContextSetTextPosition(cr, x, y);
-    red = object->foreground[0];
-    green = object->foreground[1];
-    blue = object->foreground[2];
-    alpha = object->foreground[3];
+    red = object->foreground->rgba[0];
+    green = object->foreground->rgba[1];
+    blue = object->foreground->rgba[2];
+    alpha = object->foreground->rgba[3];
     CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     CTLineDraw(line, cr);
     CFRelease(line);
@@ -125,14 +125,9 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!self) return NULL;
     widget = (WidgetObject*)self;
     widget->view = nil;
-    self->foreground[0] = 0;
-    self->foreground[1] = 0;
-    self->foreground[2] = 0;
-    self->foreground[3] = 255;
-    self->background[0] = 0;
-    self->background[1] = 0;
-    self->background[2] = 0;
-    self->background[3] = 0;
+    Py_INCREF(black);
+    self->foreground = black;
+    self->background = transparent;
     self->text = NULL;
     self->font = NULL;
     self->minimum_size = NULL;
@@ -282,46 +277,46 @@ static char Label_font__doc__[] = "font for label";
 
 static PyObject* Label_get_foreground(LabelObject* self, void* closure)
 {
-    const short red = self->foreground[0];
-    const short green = self->foreground[1];
-    const short blue = self->foreground[2];
-    const short alpha = self->foreground[3];
-    return Py_BuildValue("HHHH", red, green, blue, alpha);
+    Py_INCREF(self->foreground);
+    return (PyObject*) self->foreground;
 }
 
 static int
 Label_set_foreground(LabelObject* self, PyObject* value, void* closure)
 {
-    if (!Color_converter(value, self->foreground)) return -1;
-    else {
-        WidgetObject* widget = (WidgetObject*) self;
-        LabelView* label = (LabelView*) (widget->view);
-        label.needsDisplay = YES;
-        return 0;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (!Py_IS_TYPE(value, &ColorType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Color object");
+        return -1;
     }
+    Py_INCREF(value);
+    self->foreground = (ColorObject*) value;
+    label.needsDisplay = YES;
+    return 0;
 }
 
 static char Label_foreground__doc__[] = "foreground color.";
 
 static PyObject* Label_get_background(LabelObject* self, void* closure)
 {
-    const short red = self->background[0];
-    const short green = self->background[1];
-    const short blue = self->background[2];
-    const short alpha = self->background[3];
-    return Py_BuildValue("HHHH", red, green, blue, alpha);
+    Py_INCREF(self->background);
+    return (PyObject*) self->background;
 }
 
 static int
 Label_set_background(LabelObject* self, PyObject* value, void* closure)
 {
-    if (!Color_converter(value, self->background)) return -1;
-    else {
-        WidgetObject* widget = (WidgetObject*) self;
-        LabelView* label = (LabelView*) (widget->view);
-        label.needsDisplay = YES;
-        return 0;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (!Py_IS_TYPE(value, &ColorType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Color object");
+        return -1;
     }
+    Py_INCREF(value);
+    self->background = (ColorObject*) value;
+    label.needsDisplay = YES;
+    return 0;
 }
 
 static char Label_background__doc__[] = "background color.";

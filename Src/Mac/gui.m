@@ -158,7 +158,8 @@ PyObject* PyInit_gui(void)
     Py_INCREF(&ListboxType);
     Py_INCREF(&ColorType);
 
-    _init_default_fonts();
+    if (_init_default_fonts() == false) goto error;
+    if (_init_default_colors() == false) goto error;;
 
     if (PyModule_AddObject(module, "Window", (PyObject*) &WindowType) < 0)
         goto error;

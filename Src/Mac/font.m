@@ -732,33 +732,45 @@ _init_default_font(FontObject** font_object_pointer, CTFontUIFontType uiType)
 Boolean _init_default_fonts(void)
 {
     if (!_init_default_font(&fixed_font_object, kCTFontUIFontUserFixedPitch))
-        return false;
+        goto error;
 
     if (!_init_default_font(&default_font_object, kCTFontUIFontSystem))
-        return false;
+        goto error;
 
     if (!_init_default_font(&icon_font_object, kCTFontUIFontSystem))
-        return false;
+        goto error;
 
     if (!_init_default_font(&caption_font_object, kCTFontUIFontEmphasizedSystem))
-        return false;
+        goto error;
 
     if (!_init_default_font(&heading_font_object, kCTFontUIFontSmallSystem))
-        return false;
+        goto error;
 
     if (!_init_default_font(&tooltip_font_object, kCTFontUIFontSmallSystem))
-        return false;
+        goto error;
 
     if (!_init_default_font(&text_font_object, kCTFontUIFontApplication))
-        return false;
+        goto error;
 
     if (!_init_default_font(&small_caption_font_object, kCTFontUIFontLabel))
-        return false;
+        goto error;
 
     if (!_init_default_font(&menu_font_object, kCTFontUIFontMenuItem))
-        return false;
+        goto error;
 
     return true;
+
+error:
+    Py_XDECREF(fixed_font_object);
+    Py_XDECREF(default_font_object);
+    Py_XDECREF(icon_font_object);
+    Py_XDECREF(caption_font_object);
+    Py_XDECREF(heading_font_object);
+    Py_XDECREF(tooltip_font_object);
+    Py_XDECREF(text_font_object);
+    Py_XDECREF(small_caption_font_object);
+    Py_XDECREF(menu_font_object);
+    return false;
 }
 
 PyObject* _create_system_font_name_tuple(void)
