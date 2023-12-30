@@ -23,7 +23,7 @@
 
 typedef struct {
     WidgetObject widget;
-    CGColorRef background;
+    ColorObject* background;
 } LayoutObject;
 
 PyTypeObject LayoutType;
@@ -68,6 +68,7 @@ PyTypeObject LayoutType;
 {
     CGContextRef cr;
     NSGraphicsContext* gc;
+    short red, green, blue, alpha;
     CGRect rect;
     LayoutObject* object = (LayoutObject*)_object;
     gc = [NSGraphicsContext currentContext];
@@ -76,7 +77,11 @@ PyTypeObject LayoutType;
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
-    CGContextSetFillColorWithColor(cr, object->background);
+    red = object->background->rgba[0];
+    green = object->background->rgba[1];
+    blue = object->background->rgba[2];
+    alpha = object->background->rgba[3];
+    CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     rect = NSRectToCGRect(dirtyRect);
     CGContextFillRect(cr, rect);
     [super drawRect:dirtyRect];
@@ -89,16 +94,13 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     PyObject* object;
     WidgetObject* widget;
     NSRect rect = NSZeroRect;
-    NSColor* color = [NSColor lightGrayColor];
-    CGFloat gray;
-    CGFloat alpha;
-    [color getWhite: &gray alpha: &alpha];
     LayoutObject *self = (LayoutObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     object = (PyObject*)self;
     widget = (WidgetObject*)self;
     widget->view = [[LayoutView alloc] initWithFrame:rect withObject:object];
-    self->background = CGColorCreateGenericGray(gray, alpha);
+    Py_INCREF(lightgray);
+    self->background = lightgray;
     
     return object;
 }
@@ -118,7 +120,7 @@ Layout_dealloc(LayoutObject* self)
     WidgetObject* widget = (WidgetObject*)self;
     NSView* view = widget->view;
     if (view) [view release];
-    CGColorRelease(self->background);
+    Py_DECREF(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -210,34 +212,21 @@ static char Layout_size__doc__[] = "Layout size";
 
 static PyObject* Layout_get_background(LayoutObject* self, void* closure)
 {
-    const CGFloat* components = CGColorGetComponents(self->background);
-    double red, green, blue, alpha;
-    red = components[0];
-    green = components[1];
-    blue = components[2];
-    alpha = components[3];
-    return Py_BuildValue("ffff", red, green, blue, alpha);
+    Py_INCREF(self->background);
+    return (PyObject*) self->background;
 }
 
 static int
 Layout_set_background(LayoutObject* self, PyObject* value, void* closure)
 {
-    short rgba[4];
-    CGFloat components[4];
-    CGColorRef background;
-    CGColorSpaceRef colorspace;
     WidgetObject* widget = (WidgetObject*) self;
-    NSView* layout = widget->view;
-    if (!Color_converter(value, rgba)) return -1;
-    CGColorRelease(self->background);
-    colorspace = CGColorSpaceCreateDeviceRGB();
-    components[0] = rgba[0] / 255.;
-    components[1] = rgba[1] / 255.;
-    components[2] = rgba[2] / 255.;
-    components[3] = rgba[3] / 255.;
-    background = CGColorCreate(colorspace, components);
-    CGColorSpaceRelease(colorspace);
-    self->background = background;
+    LayoutView* layout = (LayoutView*) (widget->view);
+    if (!Py_IS_TYPE(value, &ColorType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Color object");
+        return -1;
+    }
+    Py_INCREF(value);
+    self->background = (ColorObject*) value;
     layout.needsDisplay = YES;
     return 0;
 }

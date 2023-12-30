@@ -378,6 +378,7 @@ PyTypeObject ColorType = {
 
 ColorObject* transparent = NULL;
 ColorObject* black = NULL;
+ColorObject* lightgray = NULL;
 
 bool _init_default_colors(void)
 {
@@ -395,10 +396,19 @@ bool _init_default_colors(void)
     black->rgba[2] = 0;
     black->rgba[3] = 255;
 
+    lightgray = (ColorObject*)ColorType.tp_alloc(&ColorType, 0);
+    if (!lightgray) goto error;
+    /* Apple's [NSColor lightGrayColor] */
+    lightgray->rgba[0] = 170;
+    lightgray->rgba[1] = 170;
+    lightgray->rgba[2] = 170;
+    lightgray->rgba[3] = 255;
+
     return true;
 
 error:
     Py_XDECREF(transparent);
     Py_XDECREF(black);
+    Py_XDECREF(lightgray);
     return false;
 }
