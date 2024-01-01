@@ -73,6 +73,7 @@ typedef struct {
     green = object->background->rgba[1];
     blue = object->background->rgba[2];
     alpha = object->background->rgba[3];
+
     CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     rect = NSRectToCGRect(dirtyRect);
     CGContextFillRect(cr, rect);
@@ -126,8 +127,10 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     widget = (WidgetObject*)self;
     widget->view = nil;
     Py_INCREF(black);
+    // Py_INCREF(transparent);
+    Py_INCREF(systemWindowBackgroundColor);
     self->foreground = black;
-    self->background = transparent;
+    self->background = systemWindowBackgroundColor;
     self->text = NULL;
     self->font = NULL;
     self->minimum_size = NULL;

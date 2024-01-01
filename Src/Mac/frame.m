@@ -79,8 +79,8 @@ Frame_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     box.titlePosition = NSNoTitle;
     Py_INCREF(Py_None);
     self->content = Py_None;
-    Py_INCREF(lightgray);
-    self->background = lightgray;
+    Py_INCREF(systemWindowBackgroundColor);
+    self->background = systemWindowBackgroundColor;
     widget = (WidgetObject*)self;
     widget->view = box;
     return object;

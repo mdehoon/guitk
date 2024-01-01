@@ -23,6 +23,7 @@ typedef struct {
     Button* button;
     NSString* text;
     NSFont* font;
+    ColorObject* background;
     PyObject* minimum_size;
     PyObject* command;
 } ButtonObject;
@@ -74,20 +75,58 @@ typedef struct {
 {
     CGContextRef cr;
     NSGraphicsContext* gc;
-/*
     short red, green, blue, alpha;
     CGRect rect;
     ButtonObject* object = (ButtonObject*)_object;
-*/
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
     cr = gc.CGContext;
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
+    rect = NSRectToCGRect(dirtyRect);
+    red = object->background->rgba[0];
+    green = object->background->rgba[1];
+    blue = object->background->rgba[2];
+    alpha = object->background->rgba[3];
+    CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
+    rect = NSRectToCGRect(dirtyRect);
+    CGContextFillRect(cr, rect);
+    fprintf(stderr, "In drawRect, filling with %d,%d,%d,%d\n", red, green, blue, alpha); fflush(stderr);
+
 /*
-            Tk_Fill3DRectangle(tkwin, pixmap, butPtr->highlightBorder, 0, 0,
-                    Tk_Width(tkwin), Tk_Height(tkwin), 0, TK_RELIEF_FLAT);
+
+    if (Tk_Width(tkwin) > 0 && (Tk_Height(tkwin) > 0)) {
+        Pixmap pixmap = (Pixmap) Tk_WindowId(tkwin);
+        MacButton *macButtonPtr = (MacButton *)clientData;
+        Tk_Window tkwin = butPtr->tkwin;
+        DrawParams* dpPtr = &macButtonPtr->drawParams;
+        butPtr->flags &= ~REDRAW_PENDING;
+        if ((butPtr->tkwin == NULL) || !Tk_IsMapped(tkwin)) {
+            return;
+        }
+
+
+        XRectangle rectangle;
+        rectangle.x = 0;
+        rectangle.y = 0;
+        rectangle.width = Tk_Width(tkwin);
+        rectangle.height = Tk_Height(tkwin);
+        MacDrawable *macWin = (MacDrawable *)pixmap;
+        TkMacOSXDrawingContext dc;
+        XRectangle * rectPtr;
+        display->request++;
+        if (!TkMacOSXSetupDrawingContext(pixmap, butPtr->highlightBorder, &dc)) {
+            return;
+        }
+        if (dc.context) {
+            CGRect rect = GRectMake(macWin->xOff + rectPtr->x,
+                                    macWin->yOff + rectPtr->y,
+                                    rectangle.width, rectangle.height);
+            CGContextFillRect(dc.context, rect);
+        }
+        TkMacOSXRestoreDrawingContext(&dc);
+    }
         DrawButtonImageAndText(butPtr);
         GC gc = NULL;
         if ((butPtr->flags & GOT_FOCUS) && butPtr->highlightColorPtr) {
@@ -99,7 +138,6 @@ typedef struct {
             TkMacOSXDrawSolidBorder(tkwin, gc, 0, butPtr->highlightWidth);
         }
 */
-    fprintf(stderr, "In drawRect\n"); fflush(stderr);
 }
 @end
 
@@ -129,6 +167,10 @@ Button_init(ButtonObject *self, PyObject *args, PyObject *keywords)
     button = [[Button alloc] initWithObject: (PyObject*)self];
     color = [NSColor lightGrayColor];
     [[button cell] setBackgroundColor: color];
+
+    Py_INCREF(systemWindowBackgroundColor);
+    self->background = systemWindowBackgroundColor;
+
     s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
     fprintf(stderr, "Should call [button setTitle: s]\n"); fflush(stderr);
 /*

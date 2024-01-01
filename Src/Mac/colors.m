@@ -1,3 +1,4 @@
+#include <Cocoa/Cocoa.h>
 #include <Python.h>
 #include <stdbool.h>
 #include "colors.h"
@@ -154,6 +155,7 @@ static char* colors[][2] = {
     {"YellowGreen", "#9ACD32"},
     {NULL, NULL},
 };
+
 
 int Color_converter(PyObject* argument, void* address)
 {
@@ -378,10 +380,50 @@ PyTypeObject ColorType = {
 
 ColorObject* transparent = NULL;
 ColorObject* black = NULL;
-ColorObject* lightgray = NULL;
+ColorObject* systemWindowBackgroundColor = NULL;
+
+
+@interface AppearanceObserver : NSObject
+{
+}
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary<NSKeyValueChangeKey,id> *)change
+                       context:(void *)context;
+@end
+
+static void _set_system_colors(void) {
+    NSColor* color;
+    color = [[NSColor windowBackgroundColor]
+             colorUsingColorSpace:[NSColorSpace genericRGBColorSpace]];
+    systemWindowBackgroundColor->rgba[0] = (short) round(255.0 * color.redComponent);
+    systemWindowBackgroundColor->rgba[1] = (short) round(255.0 * color.greenComponent);
+    systemWindowBackgroundColor->rgba[2] = (short) round(255.0 * color.blueComponent);
+    systemWindowBackgroundColor->rgba[3] = (short) round(255.0 * color.alphaComponent);
+}
+
+@implementation AppearanceObserver
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary<NSKeyValueChangeKey,id> *)change
+                       context:(void *)context {
+    if ([keyPath isEqualToString:@"effectiveAppearance"]) {
+        NSAppearance *savedAppearance = [NSAppearance currentAppearance];
+        NSAppearance.currentAppearance = [NSApp effectiveAppearance];
+        _set_system_colors();
+        [NSAppearance setCurrentAppearance:savedAppearance];
+    }
+}
+@end
 
 bool _init_default_colors(void)
 {
+    AppearanceObserver* observer = [[AppearanceObserver alloc] init];
+    [NSApp addObserver:observer
+            forKeyPath:@"effectiveAppearance"
+               options:NSKeyValueObservingOptionNew
+               context:NULL];
+
     transparent = (ColorObject*)ColorType.tp_alloc(&ColorType, 0);
     if (!transparent) goto error;
     transparent->rgba[0] = 0;
@@ -396,19 +438,16 @@ bool _init_default_colors(void)
     black->rgba[2] = 0;
     black->rgba[3] = 255;
 
-    lightgray = (ColorObject*)ColorType.tp_alloc(&ColorType, 0);
-    if (!lightgray) goto error;
-    /* Apple's [NSColor lightGrayColor] */
-    lightgray->rgba[0] = 170;
-    lightgray->rgba[1] = 170;
-    lightgray->rgba[2] = 170;
-    lightgray->rgba[3] = 255;
+    systemWindowBackgroundColor = (ColorObject*)ColorType.tp_alloc(&ColorType, 0);
+    if (!systemWindowBackgroundColor) goto error;
+
+    _set_system_colors();
 
     return true;
 
 error:
     Py_XDECREF(transparent);
     Py_XDECREF(black);
-    Py_XDECREF(lightgray);
+    Py_XDECREF(systemWindowBackgroundColor);
     return false;
 }

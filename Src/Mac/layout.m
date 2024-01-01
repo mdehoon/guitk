@@ -99,8 +99,8 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     object = (PyObject*)self;
     widget = (WidgetObject*)self;
     widget->view = [[LayoutView alloc] initWithFrame:rect withObject:object];
-    Py_INCREF(lightgray);
-    self->background = lightgray;
+    Py_INCREF(systemWindowBackgroundColor);
+    self->background = systemWindowBackgroundColor;
     
     return object;
 }

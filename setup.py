@@ -41,7 +41,7 @@ sources = ["Src/Mac/gui.m",
            "Src/Mac/checkbox.m",
            "Src/Mac/textbox.m",
            "Src/Mac/listbox.m",
-           "Src/Generic/colors.c",
+           "Src/Mac/colors.m",
           ]
 
 extension = Extension("guitk.gui",
