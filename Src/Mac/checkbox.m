@@ -26,6 +26,8 @@ typedef struct {
     Checkbox* checkbox;
     NSString* text;
     NSFont* font;
+    ColorObject* foreground;
+    ColorObject* background;
     PyObject* minimum_size;
     PyObject* command;
 } CheckboxObject;
@@ -82,6 +84,8 @@ Checkbox_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     Py_INCREF(Py_None);
     self->command = Py_None;;
     self->minimum_size = NULL;
+    self->foreground = NULL;
+    self->background = NULL;
     return (PyObject*)self;
 }
 
@@ -98,8 +102,18 @@ Checkbox_init(CheckboxObject *self, PyObject *args, PyObject *keywords)
         return -1;
 
     checkbox = [[Checkbox alloc] initWithObject: (PyObject*)self];
-    color = [NSColor lightGrayColor];
-    [[checkbox cell] setBackgroundColor: color];
+
+    Py_INCREF(systemTextColor);
+    Py_INCREF(systemWindowBackgroundColor);
+    Py_XDECREF(self->foreground);
+    Py_XDECREF(self->background);
+    self->foreground = systemTextColor;
+    self->background = systemWindowBackgroundColor;
+
+    color = [NSColor colorWithCalibratedRed: self->background->rgba[0] / 255.
+                                      green: self->background->rgba[1] / 255.
+                                       blue: self->background->rgba[2] / 255.
+                                      alpha: self->background->rgba[3] / 255.];
 #ifdef COMPILING_FOR_10_12
     [checkbox setButtonType: NSButtonTypeSwitch];
 #else
@@ -108,6 +122,7 @@ Checkbox_init(CheckboxObject *self, PyObject *args, PyObject *keywords)
     s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
     [checkbox setTitle: s];
     [s release];
+    [[checkbox cell] setBackgroundColor: color];
     self->checkbox = checkbox;
 
     return 0;
@@ -130,6 +145,8 @@ Checkbox_dealloc(CheckboxObject* self)
         [checkbox release];
         [pool release];
     }
+    Py_XDECREF(self->foreground);
+    Py_XDECREF(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -320,37 +337,31 @@ static char Checkbox_text__doc__[] = "checkbox text.";
 
 static PyObject* Checkbox_get_background(CheckboxObject* self, void* closure)
 {
-    short rgba[4];
-    CGFloat red;
-    CGFloat green;
-    CGFloat blue;
-    CGFloat alpha;
-    Checkbox* checkbox = self->checkbox;
-    NSColor* color = [[checkbox cell] backgroundColor];
-    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
-    [color getRed: &red green: &green blue: &blue alpha: &alpha];
-    rgba[0] = (short)round(red*255);
-    rgba[1] = (short)round(green*255);
-    rgba[2] = (short)round(blue*255);
-    rgba[3] = (short)round(alpha*255);
-    return Color_create(rgba);
+    Py_INCREF(self->background);
+    return (PyObject*) self->background;
 }
 
 static int
 Checkbox_set_background(CheckboxObject* self, PyObject* value, void* closure)
 {
-    short rgba[4];
     CGFloat red;
     CGFloat green;
     CGFloat blue;
     CGFloat alpha;
     NSColor* color;
     Checkbox* checkbox = self->checkbox;
-    if (!Color_converter(value, rgba)) return -1;
-    red = rgba[0] / 255.;
-    green = rgba[1] / 255.;
-    blue = rgba[2] / 255.;
-    alpha = rgba[3] / 255.;
+
+    if (!Py_IS_TYPE(value, &ColorType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Color object");
+        return -1;
+    }
+    Py_INCREF(value);
+    Py_DECREF(self->background);
+    self->background = (ColorObject*) value;
+    red = self->background->rgba[0] / 255.;
+    green = self->background->rgba[1] / 255.;
+    blue = self->background->rgba[2] / 255.;
+    alpha = self->background->rgba[3] / 255.;
     color = [NSColor colorWithCalibratedRed: red
                                       green: green
                                        blue: blue
@@ -364,42 +375,33 @@ static char Checkbox_background__doc__[] = "background color.";
 
 static PyObject* Checkbox_get_foreground(CheckboxObject* self, void* closure)
 {
-    short rgba[4];
-    CGFloat red;
-    CGFloat green;
-    CGFloat blue;
-    CGFloat alpha;
-    Checkbox* checkbox = self->checkbox;
-    NSAttributedString* text = [checkbox attributedTitle];
-    NSColor* color = [text attribute: NSForegroundColorAttributeName
-                             atIndex: 0
-                      effectiveRange: NULL];
-    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
-    [color getRed: &red green: &green blue: &blue alpha: &alpha];
-    rgba[0] = (short)round(red*255);
-    rgba[1] = (short)round(green*255);
-    rgba[2] = (short)round(blue*255);
-    rgba[3] = (short)round(alpha*255);
-    return Color_create(rgba);
+    Py_INCREF(self->foreground);
+    return (PyObject*) self->foreground;
 }
 
 static int
 Checkbox_set_foreground(CheckboxObject* self, PyObject* value, void* closure)
 {
-    short rgba[4];
     CGFloat red;
     CGFloat green;
     CGFloat blue;
     CGFloat alpha;
     NSColor* color;
+    NSMutableAttributedString *text;
     NSRange range;
     Checkbox* checkbox = self->checkbox;
-    NSMutableAttributedString *text;
-    if (!Color_converter(value, rgba)) return -1;
-    red = rgba[0] / 255.;
-    green = rgba[1] / 255.;
-    blue = rgba[2] / 255.;
-    alpha = rgba[3] / 255.;
+
+    if (!Py_IS_TYPE(value, &ColorType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Color object");
+        return -1;
+    }
+    Py_INCREF(value);
+    Py_DECREF(self->foreground);
+    self->foreground = (ColorObject*) value;
+    red = self->foreground->rgba[0] / 255.;
+    green = self->foreground->rgba[1] / 255.;
+    blue = self->foreground->rgba[2] / 255.;
+    alpha = self->foreground->rgba[3] / 255.;
     color = [NSColor colorWithCalibratedRed: red
                                       green: green
                                        blue: blue

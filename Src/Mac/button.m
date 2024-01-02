@@ -175,10 +175,10 @@ Button_init(ButtonObject *self, PyObject *args, PyObject *keywords)
     self->foreground = systemTextColor;
     self->background = systemWindowBackgroundColor;
 
-    color = [NSColor colorWithCalibratedRed: 255. * self->background->rgba[0]
-                                      green: 255. * self->background->rgba[1]
-                                       blue: 255. * self->background->rgba[2]
-                                      alpha: 255. * self->background->rgba[3]];
+    color = [NSColor colorWithCalibratedRed: self->background->rgba[0] / 255.
+                                      green: self->background->rgba[1] / 255.
+                                       blue: self->background->rgba[2] / 255.
+                                      alpha: self->background->rgba[3] / 255.];
 
     [[button cell] setBackgroundColor: color];
 
