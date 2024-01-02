@@ -126,10 +126,8 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!self) return NULL;
     widget = (WidgetObject*)self;
     widget->view = nil;
-    Py_INCREF(systemTextColor);
-    Py_INCREF(systemWindowBackgroundColor);
-    self->foreground = systemTextColor;
-    self->background = systemWindowBackgroundColor;
+    self->foreground = NULL;
+    self->background = NULL;
     self->text = NULL;
     self->font = NULL;
     self->minimum_size = NULL;
@@ -161,6 +159,13 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     self->text = text;
     self->font = font;
 
+    Py_INCREF(systemTextColor);
+    Py_INCREF(systemWindowBackgroundColor);
+    Py_XDECREF(self->foreground);
+    Py_XDECREF(self->background);
+    self->foreground = systemTextColor;
+    self->background = systemWindowBackgroundColor;
+
     return 0;
 }
 
@@ -182,6 +187,8 @@ Label_dealloc(LabelObject* self)
     if (label) [label release];
     if (font) Py_DECREF(font);
     if (text) CFRelease(text);
+    Py_DECREF(self->foreground);
+    Py_DECREF(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -293,6 +300,7 @@ Label_set_foreground(LabelObject* self, PyObject* value, void* closure)
         return -1;
     }
     Py_INCREF(value);
+    Py_DECREF(self->foreground);
     self->foreground = (ColorObject*) value;
     label.needsDisplay = YES;
     return 0;
@@ -316,6 +324,7 @@ Label_set_background(LabelObject* self, PyObject* value, void* closure)
         return -1;
     }
     Py_INCREF(value);
+    Py_DECREF(self->background);
     self->background = (ColorObject*) value;
     label.needsDisplay = YES;
     return 0;

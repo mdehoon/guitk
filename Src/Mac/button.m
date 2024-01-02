@@ -8,14 +8,14 @@
 #endif
 
 
-@interface Button : NSControl
+@interface Button : NSButton
 {
     PyObject* _object;
 }
 @property (readonly) PyObject* object;
 - (Button*)initWithObject:(PyObject*)obj;
 - (void)command:(id)sender;
-- (void)drawRect:(NSRect)rect;
+- (void)drawRect2:(NSRect)rect;
 @end
 
 typedef struct {
@@ -23,6 +23,7 @@ typedef struct {
     Button* button;
     NSString* text;
     NSFont* font;
+    ColorObject* foreground;
     ColorObject* background;
     PyObject* minimum_size;
     PyObject* command;
@@ -71,7 +72,7 @@ typedef struct {
     PyGILState_Release(gstate);
 }
 
-- (void)drawRect:(NSRect)dirtyRect
+- (void)drawRect2:(NSRect)dirtyRect
 {
     CGContextRef cr;
     NSGraphicsContext* gc;
@@ -149,6 +150,8 @@ Button_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     Py_INCREF(Py_None);
     self->command = Py_None;;
     self->minimum_size = NULL;
+    self->foreground = NULL;
+    self->background = NULL;
     return (PyObject*)self;
 }
 
@@ -165,17 +168,23 @@ Button_init(ButtonObject *self, PyObject *args, PyObject *keywords)
         return -1;
 
     button = [[Button alloc] initWithObject: (PyObject*)self];
-    color = [NSColor lightGrayColor];
-    [[button cell] setBackgroundColor: color];
-
+    Py_INCREF(systemTextColor);
     Py_INCREF(systemWindowBackgroundColor);
+    Py_XDECREF(self->foreground);
+    Py_XDECREF(self->background);
+    self->foreground = systemTextColor;
     self->background = systemWindowBackgroundColor;
 
+    color = [NSColor colorWithCalibratedRed: 255. * self->background->rgba[0]
+                                      green: 255. * self->background->rgba[1]
+                                       blue: 255. * self->background->rgba[2]
+                                      alpha: 255. * self->background->rgba[3]];
+
+    [[button cell] setBackgroundColor: color];
+
     s = [[NSString alloc] initWithCString: text encoding: NSUTF8StringEncoding];
-    fprintf(stderr, "Should call [button setTitle: s]\n"); fflush(stderr);
-/*
     [button setTitle: s];
-*/
+
     [s release];
     self->button = button;
 
@@ -199,6 +208,8 @@ Button_dealloc(ButtonObject* self)
         [button release];
         [pool release];
     }
+    Py_XDECREF(self->foreground);
+    Py_XDECREF(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -331,37 +342,31 @@ static char Button_command__doc__[] = "Python command to be executed when the bu
 
 static PyObject* Button_get_background(ButtonObject* self, void* closure)
 {
-    short rgba[4];
-    CGFloat red;
-    CGFloat green;
-    CGFloat blue;
-    CGFloat alpha;
-    Button* button = self->button;
-    NSColor* color = [[button cell] backgroundColor];
-    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
-    [color getRed: &red green: &green blue: &blue alpha: &alpha];
-    rgba[0] = (short)round(red*255);
-    rgba[1] = (short)round(green*255);
-    rgba[2] = (short)round(blue*255);
-    rgba[3] = (short)round(alpha*255);
-    return Color_create(rgba);
+    Py_INCREF(self->background);
+    return (PyObject*) self->background;
 }
 
 static int
 Button_set_background(ButtonObject* self, PyObject* value, void* closure)
 {
-    short rgba[4];
     CGFloat red;
     CGFloat green;
     CGFloat blue;
     CGFloat alpha;
     NSColor* color;
     Button* button = self->button;
-    if (!Color_converter(value, rgba)) return -1;
-    red = rgba[0] / 255.;
-    green = rgba[1] / 255.;
-    blue = rgba[2] / 255.;
-    alpha = rgba[3] / 255.;
+
+    if (!Py_IS_TYPE(value, &ColorType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Color object");
+        return -1;
+    }
+    Py_INCREF(value);
+    Py_DECREF(self->background);
+    self->background = (ColorObject*) value;
+    red = self->background->rgba[0] / 255.;
+    green = self->background->rgba[1] / 255.;
+    blue = self->background->rgba[2] / 255.;
+    alpha = self->background->rgba[3] / 255.;
     color = [NSColor colorWithCalibratedRed: red
                                       green: green
                                        blue: blue
@@ -375,55 +380,33 @@ static char Button_background__doc__[] = "background color.";
 
 static PyObject* Button_get_foreground(ButtonObject* self, void* closure)
 {
-    short rgba[4];
-    CGFloat red;
-    CGFloat green;
-    CGFloat blue;
-    CGFloat alpha;
-    fprintf(stderr, "Should call [button attributedTitle]\n"); fflush(stderr);
-    red = 0.0;
-    green = 0.0;
-    blue = 0.0;
-    alpha = 0.0;
-/*
-    Button* button = self->button;
-    NSAttributedString* text = [button attributedTitle];
-    NSColor* color = [text attribute: NSForegroundColorAttributeName
-                             atIndex: 0
-                      effectiveRange: NULL];
-    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
-    [color getRed: &red green: &green blue: &blue alpha: &alpha];
-*/
-    rgba[0] = (short)round(red*255);
-    rgba[1] = (short)round(green*255);
-    rgba[2] = (short)round(blue*255);
-    rgba[3] = (short)round(alpha*255);
-    return Color_create(rgba);
+    Py_INCREF(self->foreground);
+    return (PyObject*) self->foreground;
 }
 
 static int
 Button_set_foreground(ButtonObject* self, PyObject* value, void* closure)
 {
-    short rgba[4];
     CGFloat red;
     CGFloat green;
     CGFloat blue;
     CGFloat alpha;
-/*
     NSColor* color;
     NSRange range;
-*/
     Button* button = self->button;
-/*
     NSMutableAttributedString *text;
-*/
-    if (!Color_converter(value, rgba)) return -1;
-    red = rgba[0] / 255.;
-    green = rgba[1] / 255.;
-    blue = rgba[2] / 255.;
-    alpha = rgba[3] / 255.;
-    fprintf(stderr, "Should call [button attributedTitle]\n"); fflush(stderr);
-/*
+
+    if (!Py_IS_TYPE(value, &ColorType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Color object");
+        return -1;
+    }
+    Py_INCREF(value);
+    Py_DECREF(self->foreground);
+    self->foreground = (ColorObject*) value;
+    red = self->foreground->rgba[0] / 255.;
+    green = self->foreground->rgba[1] / 255.;
+    blue = self->foreground->rgba[2] / 255.;
+    alpha = self->foreground->rgba[3] / 255.;
     color = [NSColor colorWithCalibratedRed: red
                                       green: green
                                        blue: blue
@@ -434,7 +417,6 @@ Button_set_foreground(ButtonObject* self, PyObject* value, void* closure)
                   value: color
                   range: range];
     [button setAttributedTitle:text];
-*/
     button.needsDisplay = YES;
     return 0;
 }
