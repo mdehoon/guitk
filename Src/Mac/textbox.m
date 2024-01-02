@@ -16,6 +16,7 @@
 typedef struct {
     WidgetObject widget;
     NSFont* font;
+    ColorObject* background;
     PyObject* minimum_size;
     PyObject* command;
 } TextboxObject;
@@ -70,6 +71,7 @@ Textbox_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     TextboxObject *self = (TextboxObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     Py_INCREF(Py_None);
+    self->background = NULL;
     self->command = Py_None;;
     self->minimum_size = NULL;
     return (PyObject*)self;
@@ -87,8 +89,17 @@ Textbox_init(TextboxObject *self, PyObject *args, PyObject *keywords)
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O&", kwlist, string_converter, &text))
         return -1;
 
+
+    Py_INCREF(systemWindowBackgroundColor);
+    Py_XDECREF(self->background);
+    self->background = systemWindowBackgroundColor;
+
+    color = [NSColor colorWithCalibratedRed: self->background->rgba[0] / 255.
+                                      green: self->background->rgba[1] / 255.
+                                       blue: self->background->rgba[2] / 255.
+                                      alpha: self->background->rgba[3] / 255.];
+
     textbox = [[Textbox alloc] initWithObject: (PyObject*)self];
-    color = [NSColor lightGrayColor];
     [[textbox cell] setBackgroundColor: color];
     [textbox setStringValue: (NSString*)text];
     [textbox setBordered: YES];
@@ -119,6 +130,7 @@ Textbox_dealloc(TextboxObject* self)
         [textbox release];
         [pool release];
     }
+    Py_XDECREF(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -277,40 +289,34 @@ static char Textbox_command__doc__[] = "Python command to be executed when the t
 
 static PyObject* Textbox_get_background(TextboxObject* self, void* closure)
 {
-    short rgba[4];
-    CGFloat red;
-    CGFloat green;
-    CGFloat blue;
-    CGFloat alpha;
-    WidgetObject* widget = (WidgetObject*)self;
-    Textbox* textbox = (Textbox*) widget->view;
-    NSColor* color = [[textbox cell] backgroundColor];
-    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
-    [color getRed: &red green: &green blue: &blue alpha: &alpha];
-    rgba[0] = (short)round(red*255);
-    rgba[1] = (short)round(green*255);
-    rgba[2] = (short)round(blue*255);
-    rgba[3] = (short)round(alpha*255);
-    return Color_create(rgba);
+    Py_INCREF(self->background);
+    return (PyObject*) self->background;
 }
 
 static int
 Textbox_set_background(TextboxObject* self, PyObject* value, void* closure)
 {
-    short rgba[4];
     CGFloat red;
     CGFloat green;
     CGFloat blue;
     CGFloat alpha;
     NSColor* color;
     BOOL editable;
+
     WidgetObject* widget = (WidgetObject*)self;
     Textbox* textbox = (Textbox*) widget->view;
-    if (!Color_converter(value, rgba)) return -1;
-    red = rgba[0] / 255.;
-    green = rgba[1] / 255.;
-    blue = rgba[2] / 255.;
-    alpha = rgba[3] / 255.;
+
+    if (!Py_IS_TYPE(value, &ColorType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Color object");
+        return -1;
+    }
+    Py_INCREF(value);
+    Py_DECREF(self->background);
+    self->background = (ColorObject*) value;
+    red = self->background->rgba[0] / 255.;
+    green = self->background->rgba[1] / 255.;
+    blue = self->background->rgba[2] / 255.;
+    alpha = self->background->rgba[3] / 255.;
     color = [NSColor colorWithCalibratedRed: red
                                       green: green
                                        blue: blue
