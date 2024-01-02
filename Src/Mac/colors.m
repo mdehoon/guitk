@@ -380,6 +380,7 @@ PyTypeObject ColorType = {
 
 ColorObject* transparent = NULL;
 ColorObject* black = NULL;
+ColorObject* systemTextColor = NULL;
 ColorObject* systemWindowBackgroundColor = NULL;
 
 
@@ -392,14 +393,20 @@ ColorObject* systemWindowBackgroundColor = NULL;
                        context:(void *)context;
 @end
 
+static void _set_system_color(ColorObject* object, NSColor* color)
+{
+    color = [color colorUsingColorSpace:[NSColorSpace genericRGBColorSpace]];
+    object->rgba[0] = (short) round(255.0 * color.redComponent);
+    object->rgba[1] = (short) round(255.0 * color.greenComponent);
+    object->rgba[2] = (short) round(255.0 * color.blueComponent);
+    object->rgba[3] = (short) round(255.0 * color.alphaComponent);
+}
+
 static void _set_system_colors(void) {
-    NSColor* color;
-    color = [[NSColor windowBackgroundColor]
-             colorUsingColorSpace:[NSColorSpace genericRGBColorSpace]];
-    systemWindowBackgroundColor->rgba[0] = (short) round(255.0 * color.redComponent);
-    systemWindowBackgroundColor->rgba[1] = (short) round(255.0 * color.greenComponent);
-    systemWindowBackgroundColor->rgba[2] = (short) round(255.0 * color.blueComponent);
-    systemWindowBackgroundColor->rgba[3] = (short) round(255.0 * color.alphaComponent);
+    _set_system_color(systemTextColor,
+                      [NSColor textColor]);
+    _set_system_color(systemWindowBackgroundColor,
+                      [NSColor windowBackgroundColor]);
 }
 
 @implementation AppearanceObserver
@@ -437,6 +444,9 @@ bool _init_default_colors(void)
     black->rgba[1] = 0;
     black->rgba[2] = 0;
     black->rgba[3] = 255;
+
+    systemTextColor = (ColorObject*)ColorType.tp_alloc(&ColorType, 0);
+    if (!systemTextColor) goto error;
 
     systemWindowBackgroundColor = (ColorObject*)ColorType.tp_alloc(&ColorType, 0);
     if (!systemWindowBackgroundColor) goto error;

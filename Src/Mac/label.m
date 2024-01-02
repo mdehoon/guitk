@@ -126,10 +126,9 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!self) return NULL;
     widget = (WidgetObject*)self;
     widget->view = nil;
-    Py_INCREF(black);
-    // Py_INCREF(transparent);
+    Py_INCREF(systemTextColor);
     Py_INCREF(systemWindowBackgroundColor);
-    self->foreground = black;
+    self->foreground = systemTextColor;
     self->background = systemWindowBackgroundColor;
     self->text = NULL;
     self->font = NULL;
