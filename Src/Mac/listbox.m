@@ -13,13 +13,12 @@
 - (Listbox*)initWithObject:(PyObject*)obj;
 - (id)tableView:(NSTableView *)aTableView objectValueForTableColumn:(NSTableColumn *)aTableColumn row:(NSInteger)rowIndex;
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView;
-- (NSCell *)tableView:(NSTableView *)tableView dataCellForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row;
 @end
 
 typedef struct {
     WidgetObject widget;
     NSFont* font;
-    NSColor* foreground;
+    ColorObject* background;
     NSMutableArray* array;
 } ListboxObject;
 
@@ -70,14 +69,6 @@ typedef struct {
    long recordCount = [listbox->array count];
    return recordCount;
 }
-
-- (NSCell *)tableView:(NSTableView *)tableView dataCellForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
-    NSTextFieldCell *cell = [tableColumn dataCell];
-    ListboxObject* object = (ListboxObject*) _object;
-    NSColor* foreground = object->foreground;
-    [cell setTextColor: foreground];
-    return cell;
-}
 @end
 
 static PyObject*
@@ -85,6 +76,8 @@ Listbox_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     ListboxObject *self = (ListboxObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
+    self->background = NULL;
+
     Py_INCREF(Py_None);
     return (PyObject*)self;
 }
@@ -95,6 +88,7 @@ Listbox_init(ListboxObject *self, PyObject *args, PyObject *keywords)
     Listbox *listbox;
     PyObject* multiple = Py_False;
     WidgetObject* widget;
+    NSColor* color;
 
     static char* kwlist[] = {"multiple", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O", kwlist,
@@ -106,12 +100,23 @@ Listbox_init(ListboxObject *self, PyObject *args, PyObject *keywords)
         return -1;
     }
     self->array = [[NSMutableArray alloc] init];
-    self->foreground = [NSColor blackColor];
-    [self->foreground retain];
+
     listbox = [[Listbox alloc] initWithObject: (PyObject*)self];
     if (multiple==Py_True) listbox.allowsMultipleSelection = YES;
     widget = (WidgetObject*)self;
     widget->view = listbox;
+
+    Py_INCREF(systemWindowBackgroundColor);
+    Py_XDECREF(self->background);
+    self->background = systemWindowBackgroundColor;
+
+    color = [NSColor colorWithCalibratedRed: self->background->rgba[0] / 255.
+                                      green: self->background->rgba[1] / 255.
+                                       blue: self->background->rgba[2] / 255.
+                                      alpha: self->background->rgba[3] / 255.];
+    listbox.backgroundColor = color;
+    listbox.usesAlternatingRowBackgroundColors = NO;
+
 
     return 0;
 }
@@ -130,13 +135,13 @@ Listbox_dealloc(ListboxObject* self)
 {
     WidgetObject* widget = (WidgetObject*)self;
     Listbox* listbox = (Listbox*) widget->view;
-    [self->foreground release];
     if (listbox)
     {
         NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
         [listbox release];
         [pool release];
     }
+    Py_XDECREF(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -425,27 +430,22 @@ static char Listbox_selected__doc__[] = "indices of currently selected items.";
 
 static PyObject* Listbox_get_background(ListboxObject* self, void* closure)
 {
-    short rgba[4];
-    CGFloat red;
-    CGFloat green;
-    CGFloat blue;
-    CGFloat alpha;
     WidgetObject* widget = (WidgetObject*)self;
     Listbox* listbox = (Listbox*) widget->view;
-    NSColor* color = [[listbox cell] backgroundColor];
-    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
-    [color getRed: &red green: &green blue: &blue alpha: &alpha];
-    rgba[0] = (short)round(red*255);
-    rgba[1] = (short)round(green*255);
-    rgba[2] = (short)round(blue*255);
-    rgba[3] = (short)round(alpha*255);
-    return Color_create(rgba);
+    NSColor* c = [listbox backgroundColor];
+    fprintf(stderr, "[listbox backgroundColor] returns %f, %f, %f, %f\n",
+        [c redComponent],
+        [c greenComponent],
+        [c blueComponent],
+        [c alphaComponent]);
+
+    Py_INCREF(self->background);
+    return (PyObject*) self->background;
 }
 
 static int
 Listbox_set_background(ListboxObject* self, PyObject* value, void* closure)
 {
-    short rgba[4];
     CGFloat red;
     CGFloat green;
     CGFloat blue;
@@ -453,73 +453,32 @@ Listbox_set_background(ListboxObject* self, PyObject* value, void* closure)
     NSColor* color;
     WidgetObject* widget = (WidgetObject*)self;
     Listbox* listbox = (Listbox*) widget->view;
-    if (!Color_converter(value, rgba)) return -1;
-    red = rgba[0] / 255.;
-    green = rgba[1] / 255.;
-    blue = rgba[2] / 255.;
-    alpha = rgba[3] / 255.;
+    if (!Py_IS_TYPE(value, &ColorType)) {
+        PyErr_SetString(PyExc_ValueError, "expected a Color object");
+        return -1;
+    }
+    Py_INCREF(value);
+    Py_DECREF(self->background);
+    self->background = (ColorObject*) value;
+    red = self->background->rgba[0] / 255.;
+    green = self->background->rgba[1] / 255.;
+    blue = self->background->rgba[2] / 255.;
+    alpha = self->background->rgba[3] / 255.;
     color = [NSColor colorWithCalibratedRed: red
                                       green: green
                                        blue: blue
                                       alpha: alpha];
-    [listbox setBackgroundColor: color];
+    listbox.backgroundColor = color;
     listbox.needsDisplay = YES;
     return 0;
 }
 
 static char Listbox_background__doc__[] = "background color.";
 
-static PyObject* Listbox_get_foreground(ListboxObject* self, void* closure)
-{
-    short rgba[4];
-    CGFloat red;
-    CGFloat green;
-    CGFloat blue;
-    CGFloat alpha;
-    NSColor* color = self->foreground;
-    color = [color colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
-    [color getRed: &red green: &green blue: &blue alpha: &alpha];
-    rgba[0] = (short)round(red*255);
-    rgba[1] = (short)round(green*255);
-    rgba[2] = (short)round(blue*255);
-    rgba[3] = (short)round(alpha*255);
-    return Color_create(rgba);
-}
-
-static int
-Listbox_set_foreground(ListboxObject* self, PyObject* value, void* closure)
-{
-    short rgba[4];
-    CGFloat red;
-    CGFloat green;
-    CGFloat blue;
-    CGFloat alpha;
-    NSColor* color;
-    WidgetObject* widget = (WidgetObject*)self;
-    Listbox* listbox = (Listbox*) widget->view;
-    if (!Color_converter(value, rgba)) return -1;
-    red = rgba[0] / 255.;
-    green = rgba[1] / 255.;
-    blue = rgba[2] / 255.;
-    alpha = rgba[3] / 255.;
-    color = [NSColor colorWithCalibratedRed: red
-                                      green: green
-                                       blue: blue
-                                      alpha: alpha];
-    [self->foreground release];
-    [color retain];
-    self->foreground = color;
-    listbox.needsDisplay = YES;
-    return 0;
-}
-
-static char Listbox_foreground__doc__[] = "foreground color.";
-
 static PyGetSetDef Listbox_getseters[] = {
     {"minimum_size", (getter)Listbox_get_minimum_size, (setter)NULL, Listbox_minimum_size__doc__, NULL},
     {"selected", (getter)Listbox_get_selected, (setter)Listbox_set_selected, Listbox_selected__doc__, NULL},
     {"background", (getter)Listbox_get_background, (setter)Listbox_set_background, Listbox_background__doc__, NULL},
-    {"foreground", (getter)Listbox_get_foreground, (setter)Listbox_set_foreground, Listbox_foreground__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 
