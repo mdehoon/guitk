@@ -7,8 +7,6 @@
 
 typedef struct TimerObject TimerObject;
 
-typedef struct SocketObject SocketObject;
-
 struct TimerObject {
     PyObject_HEAD
     unsigned long time;
@@ -101,15 +99,14 @@ check_timers(void)
         do {
             difference = timer->time - now;
             if (difference <= 0) return 0;
-            if (difference < timeout) timeout = difference;
+            if ((unsigned long)difference < timeout) timeout = difference;
             timer = timer->next;
         } while (timer);
     }
     return timeout;
 }
 
-static unsigned long
-process_timers(void)
+static unsigned long process_timers(void)
 {
     struct timeval tp;
     unsigned long now;
@@ -137,7 +134,7 @@ process_timers(void)
                 result = NULL;
                 arguments = Py_BuildValue("(O)", timer);
                 if (arguments) {
-                    result = PyEval_CallObject(timer->callback, arguments);
+                    result = PyObject_CallObject(timer->callback, arguments);
                     Py_DECREF(arguments);
                 }
                 if (result) Py_DECREF(result);
@@ -147,7 +144,7 @@ process_timers(void)
                 timer = next;
             }
             else {
-                if (difference < timeout) timeout = difference;
+                if ((unsigned long)difference < timeout) timeout = difference;
                 timer = timer->next;
             }
         } while (timer);
@@ -194,14 +191,6 @@ PyEvents_RemoveTimer(PyObject* unused, PyObject* argument)
     Py_INCREF(Py_None);
     return Py_None;
 }
-
-struct SocketObject {
-    PyObject_HEAD
-    int fd;
-    int mask;
-    PyObject* callback;
-    SocketObject* next;
-};
 
 static PyTypeObject SocketType = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -339,7 +328,7 @@ PyEvents_WaitForEvent(PyObject* unused, PyObject* args)
     fd_set errorfds;
     struct timeval timeout;
     unsigned long waittime;
-    long milliseconds;
+    unsigned long milliseconds;
     long result = 0;
     if (!PyArg_ParseTuple(args, "k", &milliseconds)) return NULL;
     waittime = check_timers();
@@ -351,7 +340,7 @@ PyEvents_WaitForEvent(PyObject* unused, PyObject* args)
         if (select(nfds, &readfds, &writefds, &errorfds, &timeout)==-1)
             return PyErr_SetFromErrno(PyExc_RuntimeError);
     }
-    return PyInt_FromLong(result);
+    return PyLong_FromLong(result);
 }
 
 static int wait_for_stdin(void)
@@ -361,7 +350,7 @@ static int wait_for_stdin(void)
     int fd_stdin = fileno(stdin);
     int ready;
     int nfds;
-    long int waittime;
+    unsigned long waittime;
     fd_set readfds;
     fd_set writefds;
     fd_set errorfds;
@@ -410,7 +399,7 @@ static int wait_for_stdin(void)
 
                 if (arguments) {
                     PyObject* callback = socket->callback;
-                    result = PyEval_CallObject(callback, arguments);
+                    result = PyObject_CallObject(callback, arguments);
                     Py_DECREF(arguments);
                 }
                 if (result) Py_DECREF(result);

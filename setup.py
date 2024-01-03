@@ -15,41 +15,51 @@ except ImportError:
 
 extensions = []
 
-sources = ["Src/Mac/events.m",
-          ]
+include_dirs = ['Src','Src/Generic']
+# if sys.platform == 'darwin':
+if False:
+    event_sources = ["Src/Mac/events.m",
+              ]
+    gui_sources = ["Src/Mac/gui.m",
+                   "Src/Mac/window.m",
+                   "Src/Mac/image.m",
+                   "Src/Mac/text.m",
+                   "Src/Mac/widgets.m",
+                   "Src/Mac/layout.m",
+                   "Src/Mac/font.m",
+                   "Src/Mac/frame.m",
+                   "Src/Mac/separator.m",
+                   "Src/Mac/label.m",
+                   "Src/Mac/button.m",
+                   "Src/Mac/checkbox.m",
+                   "Src/Mac/textbox.m",
+                   "Src/Mac/listbox.m",
+                   "Src/Mac/colors.m",
+                  ]
+    extra_link_args = ['-framework', 'Cocoa']
+else:
+    event_sources = ["Src/X11/events.c",
+                    ]
+    gui_sources = ["Src/X11/window.c",
+                   "Src/X11/graphics.c",
+                   "Src/X11/gui.c",
+                  ]
+    include_dirs.append("/opt/X11/include")
+    extra_link_args = ["-L/opt/X11/lib/", "-lX11"]
 
 extension = Extension("guitk.events",
-                      sources,
-                      include_dirs=['Src','Src/Generic'],
+                      event_sources,
+                      include_dirs=include_dirs,
+                      extra_link_args=extra_link_args,
                       )
-
-extension.extra_link_args.extend(['-framework', 'Cocoa'])
 
 extensions.append(extension)
 
-sources = ["Src/Mac/gui.m",
-           "Src/Mac/window.m",
-           "Src/Mac/image.m",
-           "Src/Mac/text.m",
-           "Src/Mac/widgets.m",
-           "Src/Mac/layout.m",
-           "Src/Mac/font.m",
-           "Src/Mac/frame.m",
-           "Src/Mac/separator.m",
-           "Src/Mac/label.m",
-           "Src/Mac/button.m",
-           "Src/Mac/checkbox.m",
-           "Src/Mac/textbox.m",
-           "Src/Mac/listbox.m",
-           "Src/Mac/colors.m",
-          ]
-
 extension = Extension("guitk.gui",
-                      sources,
-                      include_dirs=['Src','Src/Generic'],
+                      gui_sources,
+                      include_dirs=include_dirs,
+                      extra_link_args=extra_link_args,
                       )
-
-extension.extra_link_args.extend(['-framework', 'Cocoa'])
 
 extensions.append(extension)
 

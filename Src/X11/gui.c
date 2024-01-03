@@ -126,19 +126,17 @@ PyObject* PyInit_gui(void)
         goto error;
     if (PyType_Ready(&LabelType) < 0)
         goto error;
-*/
     if (PyType_Ready(&ButtonType) < 0)
         goto error;
-/*
     if (PyType_Ready(&CheckboxType) < 0)
         goto error;
     if (PyType_Ready(&TextboxType) < 0)
         goto error;
     if (PyType_Ready(&ListboxType) < 0)
         goto error;
-*/
     if (PyType_Ready(&ColorType) < 0)
         goto error;
+*/
 
     Py_INCREF(&WindowType);
     Py_INCREF(&GraphicsContextType);
@@ -149,14 +147,12 @@ PyObject* PyInit_gui(void)
     Py_INCREF(&SeparatorType);
     Py_INCREF(&ImageType);
     Py_INCREF(&LabelType);
-*/
     Py_INCREF(&ButtonType);
-/*
     Py_INCREF(&CheckboxType);
     Py_INCREF(&TextboxType);
     Py_INCREF(&ListboxType);
-*/
     Py_INCREF(&ColorType);
+*/
 
     if (PyModule_AddObject(module, "Window", (PyObject*) &WindowType) < 0)
         goto error;
@@ -175,19 +171,17 @@ PyObject* PyInit_gui(void)
         goto error;
     if (PyModule_AddObject(module, "Label", (PyObject*) &LabelType) < 0)
         goto error;
-*/
     if (PyModule_AddObject(module, "Button", (PyObject*) &ButtonType) < 0)
         goto error;
-/*
     if (PyModule_AddObject(module, "Checkbox", (PyObject*) &CheckboxType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Textbox", (PyObject*) &TextboxType) < 0)
         goto error;
     if (PyModule_AddObject(module, "Listbox", (PyObject*) &ListboxType) < 0)
         goto error;
-*/
     if (PyModule_AddObject(module, "Color", (PyObject*) &ColorType) < 0)
         goto error;
+*/
 
     return module;
 error:

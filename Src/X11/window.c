@@ -114,7 +114,7 @@ static WindowObject* Window_retrieve_object(Window window) {
     return object;
 }
 
-static void event_callback(IdleObject* idle)
+static void event_callback(void* idle)
 {
     XEvent event;
     Window window;
@@ -158,7 +158,7 @@ static void event_callback(IdleObject* idle)
                 window = event.xclient.window;
                 object = Window_retrieve_object(window);
                 if (!object) continue;
-                if (event.xclient.data.l[0] == wm_delete_atom) {
+                if (event.xclient.data.l[0] == (long)wm_delete_atom) {
                     XWithdrawWindow(display, window, screen);
                 }
                 else printf("Unknown client message\n");
@@ -239,16 +239,18 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
             PyErr_SetString(PyExc_RuntimeError, "failed to open display");
             return -1;
         }
+/*
         if (import_events() < 0) {
             PyErr_SetString(PyExc_RuntimeError, "failed to import events");
             return -1;
         }
+*/
         fd = ConnectionNumber(display);
+/*
         if (PyEvents_create_socket(event_socket_callback, fd, PyEvents_READABLE, 0) < 0) {
             PyErr_SetString(PyExc_RuntimeError, "failed to create socket");
             return -1;
         }
-/*
         if (PyEvents_create_idle(event_callback) < 0) {
             PyErr_SetString(PyExc_RuntimeError, "failed to create idle function");
             return -1;
