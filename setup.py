@@ -16,8 +16,7 @@ except ImportError:
 extensions = []
 
 include_dirs = ['Src','Src/Generic']
-# if sys.platform == 'darwin':
-if False:
+if sys.platform == 'darwin':
     event_sources = ["Src/Mac/events.m",
               ]
     gui_sources = ["Src/Mac/gui.m",
