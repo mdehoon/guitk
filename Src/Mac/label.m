@@ -55,6 +55,54 @@ typedef struct {
     PyObject* minimum_size;
 } LabelObject;
 
+
+static void
+_compute_anchor(Anchor anchor,
+                int padx, int pady,
+                int innerWidth, int innerHeight, CGFloat* x, CGFloat* y)
+{
+    switch (anchor) {
+    case NW:
+    case W:
+    case SW:
+        // *xPtr = Tk_InternalBorderLeft(tkwin) + padx;
+        break;
+
+    case N:
+    case C:
+    case S:
+        // *xPtr = (Tk_Width(tkwin) - innerWidth - Tk_InternalBorderLeft(tkwin) -
+          //       Tk_InternalBorderRight(tkwin)) / 2 +
+            //     Tk_InternalBorderLeft(tkwin);
+        break;
+
+    default:
+        // *xPtr = Tk_Width(tkwin) - Tk_InternalBorderRight(tkwin) - padx
+          //       - innerWidth;
+        break;
+    }
+    switch (anchor) {
+    case NW:
+    case N:
+    case NE:
+        // *yPtr = Tk_InternalBorderTop(tkwin) + padY;
+        break;
+
+    case W:
+    case C:
+    case E:
+        // *yPtr = (Tk_Height(tkwin) - innerHeight- Tk_InternalBorderTop(tkwin) -
+          //       Tk_InternalBorderBottom(tkwin)) / 2 +
+            //     Tk_InternalBorderTop(tkwin);
+        break;
+
+    default:
+        // *yPtr = Tk_Height(tkwin) - Tk_InternalBorderBottom(tkwin) - padY
+          //       - innerHeight;
+        break;
+    }
+}
+
 @implementation LabelView
 - (PyObject*)object
 {
@@ -96,17 +144,20 @@ typedef struct {
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
-    if (object->state == ACTIVE) {
-        red = object->active_background->rgba[0];
-        green = object->active_background->rgba[1];
-        blue = object->active_background->rgba[2];
-        alpha = object->active_background->rgba[3];
-    }
-    else {
-        red = object->background->rgba[0];
-        green = object->background->rgba[1];
-        blue = object->background->rgba[2];
-        alpha = object->background->rgba[3];
+    switch (object->state) {
+        case ACTIVE:
+            red = object->active_background->rgba[0];
+            green = object->active_background->rgba[1];
+            blue = object->active_background->rgba[2];
+            alpha = object->active_background->rgba[3];
+            break;
+        case NORMAL:
+        case DISABLED:
+            red = object->background->rgba[0];
+            green = object->background->rgba[1];
+            blue = object->background->rgba[2];
+            alpha = object->background->rgba[3];
+            break;
     }
 
     CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
@@ -135,13 +186,31 @@ typedef struct {
     x -= 0.5 * width;
     y += 0.5 * height;
     y -= descent;
-    CGAffineTransform transform = CGAffineTransformMakeScale (1.0, -1.0); 
+    _compute_anchor(object->anchor, object->padx, object->pady,
+                    width, height, &x, &y);
+    CGAffineTransform transform = CGAffineTransformMakeScale(1.0, -1.0);
     CGContextSetTextMatrix(cr, transform);
     CGContextSetTextPosition(cr, x, y);
-    red = object->foreground->rgba[0];
-    green = object->foreground->rgba[1];
-    blue = object->foreground->rgba[2];
-    alpha = object->foreground->rgba[3];
+    switch (object->state) {
+        case NORMAL:
+            red = object->foreground->rgba[0];
+            green = object->foreground->rgba[1];
+            blue = object->foreground->rgba[2];
+            alpha = object->foreground->rgba[3];
+            break;
+        case ACTIVE:
+            red = object->active_foreground->rgba[0];
+            green = object->active_foreground->rgba[1];
+            blue = object->active_foreground->rgba[2];
+            alpha = object->active_foreground->rgba[3];
+            break;
+        case DISABLED:
+            red = object->disabled_foreground->rgba[0];
+            green = object->disabled_foreground->rgba[1];
+            blue = object->disabled_foreground->rgba[2];
+            alpha = object->disabled_foreground->rgba[3];
+            break;
+    }
     CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     CTLineDraw(line, cr);
     CFRelease(line);
@@ -402,13 +471,13 @@ Label_dealloc(LabelObject* self)
     if (label) [label release];
     if (font) Py_DECREF(font);
     if (text) CFRelease(text);
-    Py_DECREF(self->foreground);
-    Py_DECREF(self->background);
-    Py_DECREF(self->active_foreground);
-    Py_DECREF(self->active_background);
-    Py_DECREF(self->disabled_foreground);
-    Py_DECREF(self->highlight_background);
-    Py_DECREF(self->highlight_color);
+    Py_XDECREF(self->foreground);
+    Py_XDECREF(self->background);
+    Py_XDECREF(self->active_foreground);
+    Py_XDECREF(self->active_background);
+    Py_XDECREF(self->disabled_foreground);
+    Py_XDECREF(self->highlight_background);
+    Py_XDECREF(self->highlight_color);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -680,7 +749,7 @@ static PyObject* Label_get_state(LabelObject* self, void* closure)
         case DISABLED: return PyUnicode_FromString("DISABLED");
         default:
             PyErr_Format(PyExc_RuntimeError,
-                "expected NORMAL (%d), ACTIVE (%d), or DISABLED (%d), got '%d'",
+                "expected NORMAL (%d), ACTIVE (%d), or DISABLED (%d), got %d",
                 NORMAL, ACTIVE, DISABLED, self->state);
             return NULL;
     }
@@ -702,8 +771,9 @@ Label_set_state(LabelObject* self, PyObject* value, void* closure)
     else if (PyOS_stricmp(state, "ACTIVE")==0) self->state = ACTIVE;
     else if (PyOS_stricmp(state, "DISABLED")==0) self->state = DISABLED;
     else {
-        PyErr_SetString(PyExc_ValueError,
-            "expected 'NORMAL', 'ACTIVE', 'DISABLED (case-insensitive)'");
+        PyErr_Format(PyExc_ValueError,
+            "expected 'NORMAL', 'ACTIVE', 'DISABLED (case-insensitive)' "
+            "got %s", state);
         return -1;
     }
     label.needsDisplay = YES;
@@ -711,6 +781,154 @@ Label_set_state(LabelObject* self, PyObject* value, void* closure)
 }
 
 static char Label_state__doc__[] = "state of the label ('NORMAL', 'ACTIVE', or 'DISABLED').";
+
+static PyObject* Label_get_take_focus(LabelObject* self, void* closure)
+{
+    if (self->take_focus) Py_RETURN_TRUE;
+    else Py_RETURN_FALSE;
+}
+
+static int
+Label_set_take_focus(LabelObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (value == Py_True) self->take_focus = true;
+    else if (value == Py_False) self->take_focus = false;
+    else {
+        PyErr_SetString(PyExc_ValueError, "expected either True or False");
+        return -1;
+    }
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_take_focus__doc__[] = "True if the label accepts the focus during keyboard traversal, False otherwise.";
+
+static PyObject* Label_get_relief(LabelObject* self, void* closure)
+{
+    switch (self->relief) {
+        case RAISED: return PyUnicode_FromString("RAISED");
+        case SUNKEN: return PyUnicode_FromString("SUNKEN");
+        case FLAT: return PyUnicode_FromString("FLAT");
+        case RIDGE: return PyUnicode_FromString("RIDGE");
+        case SOLID: return PyUnicode_FromString("SOLID");
+        case GROOVE: return PyUnicode_FromString("GROOVE");
+        default:
+            PyErr_Format(PyExc_RuntimeError,
+                "expected RAISED (%d), SUNKEN (%d), FLAT (%d), RIDGE (%d) "
+                "SOLID (%d), or GROOVE (%d), got %d",
+                RAISED, SUNKEN, FLAT, RIDGE, SOLID, GROOVE, self->relief);
+            return NULL;
+    }
+}
+
+static int
+Label_set_relief(LabelObject* self, PyObject* value, void* closure)
+{
+    const char* relief;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (!PyUnicode_Check(value)) {
+        PyErr_SetString(PyExc_ValueError, "expected a string");
+        return -1;
+    }
+    relief = PyUnicode_AsUTF8(value);
+    if (!relief) return -1;
+    if (PyOS_stricmp(relief, "RAISED")==0) self->relief = RAISED;
+    else if (PyOS_stricmp(relief, "SUNKEN")==0) self->relief = SUNKEN;
+    else if (PyOS_stricmp(relief, "FLAT")==0) self->relief = FLAT;
+    else if (PyOS_stricmp(relief, "RIDGE")==0) self->relief = RIDGE;
+    else if (PyOS_stricmp(relief, "SOLID")==0) self->relief = SOLID;
+    else if (PyOS_stricmp(relief, "GROOVE")==0) self->relief = GROOVE;
+    else {
+        PyErr_Format(PyExc_ValueError,
+            "expected 'RAISED', 'SUNKEN', 'FLAT', 'RIDGE', 'SOLID', 'GROOVE' "
+            "(case-insensitive), got %s.", relief);
+        return -1;
+    }
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_relief__doc__[] = "desired 3D effect of the label ('NORMAL', 'ACTIVE', or 'DISABLED').";
+
+static PyObject* Label_get_border_width(LabelObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->border_width);
+}
+
+static int
+Label_set_border_width(LabelObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    const CGFloat border_width = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    self->border_width = border_width;
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_border_width__doc__[] = "width of the 3-D border to draw around the outside of the label.";
+
+static PyObject* Label_get_padx(LabelObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->padx);
+}
+
+static int
+Label_set_padx(LabelObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    const CGFloat padx = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    self->padx = padx;
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_padx__doc__[] = "extra space to request for the label in the X-direction.";
+
+static PyObject* Label_get_pady(LabelObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->pady);
+}
+
+static int
+Label_set_pady(LabelObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    const CGFloat pady = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    self->pady = pady;
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_pady__doc__[] = "extra space to request for the label in the Y-direction.";
+
+static PyObject* Label_get_highlight_thickness(LabelObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->highlight_thickness);
+}
+
+static int
+Label_set_highlight_thickness(LabelObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    const CGFloat highlight_thickness = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    self->highlight_thickness = highlight_thickness;
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_highlight_thickness__doc__[] = "width of the highlight rectangle to draw around the outside of the label when it has the input focus.";
+
 static PyObject* Label_get_anchor(LabelObject* self, void* closure)
 {
     switch (self->anchor) {
@@ -724,7 +942,7 @@ static PyObject* Label_get_anchor(LabelObject* self, void* closure)
         case NW: return PyUnicode_FromString("NW");
         case C: return PyUnicode_FromString("CENTER");
         default:
-            PyErr_Format(PyExc_ValueError,
+            PyErr_Format(PyExc_RuntimeError,
                 "expected N (%d), NE (%d), E (%d), SE (%d), S (%d), SW (%d), "
                 "W (%d), NW (%d), or C (%d), got %d",
                 N, NE, E, SE, S, SW, W, NW, C, self->anchor);
@@ -754,8 +972,9 @@ Label_set_anchor(LabelObject* self, PyObject* value, void* closure)
     else if (PyOS_stricmp(anchor, "NW")==0) self->anchor = NW;
     else if (PyOS_stricmp(anchor, "CENTER")==0) self->anchor = C;
     else {
-        PyErr_SetString(PyExc_ValueError,
-            "expected 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', or 'CENTER'");
+        PyErr_Format(PyExc_ValueError,
+            "expected 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', "
+            "or 'CENTER' (case-insensitive), got %s", anchor);
         return -1;
     }
     label.needsDisplay = YES;
@@ -820,8 +1039,14 @@ static PyGetSetDef Label_getseters[] = {
     {"disabled_foreground", (getter)Label_get_disabled_foreground, (setter)Label_set_disabled_foreground, Label_disabled_foreground__doc__, NULL},
     {"highlight_background", (getter)Label_get_highlight_background, (setter)Label_set_highlight_background, Label_highlight_background__doc__, NULL},
     {"highlight_color", (getter)Label_get_highlight_color, (setter)Label_set_highlight_color, Label_highlight_color__doc__, NULL},
+    {"relief", (getter)Label_get_relief, (setter)Label_set_relief, Label_relief__doc__, NULL},
     {"state", (getter)Label_get_state, (setter)Label_set_state, Label_state__doc__, NULL},
+    {"take_focus", (getter)Label_get_take_focus, (setter)Label_set_take_focus, Label_take_focus__doc__, NULL},
     {"anchor", (getter)Label_get_anchor, (setter)Label_set_anchor, Label_anchor__doc__, NULL},
+    {"border_width", (getter)Label_get_border_width, (setter)Label_set_border_width, Label_border_width__doc__, NULL},
+    {"padx", (getter)Label_get_padx, (setter)Label_set_padx, Label_padx__doc__, NULL},
+    {"pady", (getter)Label_get_pady, (setter)Label_set_pady, Label_pady__doc__, NULL},
+    {"highlight_thickness", (getter)Label_get_highlight_thickness, (setter)Label_set_highlight_thickness, Label_highlight_thickness__doc__, NULL},
     {"minimum_size", (getter)Label_get_minimum_size, (setter)NULL, Label_minimum_size__doc__, NULL},
     {NULL}  /* Sentinel */
 };
