@@ -84,6 +84,7 @@ typedef struct {
     double width;
     CGFloat height;
     short red, green, blue, alpha;
+
     LabelObject* object = (LabelObject*)_object;
     CFStringRef keys[] = { kCTFontAttributeName,
                            kCTForegroundColorFromContextAttributeName };
@@ -95,10 +96,18 @@ typedef struct {
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
-    red = object->background->rgba[0];
-    green = object->background->rgba[1];
-    blue = object->background->rgba[2];
-    alpha = object->background->rgba[3];
+    if (object->state == ACTIVE) {
+        red = object->active_background->rgba[0];
+        green = object->active_background->rgba[1];
+        blue = object->active_background->rgba[2];
+        alpha = object->active_background->rgba[3];
+    }
+    else {
+        red = object->background->rgba[0];
+        green = object->background->rgba[1];
+        blue = object->background->rgba[2];
+        alpha = object->background->rgba[3];
+    }
 
     CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     rect = NSRectToCGRect(dirtyRect);
@@ -663,6 +672,45 @@ Label_set_disabled_foreground(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_disabled_foreground__doc__[] = "foreground color when disabled.";
 
+static PyObject* Label_get_state(LabelObject* self, void* closure)
+{
+    switch (self->state) {
+        case NORMAL: return PyUnicode_FromString("NORMAL");
+        case ACTIVE: return PyUnicode_FromString("ACTIVE");
+        case DISABLED: return PyUnicode_FromString("DISABLED");
+        default:
+            PyErr_Format(PyExc_RuntimeError,
+                "expected NORMAL (%d), ACTIVE (%d), or DISABLED (%d), got '%d'",
+                NORMAL, ACTIVE, DISABLED, self->state);
+            return NULL;
+    }
+}
+
+static int
+Label_set_state(LabelObject* self, PyObject* value, void* closure)
+{
+    const char* state;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (!PyUnicode_Check(value)) {
+        PyErr_SetString(PyExc_ValueError, "expected a string");
+        return -1;
+    }
+    state = PyUnicode_AsUTF8(value);
+    if (!state) return -1;
+    if (PyOS_stricmp(state, "NORMAL")==0) self->state = NORMAL;
+    else if (PyOS_stricmp(state, "ACTIVE")==0) self->state = ACTIVE;
+    else if (PyOS_stricmp(state, "DISABLED")==0) self->state = DISABLED;
+    else {
+        PyErr_SetString(PyExc_ValueError,
+            "expected 'NORMAL', 'ACTIVE', 'DISABLED (case-insensitive)'");
+        return -1;
+    }
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_state__doc__[] = "state of the label ('NORMAL', 'ACTIVE', or 'DISABLED').";
 static PyObject* Label_get_anchor(LabelObject* self, void* closure)
 {
     switch (self->anchor) {
@@ -676,8 +724,10 @@ static PyObject* Label_get_anchor(LabelObject* self, void* closure)
         case NW: return PyUnicode_FromString("NW");
         case C: return PyUnicode_FromString("CENTER");
         default:
-            PyErr_SetString(PyExc_ValueError,
-                            "expected 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', or 'CENTER'");
+            PyErr_Format(PyExc_ValueError,
+                "expected N (%d), NE (%d), E (%d), SE (%d), S (%d), SW (%d), "
+                "W (%d), NW (%d), or C (%d), got %d",
+                N, NE, E, SE, S, SW, W, NW, C, self->anchor);
             return NULL;
     }
 }
@@ -770,6 +820,7 @@ static PyGetSetDef Label_getseters[] = {
     {"disabled_foreground", (getter)Label_get_disabled_foreground, (setter)Label_set_disabled_foreground, Label_disabled_foreground__doc__, NULL},
     {"highlight_background", (getter)Label_get_highlight_background, (setter)Label_set_highlight_background, Label_highlight_background__doc__, NULL},
     {"highlight_color", (getter)Label_get_highlight_color, (setter)Label_set_highlight_color, Label_highlight_color__doc__, NULL},
+    {"state", (getter)Label_get_state, (setter)Label_set_state, Label_state__doc__, NULL},
     {"anchor", (getter)Label_get_anchor, (setter)Label_set_anchor, Label_anchor__doc__, NULL},
     {"minimum_size", (getter)Label_get_minimum_size, (setter)NULL, Label_minimum_size__doc__, NULL},
     {NULL}  /* Sentinel */
