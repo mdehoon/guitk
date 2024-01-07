@@ -214,6 +214,42 @@ _compute_anchor(Anchor anchor,
     CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     CTLineDraw(line, cr);
     CFRelease(line);
+    if (object->relief != FLAT) {
+        CGFloat inset = object->highlight_thickness;
+        CGFloat border_width = object->border_width;
+        width = size.width;
+        height = size.height;
+        x = inset;
+        y = inset;
+        if (width < 2 * border_width) border_width = width / 2.0;
+        if (height < 2 * border_width) border_width = height / 2.0;
+        switch (object->state) {
+            case ACTIVE:
+                red = object->active_background->rgba[0];
+                green = object->active_background->rgba[1];
+                blue = object->active_background->rgba[2];
+                alpha = object->active_background->rgba[3];
+                break;
+            case NORMAL:
+            case DISABLED:
+                red = object->background->rgba[0];
+                green = object->background->rgba[1];
+                blue = object->background->rgba[2];
+                alpha = object->background->rgba[3];
+                break;
+        }
+
+/*
+    Tk_3DVerticalBevel(tkwin, drawable, border, x, y, borderWidth, height,
+            1, relief);
+    Tk_3DVerticalBevel(tkwin, drawable, border, x+width-borderWidth, y,
+            borderWidth, height, 0, relief);
+    Tk_3DHorizontalBevel(tkwin, drawable, border, x, y, width, borderWidth,
+            1, 1, 1, relief);
+    Tk_3DHorizontalBevel(tkwin, drawable, border, x, y+height-borderWidth,
+            width, borderWidth, 0, 0, 0, relief);
+*/
+    }
 }
 
 - (BOOL)isFlipped
@@ -237,7 +273,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->disabled_foreground = NULL;
     self->highlight_background = NULL;
     self->highlight_color = NULL;
-    self->border_width = 2.0;
+    self->border_width = 1.0;
     self->highlight_thickness = 0.0;
     self->alignment = CENTER;
     self->padx = 1.0;
@@ -1013,6 +1049,8 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self)
     if (!line) return PyErr_NoMemory();
     width = CTLineGetTypographicBounds(line, &ascent, &descent, NULL);
     height = ascent + descent;
+    width += 2 * (self->padx + self->highlight_thickness + self->border_width);
+    height += 2 * (self->pady + self->highlight_thickness + self->border_width);
     return Py_BuildValue("ff", width, height);
 }
 
