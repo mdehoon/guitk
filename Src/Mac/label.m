@@ -103,6 +103,68 @@ _compute_anchor(Anchor anchor,
     }
 }
 
+static void
+_draw_3d_vertical_bevel(CGContextRef cr,
+                        ColorObject* color,
+                        CGFloat x, CGFloat y,
+                        CGFloat width, CGFloat height,
+                        bool left_bevel, Relief relief)
+{
+    short red = color->rgba[0];
+    short green = color->rgba[1];
+    short blue = color->rgba[2];
+    short alpha = color->rgba[3];
+/*
+    if (relief != FLAT) {
+        TkpGetShadows(borderPtr, tkwin);
+    }
+*/
+
+/*
+    if (relief == TK_RELIEF_RAISED) {
+        XFillRectangle(display, drawable,
+                (leftBevel) ? borderPtr->lightGC : borderPtr->darkGC,
+                x, y, (unsigned) width, (unsigned) height);
+    } else if (relief == TK_RELIEF_SUNKEN) {
+        XFillRectangle(display, drawable,
+                (leftBevel) ? borderPtr->darkGC : borderPtr->lightGC,
+                x, y, (unsigned) width, (unsigned) height);
+    } else if (relief == TK_RELIEF_RIDGE) {
+        int half;
+
+        left = borderPtr->lightGC;
+        right = borderPtr->darkGC;
+    ridgeGroove:
+        half = width/2;
+        if (!leftBevel && (width & 1)) {
+            half++;
+        }
+        XFillRectangle(display, drawable, left, x, y, (unsigned) half,
+                (unsigned) height);
+        XFillRectangle(display, drawable, right, x+half, y,
+                (unsigned) (width-half), (unsigned) height);
+    } else if (relief == TK_RELIEF_GROOVE) {
+        left = borderPtr->darkGC;
+        right = borderPtr->lightGC;
+        goto ridgeGroove;
+    } else */ if (relief == FLAT) {
+        CGRect rect = CGRectMake(x, y, width, height);
+        CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
+        CGContextFillRect(cr, rect);
+    } /* else if (relief == TK_RELIEF_SOLID) {
+        UnixBorder *unixBorderPtr = (UnixBorder *) borderPtr;
+        if (unixBorderPtr->solidGC == NULL) {
+            XGCValues gcValues;
+
+            gcValues.foreground = BlackPixelOfScreen(borderPtr->screen);
+            unixBorderPtr->solidGC = Tk_GetGC(tkwin, GCForeground, &gcValues);
+        }
+        XFillRectangle(display, drawable, unixBorderPtr->solidGC, x, y,
+                (unsigned) width, (unsigned) height);
+    }
+*/
+}
+
 @implementation LabelView
 - (PyObject*)object
 {
@@ -138,6 +200,7 @@ _compute_anchor(Anchor anchor,
                            kCTForegroundColorFromContextAttributeName };
     CFTypeRef values[] = { object->font->font,
                            kCFBooleanTrue };
+    const Relief relief = object->relief;
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
     cr = [gc CGContext];
@@ -214,7 +277,8 @@ _compute_anchor(Anchor anchor,
     CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     CTLineDraw(line, cr);
     CFRelease(line);
-    if (object->relief != FLAT) {
+    if (relief != FLAT) {
+        ColorObject* color;
         CGFloat inset = object->highlight_thickness;
         CGFloat border_width = object->border_width;
         width = size.width;
@@ -225,19 +289,14 @@ _compute_anchor(Anchor anchor,
         if (height < 2 * border_width) border_width = height / 2.0;
         switch (object->state) {
             case ACTIVE:
-                red = object->active_background->rgba[0];
-                green = object->active_background->rgba[1];
-                blue = object->active_background->rgba[2];
-                alpha = object->active_background->rgba[3];
+                color = object->active_background;
                 break;
             case NORMAL:
             case DISABLED:
-                red = object->background->rgba[0];
-                green = object->background->rgba[1];
-                blue = object->background->rgba[2];
-                alpha = object->background->rgba[3];
+                color = object->background;
                 break;
         }
+        _draw_3d_vertical_bevel(cr, color, x, y, border_width, height, true, relief);
 
 /*
     Tk_3DVerticalBevel(tkwin, drawable, border, x, y, borderWidth, height,
