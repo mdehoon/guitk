@@ -195,7 +195,7 @@ static int Color_converter(PyObject* argument, void* address)
                                 "expected a tuple with 4 values");
                 return 0;
             }
-            if (value < 0 || value >= 256) {
+            if (value < 0 || value > USHRT_MAX) {
                 PyErr_Format(PyExc_ValueError, "value %d is out of bounds", value);
                 return 0;
             }
@@ -224,13 +224,13 @@ static int Color_converter(PyObject* argument, void* address)
         if (s[0] == '#') {
             if (strlen(s) == 7) {
                 hexcode = s + 1;
-                rgba[3] = 255;
+                rgba[3] = USHRT_MAX;
                 hex = strtol(hexcode, NULL, 16);
             }
             else if (strlen(s) == 9) {
                 hexcode = s + 1;
                 hex = strtol(hexcode, NULL, 16);
-                rgba[3] = hex & 0xff;
+                rgba[3] = 256 * (hex & 0xff);
                 hex >>= 8;
             }
         }
@@ -241,7 +241,7 @@ static int Color_converter(PyObject* argument, void* address)
                 if (PyOS_stricmp(name, s)==0) {
                     hexcode = (*p)[1] + 1;
                     hex = strtol(hexcode, NULL, 16);
-                    rgba[3] = 255;
+                    rgba[3] = USHRT_MAX;
                     break;
                 }
             }
@@ -251,11 +251,11 @@ static int Color_converter(PyObject* argument, void* address)
             PyErr_SetString(PyExc_ValueError, "failed to find color name");
             return 0;
         }
-        rgba[2] = hex & 0xff;
+        rgba[2] = 256 * (hex & 0xff);
         hex >>= 8;
-        rgba[1] = hex & 0xff;
+        rgba[1] = 256 * (hex & 0xff);
         hex >>= 8;
-        rgba[0] = hex & 0xff;
+        rgba[0] = 256 * (hex & 0xff);
         Py_DECREF(argument);
         return 1;
     }
@@ -385,10 +385,10 @@ ColorObject* systemWindowBackgroundColor = NULL;
 static void _set_system_color(ColorObject* object, NSColor* color)
 {
     color = [color colorUsingColorSpace:[NSColorSpace genericRGBColorSpace]];
-    object->rgba[0] = (short) round(255.0 * color.redComponent);
-    object->rgba[1] = (short) round(255.0 * color.greenComponent);
-    object->rgba[2] = (short) round(255.0 * color.blueComponent);
-    object->rgba[3] = (short) round(255.0 * color.alphaComponent);
+    object->rgba[0] = (unsigned short) round(USHRT_MAX * color.redComponent);
+    object->rgba[1] = (unsigned short) round(USHRT_MAX * color.greenComponent);
+    object->rgba[2] = (unsigned short) round(USHRT_MAX * color.blueComponent);
+    object->rgba[3] = (unsigned short) round(USHRT_MAX * color.alphaComponent);
 }
 
 static void _set_system_colors(void) {
@@ -432,7 +432,7 @@ bool _init_default_colors(void)
     black->rgba[0] = 0;
     black->rgba[1] = 0;
     black->rgba[2] = 0;
-    black->rgba[3] = 255;
+    black->rgba[3] = USHRT_MAX;
 
     systemTextColor = (ColorObject*)ColorType.tp_alloc(&ColorType, 0);
     if (!systemTextColor) goto error;

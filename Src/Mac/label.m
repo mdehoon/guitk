@@ -56,6 +56,7 @@ typedef struct {
 } LabelObject;
 
 
+/* TkComputeAnchor */
 static void
 _compute_anchor(Anchor anchor,
                 int padx, int pady,
@@ -103,6 +104,57 @@ _compute_anchor(Anchor anchor,
     }
 }
 
+static void _get_dark_shadow(unsigned short* red, unsigned short* green, unsigned short *blue)
+/* TkpGetShadows */
+{
+    const unsigned short r = *red;
+    const unsigned short g = *green;
+    const unsigned short b = *blue;
+    if (r*0.5*r + g*1.0*g + b*0.28*b < USHRT_MAX*0.05*USHRT_MAX) {
+        *red = (USHRT_MAX + 3*r)/4;
+        *green = (USHRT_MAX + 3*g)/4;
+        *blue = (USHRT_MAX + 3*b)/4;
+    } else {
+        *red = (60 * r)/100;
+        *green = (60 * g)/100;
+        *blue = (60 * b)/100;
+    }
+}
+
+static void _get_light_shadow(unsigned short* red, unsigned short* green, unsigned short *blue)
+/* TkpGetShadows */
+{
+    const unsigned short r = *red;
+    const unsigned short g = *green;
+    const unsigned short b = *blue;
+    if (g > USHRT_MAX * 0.95) {
+        *red = (90 * r)/100;
+        *green = (90 * g)/100;
+        *blue = (90 * b)/100;
+    } else {
+        int tmp1, tmp2;
+        tmp1 = (14 * r)/10;
+        if (tmp1 > USHRT_MAX) {
+            tmp1 = USHRT_MAX;
+        }
+        tmp2 = (USHRT_MAX + r)/2;
+        *red = (tmp1 > tmp2) ? tmp1 : tmp2;
+        tmp1 = (14 * g)/10;
+        if (tmp1 > USHRT_MAX) {
+            tmp1 = USHRT_MAX;
+        }
+        tmp2 = (USHRT_MAX + g)/2;
+        *green = (tmp1 > tmp2) ? tmp1 : tmp2;
+        tmp1 = (14 * b)/10;
+        if (tmp1 > USHRT_MAX) {
+            tmp1 = USHRT_MAX;
+        }
+        tmp2 = (USHRT_MAX + b)/2;
+        *blue = (tmp1 > tmp2) ? tmp1 : tmp2;
+    }
+}
+
+/* Tk_3DVerticalBevel */
 static void
 _draw_3d_vertical_bevel(CGContextRef cr,
                         ColorObject* color,
@@ -110,22 +162,35 @@ _draw_3d_vertical_bevel(CGContextRef cr,
                         CGFloat width, CGFloat height,
                         bool left_bevel, Relief relief)
 {
-    short red = color->rgba[0];
-    short green = color->rgba[1];
-    short blue = color->rgba[2];
-    short alpha = color->rgba[3];
+    unsigned short red = color->rgba[0];
+    unsigned short green = color->rgba[1];
+    unsigned short blue = color->rgba[2];
+    unsigned short alpha = color->rgba[3];
 /*
-    if (relief != FLAT) {
+    if ((borderPtr->lightGC == NULL) && (relief != TK_RELIEF_FLAT)) {
         TkpGetShadows(borderPtr, tkwin);
     }
 */
 
+    if (relief == RAISED) {
 /*
-    if (relief == TK_RELIEF_RAISED) {
         XFillRectangle(display, drawable,
                 (leftBevel) ? borderPtr->lightGC : borderPtr->darkGC,
                 x, y, (unsigned) width, (unsigned) height);
-    } else if (relief == TK_RELIEF_SUNKEN) {
+*/
+        CGRect rect = CGRectMake(x, y, width, height);
+        if (left_bevel) {
+            _get_light_shadow(&red, &green, &blue);
+        } else {
+            _get_dark_shadow(&red, &green, &blue);
+        }
+        fprintf(stderr, "drawing bevel %d to %f, %f, %f, %f with color %d, %d, %d\n", left_bevel, x, y, width, height, red, green, blue);
+        CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
+                                     ((CGFloat)green)/USHRT_MAX,
+                                     ((CGFloat)blue)/USHRT_MAX,
+                                     ((CGFloat)alpha)/USHRT_MAX);
+        CGContextFillRect(cr, rect);
+    } /* else if (relief == TK_RELIEF_SUNKEN) {
         XFillRectangle(display, drawable,
                 (leftBevel) ? borderPtr->darkGC : borderPtr->lightGC,
                 x, y, (unsigned) width, (unsigned) height);
@@ -147,9 +212,12 @@ _draw_3d_vertical_bevel(CGContextRef cr,
         left = borderPtr->darkGC;
         right = borderPtr->lightGC;
         goto ridgeGroove;
-    } else */ if (relief == FLAT) {
+    } */ else if (relief == FLAT) {
         CGRect rect = CGRectMake(x, y, width, height);
-        CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
+        CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
+                                     ((CGFloat)green)/USHRT_MAX,
+                                     ((CGFloat)blue)/USHRT_MAX,
+                                     ((CGFloat)alpha)/USHRT_MAX);
         CGContextFillRect(cr, rect);
     } /* else if (relief == TK_RELIEF_SOLID) {
         UnixBorder *unixBorderPtr = (UnixBorder *) borderPtr;
@@ -165,6 +233,121 @@ _draw_3d_vertical_bevel(CGContextRef cr,
 */
 }
 
+/* Tk_3DHorizontalBevel */
+static void
+_draw_3d_horizontal_bevel(CGContextRef cr,
+                          ColorObject* color,
+                          CGFloat x, CGFloat y,
+                          CGFloat width, CGFloat height,
+                          bool left_in, bool right_in, bool top_bevel,
+                          Relief relief)
+{
+    int bottom, halfway, x1, x2, x1Delta, x2Delta;
+
+    unsigned short red = color->rgba[0];
+    unsigned short green = color->rgba[1];
+    unsigned short blue = color->rgba[2];
+    unsigned short alpha = color->rgba[3];
+
+    unsigned short red_top = red;
+    unsigned short green_top = green;
+    unsigned short blue_top = blue;
+
+    unsigned short red_bottom = red;
+    unsigned short green_bottom = green;
+    unsigned short blue_bottom = blue;
+
+/*
+    if ((borderPtr->lightGC == NULL) && (relief != TK_RELIEF_FLAT) &&
+            (relief != TK_RELIEF_SOLID)) {
+        TkpGetShadows(borderPtr, tkwin);
+    }
+*/
+    switch (relief) {
+    case FLAT:
+        break;
+    case GROOVE:
+/*
+        topGC = borderPtr->darkGC;
+        bottomGC = borderPtr->lightGC;
+*/
+        break;
+    case RAISED:
+        if (top_bevel) {
+            _get_light_shadow(&red_top, &green_top, &blue_top);
+            _get_light_shadow(&red_bottom, &green_bottom, &blue_bottom);
+        } else {
+            _get_dark_shadow(&red_top, &green_top, &blue_top);
+            _get_dark_shadow(&red_bottom, &green_bottom, &blue_bottom);
+        }
+        break;
+    case RIDGE:
+/*
+        topGC = borderPtr->lightGC;
+        bottomGC = borderPtr->darkGC;
+*/
+        break;
+    case SOLID:
+/*
+        if (unixBorderPtr->solidGC == NULL) {
+            XGCValues gcValues;
+
+            gcValues.foreground = BlackPixelOfScreen(borderPtr->screen);
+            unixBorderPtr->solidGC = Tk_GetGC(tkwin, GCForeground, &gcValues);
+        }
+        XFillRectangle(display, drawable, unixBorderPtr->solidGC, x, y,
+                (unsigned) width, (unsigned) height);
+*/
+        return;
+    case SUNKEN:
+/*
+        topGC = bottomGC = (topBevel? borderPtr->darkGC : borderPtr->lightGC);
+*/
+        break;
+    }
+
+    x1 = x;
+    if (!left_in) {
+        x1 += height;
+    }
+    x2 = x+width;
+    if (!right_in) {
+        x2 -= height;
+    }
+    x1Delta = (left_in) ? 1 : -1;
+    x2Delta = (right_in) ? -1 : 1;
+    halfway = y + height/2;
+    if (!top_bevel && (height > 0)) {
+        halfway++;
+    }
+    bottom = y + height;
+
+    for ( ; y < bottom; y++) {
+        if (x1 < SHRT_MIN) {
+            x1 = SHRT_MIN;
+        }
+        if (x2 > SHRT_MAX) {
+            x2 = SHRT_MAX;
+        }
+        if (x1 < x2) {
+            CGRect rect = CGRectMake(x1, y, x2 - x1, 1);
+            if (y < halfway)
+                CGContextSetRGBFillColor(cr, ((CGFloat)red_top)/USHRT_MAX,
+                                             ((CGFloat)green_top)/USHRT_MAX,
+                                             ((CGFloat)blue_top)/USHRT_MAX,
+                                             ((CGFloat)alpha)/USHRT_MAX);
+            else
+                CGContextSetRGBFillColor(cr, ((CGFloat)red_bottom)/USHRT_MAX,
+                                             ((CGFloat)green_bottom)/USHRT_MAX,
+                                             ((CGFloat)blue_bottom)/USHRT_MAX,
+                                             ((CGFloat)alpha)/USHRT_MAX);
+            CGContextFillRect(cr, rect);
+        }
+        x1 += x1Delta;
+        x2 += x2Delta;
+    }
+}
+
 @implementation LabelView
 - (PyObject*)object
 {
@@ -178,6 +361,7 @@ _draw_3d_vertical_bevel(CGContextRef cr,
     return self;
 }
 
+/* TkpDisplayButton */
 - (void)drawRect:(NSRect)dirtyRect
 {
     CTLineRef line;
@@ -193,7 +377,7 @@ _draw_3d_vertical_bevel(CGContextRef cr,
     CGFloat descent;
     double width;
     CGFloat height;
-    short red, green, blue, alpha;
+    unsigned short red, green, blue, alpha;
 
     LabelObject* object = (LabelObject*)_object;
     CFStringRef keys[] = { kCTFontAttributeName,
@@ -223,8 +407,15 @@ _draw_3d_vertical_bevel(CGContextRef cr,
             break;
     }
 
-    CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
+    CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
+                                 ((CGFloat)green)/USHRT_MAX,
+                                 ((CGFloat)blue)/USHRT_MAX,
+                                 ((CGFloat)alpha)/USHRT_MAX);
     rect = NSRectToCGRect(dirtyRect);
+/*
+    Tk_Fill3DRectangle(tkwin, pixmap, border, 0, 0, Tk_Width(tkwin),
+            Tk_Height(tkwin), 0, TK_RELIEF_FLAT);
+*/
     CGContextFillRect(cr, rect);
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
@@ -249,6 +440,11 @@ _draw_3d_vertical_bevel(CGContextRef cr,
     x -= 0.5 * width;
     y += 0.5 * height;
     y -= descent;
+/*
+            TkComputeAnchor(butPtr->anchor, tkwin, butPtr->padX, butPtr->padY,
+                    butPtr->indicatorSpace + butPtr->textWidth,
+                    butPtr->textHeight, &x, &y);
+*/
     _compute_anchor(object->anchor, object->padx, object->pady,
                     width, height, &x, &y);
     CGAffineTransform transform = CGAffineTransformMakeScale(1.0, -1.0);
@@ -274,19 +470,25 @@ _draw_3d_vertical_bevel(CGContextRef cr,
             alpha = object->disabled_foreground->rgba[3];
             break;
     }
-    CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
+    CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
+                                 ((CGFloat)green)/USHRT_MAX,
+                                 ((CGFloat)blue)/USHRT_MAX,
+                                 ((CGFloat)alpha)/USHRT_MAX);
     CTLineDraw(line, cr);
     CFRelease(line);
+/*
+        Tk_Draw3DRectangle(tkwin, pixmap, border, inset, inset,
+                Tk_Width(tkwin) - 2*inset, Tk_Height(tkwin) - 2*inset,
+                butPtr->borderWidth, relief);
+*/
     if (relief != FLAT) {
         ColorObject* color;
         CGFloat inset = object->highlight_thickness;
         CGFloat border_width = object->border_width;
-        width = size.width;
-        height = size.height;
         x = inset;
         y = inset;
-        if (width < 2 * border_width) border_width = width / 2.0;
-        if (height < 2 * border_width) border_width = height / 2.0;
+        width = size.width - 2 * inset;
+        height = size.height - 2 * inset;
         switch (object->state) {
             case ACTIVE:
                 color = object->active_background;
@@ -296,7 +498,13 @@ _draw_3d_vertical_bevel(CGContextRef cr,
                 color = object->background;
                 break;
         }
+        /* Tk_Draw3DRectangle */
+        if (width < 2 * border_width) border_width = width / 2.0;
+        if (height < 2 * border_width) border_width = height / 2.0;
         _draw_3d_vertical_bevel(cr, color, x, y, border_width, height, true, relief);
+        _draw_3d_vertical_bevel(cr, color, x+width-border_width, y, border_width, height, false, relief);
+        _draw_3d_horizontal_bevel(cr, color, x, y, width, border_width, true, true, true, relief);
+        _draw_3d_horizontal_bevel(cr, color, x, y+height-border_width, width, border_width, false, false, false, relief);
 
 /*
     Tk_3DVerticalBevel(tkwin, drawable, border, x, y, borderWidth, height,
@@ -525,8 +733,12 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     self->text = text;
     self->font = font;
 
-    Py_INCREF(systemWindowBackgroundColor);
     Py_INCREF(systemTextColor);
+    Py_INCREF(systemTextColor);
+    Py_INCREF(systemTextColor);
+    Py_INCREF(systemWindowBackgroundColor);
+    Py_INCREF(systemWindowBackgroundColor);
+    Py_INCREF(systemWindowBackgroundColor);
     Py_INCREF(systemWindowBackgroundColor);
     Py_XDECREF(self->foreground);
     Py_XDECREF(self->background);
