@@ -22,7 +22,7 @@ typedef enum {NORMAL, ACTIVE, DISABLED} State;
 {
     PyObject* _object;
 }
-@property (readonly) PyObject* object;
+@property(readonly) PyObject* object;
 - (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
 - (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
@@ -52,6 +52,7 @@ typedef struct {
     Py_ssize_t underline;
     long wrap_length;
     bool take_focus;
+    bool is_first_responder;
     PyObject* minimum_size;
 } LabelObject;
 
@@ -184,7 +185,6 @@ _draw_3d_vertical_bevel(CGContextRef cr,
         } else {
             _get_dark_shadow(&red, &green, &blue);
         }
-        fprintf(stderr, "drawing bevel %d to %f, %f, %f, %f with color %d, %d, %d\n", left_bevel, x, y, width, height, red, green, blue);
         CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
                                      ((CGFloat)green)/USHRT_MAX,
                                      ((CGFloat)blue)/USHRT_MAX,
@@ -322,6 +322,7 @@ _draw_3d_horizontal_bevel(CGContextRef cr,
     }
     bottom = y + height;
 
+    /* use CGContextDrawPath */
     for ( ; y < bottom; y++) {
         if (x1 < SHRT_MIN) {
             x1 = SHRT_MIN;
@@ -348,6 +349,31 @@ _draw_3d_horizontal_bevel(CGContextRef cr,
     }
 }
 
+/* Tk_DrawFocusHighlight */
+static void
+_draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat width)
+{
+/*
+    On X11: TkDrawInsetFocusHighlight(tkwin, gc, width, drawable, 0);
+    On Max: TkMacOSXDrawSolidBorder
+*/
+    unsigned short red, green, blue, alpha;
+    red = color->rgba[0];
+    green = color->rgba[1];
+    blue = color->rgba[2];
+    alpha = color->rgba[3];
+    CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
+                                 ((CGFloat)green)/USHRT_MAX,
+                                 ((CGFloat)blue)/USHRT_MAX,
+                                 ((CGFloat)alpha)/USHRT_MAX);
+    CGRect outer = CGRectMake(0, 0, size.width, size.height);
+    CGRect inner = CGRectInset(outer, width, width);
+    CGContextBeginPath(cr);
+    CGContextAddRect(cr, outer);
+    CGContextAddRect(cr, inner);
+    CGContextEOFillPath(cr);
+}
+
 @implementation LabelView
 - (PyObject*)object
 {
@@ -357,8 +383,27 @@ _draw_3d_horizontal_bevel(CGContextRef cr,
 - (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
 {
     self = [super initWithFrame: rect];
+
     _object = object;
     return self;
+}
+
+- (BOOL)acceptsFirstResponder {
+    return YES;
+}
+
+- (BOOL)becomeFirstResponder {
+    LabelObject* object = (LabelObject*) _object;
+    object->is_first_responder = true;
+    [self setNeedsDisplay:YES];
+    return YES;
+}
+
+- (BOOL)resignFirstResponder {
+    LabelObject* object = (LabelObject*) _object;
+    object->is_first_responder = false;
+    [self setNeedsDisplay:YES];
+    return YES;
 }
 
 /* TkpDisplayButton */
@@ -505,17 +550,20 @@ _draw_3d_horizontal_bevel(CGContextRef cr,
         _draw_3d_vertical_bevel(cr, color, x+width-border_width, y, border_width, height, false, relief);
         _draw_3d_horizontal_bevel(cr, color, x, y, width, border_width, true, true, true, relief);
         _draw_3d_horizontal_bevel(cr, color, x, y+height-border_width, width, border_width, false, false, false, relief);
-
+    }
+    if (object->highlight_thickness > 0) {
+        Window* window = (Window*) [self window];
+        ColorObject* color;
+        if (window.object->is_key && object->is_first_responder) {
+            color = object->highlight_color;
+        }
+        else {
+            color = object->highlight_background;
+        }
 /*
-    Tk_3DVerticalBevel(tkwin, drawable, border, x, y, borderWidth, height,
-            1, relief);
-    Tk_3DVerticalBevel(tkwin, drawable, border, x+width-borderWidth, y,
-            borderWidth, height, 0, relief);
-    Tk_3DHorizontalBevel(tkwin, drawable, border, x, y, width, borderWidth,
-            1, 1, 1, relief);
-    Tk_3DHorizontalBevel(tkwin, drawable, border, x, y+height-borderWidth,
-            width, borderWidth, 0, 0, 0, relief);
+            Tk_DrawFocusHighlight(tkwin, gc, butPtr->highlightWidth, pixmap);
 */
+            _draw_focus_highlight(cr, color, size, object->highlight_thickness);
     }
 }
 
@@ -548,6 +596,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->relief = FLAT;
     self->state = NORMAL;
     self->take_focus = false;
+    self->is_first_responder = false;
     self->underline = -1;
     self->width = 0.0;
     self->height = 0.0;

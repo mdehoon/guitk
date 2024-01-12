@@ -23,6 +23,7 @@
 #define CGFloat float
 #endif
 
+
 @implementation Window
 @synthesize object = _object;
 
@@ -49,6 +50,18 @@
 - (void)windowDidResize:(NSNotification *)notification
 {
     [self requestLayout];
+}
+
+- (void)windowDidBecomeKey:(NSNotification *)notification;
+{
+    _object->is_key = true;
+    [[self contentView] setNeedsDisplay:YES];
+}
+
+- (void)windowDidResignKey:(NSNotification *)notification;
+{
+    _object->is_key = false;
+    [[self contentView] setNeedsDisplay:YES];
 }
 
 - (void)requestLayout
