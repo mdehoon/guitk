@@ -52,19 +52,13 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
     double y;
     double width;
     double height;
-    NSPoint origin;
-    NSSize size;
     static char* kwlist[] = {"x", "y", "width", "height", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "dddd", kwlist,
                                      &x, &y, &width, &height))
         return NULL;
 
-    origin.x = x;
-    origin.y = y;
-    size.width = width;
-    size.height = height;
-
     if (self->halign!='f' || self->valign!='f') {
+        CGFloat minimum_width, minimum_height;
         PyObject* item;
         PyObject* object = (PyObject*)self;
         PyObject* minimum_size = PyObject_GetAttrString(object, "minimum_size");
@@ -80,14 +74,14 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
             return NULL;
         }
         item = PyTuple_GET_ITEM(minimum_size, 0);
-        width = PyFloat_AsDouble(item);
+        minimum_width = PyFloat_AsDouble(item);
         if (PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                 "width returned by minimum_size should be numeric.");
             return NULL;
         }
         item = PyTuple_GET_ITEM(minimum_size, 1);
-        height = PyFloat_AsDouble(item);
+        minimum_height = PyFloat_AsDouble(item);
         if (PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                 "height returned by minimum_size should be numeric.");
@@ -99,15 +93,15 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
             case 'f':
                 break;
             case 'l':
-                size.width = width;
+                width = minimum_width;
                 break;
             case 'c':
-                origin.x += 0.5 * (size.width - width);
-                size.width = width;
+                x += 0.5 * (width - minimum_width);
+                width = minimum_width;
                 break;
             case 'r':
-                origin.x += size.width - width;
-                size.width = width;
+                x += width - minimum_width;
+                width = minimum_width;
                 break;
             default:
                 PyErr_SetString(PyExc_SystemError,
@@ -118,15 +112,15 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
             case 'f':
                 break;
             case 't':
-                size.height = height;
+                height = minimum_height;
                 break;
             case 'c':
-                origin.y += 0.5 * (size.height - height);
-                size.height = height;
+                y += 0.5 * (height - minimum_height);
+                height = minimum_height;
                 break;
             case 'b':
-                origin.y += size.height - height;
-                size.height = height;
+                y += height - minimum_height;
+                height = minimum_height;
                 break;
             default:
                 PyErr_SetString(PyExc_SystemError,
@@ -134,10 +128,14 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
                 return NULL;
         }
     }
-    x = origin.x;
-    y = origin.y;
-    width = size.width;
-    height = size.height;
+    width += x;
+    x = floor(x);
+    width -= x;
+    width = ceil(width);
+    height += y;
+    y = floor(y);
+    height -= y;
+    height = ceil(height);
     return Py_BuildValue("dddd", x, y, width, height);
 }
 
