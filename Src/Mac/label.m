@@ -14,7 +14,12 @@ typedef enum {N, NE, E, SE, S, SW, W, NW, C} Anchor;
 
 typedef enum {LEFT, CENTER, RIGHT} Alignment;
 
-typedef enum {RAISED, SUNKEN, FLAT, RIDGE, SOLID, GROOVE} Relief;
+typedef enum {PY_RELIEF_RAISED,
+              PY_RELIEF_SUNKEN,
+              PY_RELIEF_FLAT,
+              PY_RELIEF_RIDGE,
+              PY_RELIEF_SOLID,
+              PY_RELIEF_GROOVE} Relief;
 
 typedef enum {NORMAL, ACTIVE, DISABLED} State;
 
@@ -167,18 +172,8 @@ _draw_3d_vertical_bevel(CGContextRef cr,
     unsigned short green = color->rgba[1];
     unsigned short blue = color->rgba[2];
     unsigned short alpha = color->rgba[3];
-/*
-    if ((borderPtr->lightGC == NULL) && (relief != TK_RELIEF_FLAT)) {
-        TkpGetShadows(borderPtr, tkwin);
-    }
-*/
 
-    if (relief == RAISED) {
-/*
-        XFillRectangle(display, drawable,
-                (leftBevel) ? borderPtr->lightGC : borderPtr->darkGC,
-                x, y, (unsigned) width, (unsigned) height);
-*/
+    if (relief == PY_RELIEF_RAISED) {
         CGRect rect = CGRectMake(x, y, width, height);
         if (left_bevel) {
             _get_light_shadow(&red, &green, &blue);
@@ -190,47 +185,92 @@ _draw_3d_vertical_bevel(CGContextRef cr,
                                      ((CGFloat)blue)/USHRT_MAX,
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextFillRect(cr, rect);
-    } /* else if (relief == TK_RELIEF_SUNKEN) {
-        XFillRectangle(display, drawable,
-                (leftBevel) ? borderPtr->darkGC : borderPtr->lightGC,
-                x, y, (unsigned) width, (unsigned) height);
-    } else if (relief == TK_RELIEF_RIDGE) {
-        int half;
-
-        left = borderPtr->lightGC;
-        right = borderPtr->darkGC;
-    ridgeGroove:
-        half = width/2;
-        if (!leftBevel && (width & 1)) {
-            half++;
+    } else if (relief == PY_RELIEF_SUNKEN) {
+        CGRect rect = CGRectMake(x, y, width, height);
+        if (left_bevel) {
+            _get_dark_shadow(&red, &green, &blue);
+        } else {
+            _get_light_shadow(&red, &green, &blue);
         }
-        XFillRectangle(display, drawable, left, x, y, (unsigned) half,
-                (unsigned) height);
-        XFillRectangle(display, drawable, right, x+half, y,
-                (unsigned) (width-half), (unsigned) height);
-    } else if (relief == TK_RELIEF_GROOVE) {
-        left = borderPtr->darkGC;
-        right = borderPtr->lightGC;
-        goto ridgeGroove;
-    } */ else if (relief == FLAT) {
+        CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
+                                     ((CGFloat)green)/USHRT_MAX,
+                                     ((CGFloat)blue)/USHRT_MAX,
+                                     ((CGFloat)alpha)/USHRT_MAX);
+        CGContextFillRect(cr, rect);
+    } else if (relief == PY_RELIEF_RIDGE) {
+        unsigned short red_shadow;
+        unsigned short green_shadow;
+        unsigned short blue_shadow;
+        CGRect rect;
+        CGFloat half = width/2;
+        if (!left_bevel && (width > 0.0)) half++;
+        red_shadow = red;
+        green_shadow = green;
+        blue_shadow = blue;
+        _get_light_shadow(&red_shadow, &green_shadow, &blue_shadow);
+        rect.origin.x = x;
+        rect.origin.y = y;
+        rect.size.width = half;
+        rect.size.height = height;
+        CGContextSetRGBFillColor(cr, ((CGFloat)red_shadow)/USHRT_MAX,
+                                     ((CGFloat)green_shadow)/USHRT_MAX,
+                                     ((CGFloat)blue_shadow)/USHRT_MAX,
+                                     ((CGFloat)alpha)/USHRT_MAX);
+        CGContextFillRect(cr, rect);
+        rect.origin.x = x + half;
+        rect.size.width = width - half;
+        red_shadow = red;
+        green_shadow = green;
+        blue_shadow = blue;
+        _get_dark_shadow(&red_shadow, &green_shadow, &blue_shadow);
+        CGContextSetRGBFillColor(cr, ((CGFloat)red_shadow)/USHRT_MAX,
+                                     ((CGFloat)green_shadow)/USHRT_MAX,
+                                     ((CGFloat)blue_shadow)/USHRT_MAX,
+                                     ((CGFloat)alpha)/USHRT_MAX);
+        CGContextFillRect(cr, rect);
+    } else if (relief == PY_RELIEF_GROOVE) {
+        unsigned short red_shadow;
+        unsigned short green_shadow;
+        unsigned short blue_shadow;
+        CGRect rect;
+        CGFloat half = width/2;
+        if (!left_bevel && (width > 0.0)) half++;
+        red_shadow = red;
+        green_shadow = green;
+        blue_shadow = blue;
+        _get_dark_shadow(&red_shadow, &green_shadow, &blue_shadow);
+        rect.origin.x = x;
+        rect.origin.y = y;
+        rect.size.width = half;
+        rect.size.height = height;
+        CGContextSetRGBFillColor(cr, ((CGFloat)red_shadow)/USHRT_MAX,
+                                     ((CGFloat)green_shadow)/USHRT_MAX,
+                                     ((CGFloat)blue_shadow)/USHRT_MAX,
+                                     ((CGFloat)alpha)/USHRT_MAX);
+        CGContextFillRect(cr, rect);
+        rect.origin.x = x + half;
+        rect.size.width = width - half;
+        red_shadow = red;
+        green_shadow = green;
+        blue_shadow = blue;
+        _get_light_shadow(&red_shadow, &green_shadow, &blue_shadow);
+        CGContextSetRGBFillColor(cr, ((CGFloat)red_shadow)/USHRT_MAX,
+                                     ((CGFloat)green_shadow)/USHRT_MAX,
+                                     ((CGFloat)blue_shadow)/USHRT_MAX,
+                                     ((CGFloat)alpha)/USHRT_MAX);
+        CGContextFillRect(cr, rect);
+    } else if (relief == PY_RELIEF_FLAT) {
         CGRect rect = CGRectMake(x, y, width, height);
         CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
                                      ((CGFloat)green)/USHRT_MAX,
                                      ((CGFloat)blue)/USHRT_MAX,
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextFillRect(cr, rect);
-    } /* else if (relief == TK_RELIEF_SOLID) {
-        UnixBorder *unixBorderPtr = (UnixBorder *) borderPtr;
-        if (unixBorderPtr->solidGC == NULL) {
-            XGCValues gcValues;
-
-            gcValues.foreground = BlackPixelOfScreen(borderPtr->screen);
-            unixBorderPtr->solidGC = Tk_GetGC(tkwin, GCForeground, &gcValues);
-        }
-        XFillRectangle(display, drawable, unixBorderPtr->solidGC, x, y,
-                (unsigned) width, (unsigned) height);
+    } else if (relief == PY_RELIEF_SOLID) {
+        CGRect rect = CGRectMake(x, y, width, height);
+        CGContextSetRGBFillColor(cr, 0.0, 0.0, 0.0, 1.0);
+        CGContextFillRect(cr, rect);
     }
-*/
 }
 
 /* Tk_3DHorizontalBevel */
@@ -257,22 +297,14 @@ _draw_3d_horizontal_bevel(CGContextRef cr,
     unsigned short green_bottom = green;
     unsigned short blue_bottom = blue;
 
-/*
-    if ((borderPtr->lightGC == NULL) && (relief != TK_RELIEF_FLAT) &&
-            (relief != TK_RELIEF_SOLID)) {
-        TkpGetShadows(borderPtr, tkwin);
-    }
-*/
     switch (relief) {
-    case FLAT:
+    case PY_RELIEF_FLAT:
         break;
-    case GROOVE:
-/*
-        topGC = borderPtr->darkGC;
-        bottomGC = borderPtr->lightGC;
-*/
+    case PY_RELIEF_GROOVE:
+        _get_dark_shadow(&red_top, &green_top, &blue_top);
+        _get_light_shadow(&red_bottom, &green_bottom, &blue_bottom);
         break;
-    case RAISED:
+    case PY_RELIEF_RAISED:
         if (top_bevel) {
             _get_light_shadow(&red_top, &green_top, &blue_top);
             _get_light_shadow(&red_bottom, &green_bottom, &blue_bottom);
@@ -281,28 +313,24 @@ _draw_3d_horizontal_bevel(CGContextRef cr,
             _get_dark_shadow(&red_bottom, &green_bottom, &blue_bottom);
         }
         break;
-    case RIDGE:
-/*
-        topGC = borderPtr->lightGC;
-        bottomGC = borderPtr->darkGC;
-*/
+    case PY_RELIEF_RIDGE:
+        _get_light_shadow(&red_top, &green_top, &blue_top);
+        _get_dark_shadow(&red_bottom, &green_bottom, &blue_bottom);
         break;
-    case SOLID:
-/*
-        if (unixBorderPtr->solidGC == NULL) {
-            XGCValues gcValues;
-
-            gcValues.foreground = BlackPixelOfScreen(borderPtr->screen);
-            unixBorderPtr->solidGC = Tk_GetGC(tkwin, GCForeground, &gcValues);
-        }
-        XFillRectangle(display, drawable, unixBorderPtr->solidGC, x, y,
-                (unsigned) width, (unsigned) height);
-*/
+    case PY_RELIEF_SOLID: {
+        CGRect rect = CGRectMake(x, y, width, height);
+        CGContextSetRGBFillColor(cr, 0.0, 0.0, 0.0, 1.0);
+        CGContextFillRect(cr, rect);
         return;
-    case SUNKEN:
-/*
-        topGC = bottomGC = (topBevel? borderPtr->darkGC : borderPtr->lightGC);
-*/
+    }
+    case PY_RELIEF_SUNKEN:
+        if (top_bevel) {
+            _get_dark_shadow(&red_top, &green_top, &blue_top);
+            _get_dark_shadow(&red_bottom, &green_bottom, &blue_bottom);
+        } else {
+            _get_light_shadow(&red_top, &green_top, &blue_top);
+            _get_light_shadow(&red_bottom, &green_bottom, &blue_bottom);
+        }
         break;
     }
 
@@ -526,7 +554,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
                 Tk_Width(tkwin) - 2*inset, Tk_Height(tkwin) - 2*inset,
                 butPtr->borderWidth, relief);
 */
-    if (relief != FLAT) {
+    if (relief != PY_RELIEF_FLAT) {
         ColorObject* color;
         CGFloat inset = object->highlight_thickness;
         CGFloat border_width = object->border_width;
@@ -593,7 +621,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->alignment = CENTER;
     self->padx = 1.0;
     self->pady = 1.0;
-    self->relief = FLAT;
+    self->relief = PY_RELIEF_FLAT;
     self->state = NORMAL;
     self->take_focus = false;
     self->is_first_responder = false;
@@ -1164,17 +1192,19 @@ static char Label_take_focus__doc__[] = "True if the label accepts the focus dur
 static PyObject* Label_get_relief(LabelObject* self, void* closure)
 {
     switch (self->relief) {
-        case RAISED: return PyUnicode_FromString("RAISED");
-        case SUNKEN: return PyUnicode_FromString("SUNKEN");
-        case FLAT: return PyUnicode_FromString("FLAT");
-        case RIDGE: return PyUnicode_FromString("RIDGE");
-        case SOLID: return PyUnicode_FromString("SOLID");
-        case GROOVE: return PyUnicode_FromString("GROOVE");
+        case PY_RELIEF_RAISED: return PyUnicode_FromString("RAISED");
+        case PY_RELIEF_SUNKEN: return PyUnicode_FromString("SUNKEN");
+        case PY_RELIEF_FLAT: return PyUnicode_FromString("FLAT");
+        case PY_RELIEF_RIDGE: return PyUnicode_FromString("RIDGE");
+        case PY_RELIEF_SOLID: return PyUnicode_FromString("SOLID");
+        case PY_RELIEF_GROOVE: return PyUnicode_FromString("GROOVE");
         default:
             PyErr_Format(PyExc_RuntimeError,
-                "expected RAISED (%d), SUNKEN (%d), FLAT (%d), RIDGE (%d) "
-                "SOLID (%d), or GROOVE (%d), got %d",
-                RAISED, SUNKEN, FLAT, RIDGE, SOLID, GROOVE, self->relief);
+                "expected RAISED (%d), SUNKEN (%d), FLAT (%d), "
+                "RIDGE (%d), SOLID (%d), or GROOVE (%d), got %d",
+                PY_RELIEF_RAISED, PY_RELIEF_SUNKEN, PY_RELIEF_FLAT,
+                PY_RELIEF_RIDGE, PY_RELIEF_SOLID, PY_RELIEF_GROOVE,
+                self->relief);
             return NULL;
     }
 }
@@ -1191,12 +1221,12 @@ Label_set_relief(LabelObject* self, PyObject* value, void* closure)
     }
     relief = PyUnicode_AsUTF8(value);
     if (!relief) return -1;
-    if (PyOS_stricmp(relief, "RAISED")==0) self->relief = RAISED;
-    else if (PyOS_stricmp(relief, "SUNKEN")==0) self->relief = SUNKEN;
-    else if (PyOS_stricmp(relief, "FLAT")==0) self->relief = FLAT;
-    else if (PyOS_stricmp(relief, "RIDGE")==0) self->relief = RIDGE;
-    else if (PyOS_stricmp(relief, "SOLID")==0) self->relief = SOLID;
-    else if (PyOS_stricmp(relief, "GROOVE")==0) self->relief = GROOVE;
+    if (PyOS_stricmp(relief, "RAISED")==0) self->relief = PY_RELIEF_RAISED;
+    else if (PyOS_stricmp(relief, "SUNKEN")==0) self->relief = PY_RELIEF_SUNKEN;
+    else if (PyOS_stricmp(relief, "FLAT")==0) self->relief = PY_RELIEF_FLAT;
+    else if (PyOS_stricmp(relief, "RIDGE")==0) self->relief = PY_RELIEF_RIDGE;
+    else if (PyOS_stricmp(relief, "SOLID")==0) self->relief = PY_RELIEF_SOLID;
+    else if (PyOS_stricmp(relief, "GROOVE")==0) self->relief = PY_RELIEF_GROOVE;
     else {
         PyErr_Format(PyExc_ValueError,
             "expected 'RAISED', 'SUNKEN', 'FLAT', 'RIDGE', 'SOLID', 'GROOVE' "
