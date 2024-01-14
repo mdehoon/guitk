@@ -437,7 +437,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
 /* TkpDisplayButton */
 - (void)drawRect:(NSRect)dirtyRect
 {
-    CTLineRef line;
     CFAttributedStringRef string = NULL;
     CFDictionaryRef attributes = NULL;
     CGContextRef cr;
@@ -446,10 +445,14 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
     CGFloat y;
     CGSize size;
     CGRect rect;
-    CGFloat ascent;
-    CGFloat descent;
-    double width;
+    CGPathRef path;
+    CGFloat width;
     CGFloat height;
+    CFRange range = CFRangeMake(0, 0);
+    CGSize constraints = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
+    CTFrameRef frame = NULL;
+    CTFramesetterRef framesetter;
+    CFRange fitRange;
     unsigned short red, green, blue, alpha;
 
     LabelObject* object = (LabelObject*)_object;
@@ -502,27 +505,31 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
                                       attributes);
     CFRelease(attributes);
     if (!string) return;
-    line = CTLineCreateWithAttributedString(string);
+    framesetter = CTFramesetterCreateWithAttributedString(string);
     CFRelease(string);
-    rect = NSRectToCGRect(self.frame);
-    size = rect.size;
-    y = 0.5 * size.height;
-    x = 0.5 * size.width;
-    width = CTLineGetTypographicBounds(line, &ascent, &descent, NULL);
-    height = ascent + descent;
-    x -= 0.5 * width;
-    y += 0.5 * height;
-    y -= descent;
+    if (!framesetter) return;
+    size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, constraints, &fitRange);
+
+    rect.origin.x = 0;
+    rect.origin.y = 0;
+    rect.size = self.frame.size;
+    path = CGPathCreateWithRect(rect, NULL);
+    if (path) {
+        frame = CTFramesetterCreateFrame(framesetter, range, path, NULL);
+        CFRelease(framesetter);
+    }
+    CFRelease(path);
+    if (!frame) return;
 /*
             TkComputeAnchor(butPtr->anchor, tkwin, butPtr->padX, butPtr->padY,
                     butPtr->indicatorSpace + butPtr->textWidth,
                     butPtr->textHeight, &x, &y);
 */
+    x = 0.5 * rect.size.width - 0.5 * size.width;
+    y = 0.5 * rect.size.height - 0.5 * size.height;
     _compute_anchor(object->anchor, object->padx, object->pady,
-                    width, height, &x, &y);
-    CGAffineTransform transform = CGAffineTransformMakeScale(1.0, -1.0);
-    CGContextSetTextMatrix(cr, transform);
-    CGContextSetTextPosition(cr, x, y);
+                    size.width, size.height, &x, &y);
+
     switch (object->state) {
         case NORMAL:
             red = object->foreground->rgba[0];
@@ -547,8 +554,13 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
                                  ((CGFloat)alpha)/USHRT_MAX);
-    CTLineDraw(line, cr);
-    CFRelease(line);
+    CGContextSaveGState(cr);
+    CGContextTranslateCTM(cr, x, rect.size.height + y);
+    CGContextScaleCTM(cr, 1.0, -1.0);
+    CTFrameDraw(frame, cr);
+    CGContextRestoreGState(cr);
+    CFRelease(frame);
+
 /*
         Tk_Draw3DRectangle(tkwin, pixmap, border, inset, inset,
                 Tk_Width(tkwin) - 2*inset, Tk_Height(tkwin) - 2*inset,
@@ -560,8 +572,8 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
         CGFloat border_width = object->border_width;
         x = inset;
         y = inset;
-        width = size.width - 2 * inset;
-        height = size.height - 2 * inset;
+        width = rect.size.width - 2 * inset;
+        height = rect.size.height - 2 * inset;
         switch (object->state) {
             case ACTIVE:
                 color = object->active_background;
@@ -591,7 +603,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
 /*
             Tk_DrawFocusHighlight(tkwin, gc, butPtr->highlightWidth, pixmap);
 */
-            _draw_focus_highlight(cr, color, size, object->highlight_thickness);
+            _draw_focus_highlight(cr, color, rect.size, object->highlight_thickness);
     }
 }
 
@@ -1371,34 +1383,53 @@ static char Label_anchor__doc__[] = "anchor specifying location of the label.";
 
 static PyObject* Label_calculate_minimum_size(LabelObject* self)
 {
-    CGFloat ascent;
-    CGFloat descent;
+    CFAttributedStringRef string = NULL;
+    CFDictionaryRef attributes = NULL;
+    CGSize size;
     CGFloat width;
     CGFloat height;
-    CTLineRef line;
-    CFAttributedStringRef string;
-    CFDictionaryRef attributes;
-    CFStringRef keys[1];
-    CFTypeRef values[1];
-    keys[0] = kCTFontAttributeName;
-    values[0] = self->font->font;
+    CFRange range = CFRangeMake(0, 0);
+    CGSize constraints = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
+    CTFramesetterRef framesetter;
+    CFRange fitRange;
+    CFStringRef keys[] = { kCTFontAttributeName };
+    CFTypeRef values[] = { self->font->font } ;
+
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
                                     (const void**)&values,
                                     1,
                                     &kCFTypeDictionaryKeyCallBacks,
                                     &kCFTypeDictionaryValueCallBacks);
-    if (!attributes) return PyErr_NoMemory();
+    if (!attributes) {
+        PyErr_SetString(PyExc_MemoryError,
+                        "failed to create attributes dictionary");
+        return NULL;
+    }
     string = CFAttributedStringCreate(kCFAllocatorDefault,
                                       self->text,
                                       attributes);
     CFRelease(attributes);
-    if (!string) return PyErr_NoMemory();
-    line = CTLineCreateWithAttributedString(string);
+    if (!string) {
+        PyErr_SetString(PyExc_MemoryError,
+                        "failed to create attributed string");
+        return NULL;
+    }
+    framesetter = CTFramesetterCreateWithAttributedString(string);
     CFRelease(string);
-    if (!line) return PyErr_NoMemory();
-    width = CTLineGetTypographicBounds(line, &ascent, &descent, NULL);
-    height = ascent + descent;
+    if (!framesetter) {
+        PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
+        return NULL;
+    }
+    size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter,
+                                                        range,
+                                                        NULL,
+                                                        constraints,
+                                                        &fitRange);
+    CFRelease(framesetter);
+
+    width = size.width;
+    height = size.height;
     width += 2 * (self->padx + self->highlight_thickness + self->border_width);
     height += 2 * (self->pady + self->highlight_thickness + self->border_width);
     return Py_BuildValue("ff", width, height);
