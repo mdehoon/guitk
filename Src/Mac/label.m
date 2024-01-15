@@ -10,7 +10,15 @@
 #define COMPILING_FOR_10_10
 #endif
 
-typedef enum {N, NE, E, SE, S, SW, W, NW, C} Anchor;
+typedef enum {PY_ANCHOR_N,
+              PY_ANCHOR_NE,
+              PY_ANCHOR_E,
+              PY_ANCHOR_SE,
+              PY_ANCHOR_S,
+              PY_ANCHOR_SW,
+              PY_ANCHOR_W,
+              PY_ANCHOR_NW,
+              PY_ANCHOR_C} Anchor;
 
 typedef enum {LEFT, CENTER, RIGHT} Alignment;
 
@@ -64,48 +72,55 @@ typedef struct {
 
 /* TkComputeAnchor */
 static void
-_compute_anchor(Anchor anchor,
-                int padx, int pady,
-                int innerWidth, int innerHeight, CGFloat* x, CGFloat* y)
+_compute_anchor(LabelObject* object, CGSize outer, CGSize inner,
+                CGFloat* x, CGFloat* y)
 {
+    Anchor anchor = object->anchor;
+    CGFloat padx = object->padx;
+    CGFloat pady = object->pady;
+
     switch (anchor) {
-    case NW:
-    case W:
-    case SW:
-        // *xPtr = Tk_InternalBorderLeft(tkwin) + padx;
+    case PY_ANCHOR_NW:
+    case PY_ANCHOR_W:
+    case PY_ANCHOR_SW:
+        *x = object->border_width + object->highlight_thickness + padx;
         break;
 
-    case N:
-    case C:
-    case S:
-        // *xPtr = (Tk_Width(tkwin) - innerWidth - Tk_InternalBorderLeft(tkwin) -
-          //       Tk_InternalBorderRight(tkwin)) / 2 +
-            //     Tk_InternalBorderLeft(tkwin);
+    case PY_ANCHOR_N:
+    case PY_ANCHOR_C:
+    case PY_ANCHOR_S:
+        *x = (outer.width - inner.width) / 2;
         break;
 
+    case PY_ANCHOR_NE:
+    case PY_ANCHOR_E:
+    case PY_ANCHOR_SE:
+        *x = outer.width - inner.width - object->border_width - object->highlight_thickness - padx;
+        break;
     default:
-        // *xPtr = Tk_Width(tkwin) - Tk_InternalBorderRight(tkwin) - padx
-          //       - innerWidth;
+        /* raise an Exception */
         break;
     }
     switch (anchor) {
-    case NW:
-    case N:
-    case NE:
-        // *yPtr = Tk_InternalBorderTop(tkwin) + padY;
+    case PY_ANCHOR_NW:
+    case PY_ANCHOR_N:
+    case PY_ANCHOR_NE:
+        *y = object->border_width + object->highlight_thickness + pady;
         break;
 
-    case W:
-    case C:
-    case E:
-        // *yPtr = (Tk_Height(tkwin) - innerHeight- Tk_InternalBorderTop(tkwin) -
-          //       Tk_InternalBorderBottom(tkwin)) / 2 +
-            //     Tk_InternalBorderTop(tkwin);
+    case PY_ANCHOR_W:
+    case PY_ANCHOR_C:
+    case PY_ANCHOR_E:
+        *y = (outer.height - inner.height) / 2;
+        break;
+
+    case PY_ANCHOR_SW:
+    case PY_ANCHOR_S:
+    case PY_ANCHOR_SE:
+        *y = outer.height - inner.height - object->border_width - object->highlight_thickness- pady;
         break;
 
     default:
-        // *yPtr = Tk_Height(tkwin) - Tk_InternalBorderBottom(tkwin) - padY
-          //       - innerHeight;
         break;
     }
 }
@@ -527,8 +542,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
 */
     x = 0.5 * rect.size.width - 0.5 * size.width;
     y = 0.5 * rect.size.height - 0.5 * size.height;
-    _compute_anchor(object->anchor, object->padx, object->pady,
-                    size.width, size.height, &x, &y);
+    _compute_anchor(object, rect.size, size, &x, &y);
 
     switch (object->state) {
         case NORMAL:
@@ -642,7 +656,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->height = 0.0;
     self->text = NULL;
     self->font = NULL;
-    self->anchor = C;
+    self->anchor = PY_ANCHOR_C;
     self->wrap_length = 0;
     self->minimum_size = NULL;
     return (PyObject*)self;
@@ -844,7 +858,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     self->highlight_background = systemWindowBackgroundColor;
     self->highlight_color = systemWindowBackgroundColor;
 
-    self->anchor = C;
+    self->anchor = PY_ANCHOR_C;
 
     return 0;
 }
@@ -1382,20 +1396,22 @@ static char Label_height__doc__[] = "preferred label height as the number of tex
 static PyObject* Label_get_anchor(LabelObject* self, void* closure)
 {
     switch (self->anchor) {
-        case N: return PyUnicode_FromString("N");
-        case NE: return PyUnicode_FromString("NE");
-        case E: return PyUnicode_FromString("E");
-        case SE: return PyUnicode_FromString("SE");
-        case S: return PyUnicode_FromString("S");
-        case SW: return PyUnicode_FromString("SW");
-        case W: return PyUnicode_FromString("W");
-        case NW: return PyUnicode_FromString("NW");
-        case C: return PyUnicode_FromString("CENTER");
+        case PY_ANCHOR_N: return PyUnicode_FromString("N");
+        case PY_ANCHOR_NE: return PyUnicode_FromString("NE");
+        case PY_ANCHOR_E: return PyUnicode_FromString("E");
+        case PY_ANCHOR_SE: return PyUnicode_FromString("SE");
+        case PY_ANCHOR_S: return PyUnicode_FromString("S");
+        case PY_ANCHOR_SW: return PyUnicode_FromString("SW");
+        case PY_ANCHOR_W: return PyUnicode_FromString("W");
+        case PY_ANCHOR_NW: return PyUnicode_FromString("NW");
+        case PY_ANCHOR_C: return PyUnicode_FromString("C");
         default:
             PyErr_Format(PyExc_RuntimeError,
                 "expected N (%d), NE (%d), E (%d), SE (%d), S (%d), SW (%d), "
                 "W (%d), NW (%d), or C (%d), got %d",
-                N, NE, E, SE, S, SW, W, NW, C, self->anchor);
+                PY_ANCHOR_N, PY_ANCHOR_NE, PY_ANCHOR_E, PY_ANCHOR_SE,
+                PY_ANCHOR_S, PY_ANCHOR_SW, PY_ANCHOR_W, PY_ANCHOR_NW,
+                PY_ANCHOR_C, self->anchor);
             return NULL;
     }
 }
@@ -1412,19 +1428,28 @@ Label_set_anchor(LabelObject* self, PyObject* value, void* closure)
     }
     anchor = PyUnicode_AsUTF8(value);
     if (!anchor) return -1;
-    if (PyOS_stricmp(anchor, "N")==0) self->anchor = N;
-    else if (PyOS_stricmp(anchor, "NE")==0) self->anchor = NE;
-    else if (PyOS_stricmp(anchor, "E")==0) self->anchor = E;
-    else if (PyOS_stricmp(anchor, "SE")==0) self->anchor = SE;
-    else if (PyOS_stricmp(anchor, "S")==0) self->anchor = S;
-    else if (PyOS_stricmp(anchor, "SW")==0) self->anchor = SW;
-    else if (PyOS_stricmp(anchor, "W")==0) self->anchor = W;
-    else if (PyOS_stricmp(anchor, "NW")==0) self->anchor = NW;
-    else if (PyOS_stricmp(anchor, "CENTER")==0) self->anchor = C;
+    if (PyOS_stricmp(anchor, "N")==0
+     || PyOS_stricmp(anchor, "NORTH")==0) self->anchor = PY_ANCHOR_N;
+    else if (PyOS_stricmp(anchor, "NE")==0
+          || PyOS_stricmp(anchor, "NORTHEAST")==0) self->anchor = PY_ANCHOR_NE;
+    else if (PyOS_stricmp(anchor, "E")==0
+          || PyOS_stricmp(anchor, "EAST")==0) self->anchor = PY_ANCHOR_E;
+    else if (PyOS_stricmp(anchor, "SE")==0
+          || PyOS_stricmp(anchor, "SOUTHEAST")==0) self->anchor = PY_ANCHOR_SE;
+    else if (PyOS_stricmp(anchor, "S")==0
+          || PyOS_stricmp(anchor, "SOUTH")==0) self->anchor = PY_ANCHOR_S;
+    else if (PyOS_stricmp(anchor, "SW")==0
+          || PyOS_stricmp(anchor, "SOUTHWEST")==0) self->anchor = PY_ANCHOR_SW;
+    else if (PyOS_stricmp(anchor, "W")==0
+          || PyOS_stricmp(anchor, "WEST")==0) self->anchor = PY_ANCHOR_W;
+    else if (PyOS_stricmp(anchor, "NW")==0
+          || PyOS_stricmp(anchor, "NORTHWEST")==0) self->anchor = PY_ANCHOR_NW;
+    else if (PyOS_stricmp(anchor, "C")==0
+          || PyOS_stricmp(anchor, "CENTER")==0) self->anchor = PY_ANCHOR_C;
     else {
         PyErr_Format(PyExc_ValueError,
-            "expected 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', "
-            "or 'CENTER' (case-insensitive), got %s", anchor);
+            "expected 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', or 'C' "
+            "(case-insensitive), got '%s'", anchor);
         return -1;
     }
     label.needsDisplay = YES;
