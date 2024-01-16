@@ -31,6 +31,12 @@ typedef enum {PY_RELIEF_RAISED,
 
 typedef enum {NORMAL, ACTIVE, DISABLED} State;
 
+typedef enum {PY_STICKY_N = 0x1,
+              PY_STICKY_W = 0x2,
+              PY_STICKY_S = 0x4,
+              PY_STICKY_E = 0x8,
+             } Sticky;
+
 @interface LabelView : NSView
 {
     PyObject* _object;
@@ -56,6 +62,7 @@ typedef struct {
     double highlight_thickness;
     Alignment alignment;
     Relief relief;
+    Sticky sticky;
     double padx;
     double pady;
     Anchor anchor;
@@ -648,6 +655,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->padx = 1.0;
     self->pady = 1.0;
     self->relief = PY_RELIEF_FLAT;
+    self->sticky = 0;
     self->state = NORMAL;
     self->take_focus = false;
     self->is_first_responder = false;
@@ -1265,6 +1273,87 @@ Label_set_relief(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_relief__doc__[] = "desired 3D effect of the label ('NORMAL', 'ACTIVE', or 'DISABLED').";
 
+static PyObject* Label_get_sticky(LabelObject* self, void* closure)
+{
+    char str[4];
+    Sticky sticky = self->sticky;
+    Py_ssize_t i = 0;
+    if (sticky & PY_STICKY_N) str[i++] = 'N';
+    if (sticky & PY_STICKY_W) str[i++] = 'W';
+    if (sticky & PY_STICKY_S) str[i++] = 'S';
+    if (sticky & PY_STICKY_E) str[i++] = 'E';
+    return PyUnicode_FromStringAndSize(str, i);
+}
+
+static int
+Label_set_sticky(LabelObject* self, PyObject* value, void* closure)
+{
+    char c;
+    const char* str;
+    Py_ssize_t i;
+    Py_ssize_t length;
+    Sticky sticky = 0;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (!PyUnicode_Check(value)) {
+        PyErr_SetString(PyExc_ValueError, "expected a string");
+        return -1;
+    }
+    length = PyUnicode_GET_LENGTH(value);
+    str = PyUnicode_AsUTF8(value);
+    for (i = 0; i < length; i++) {
+        c = str[i];
+        switch(c) {
+            case 'N':
+            case 'n':
+                if (sticky & PY_STICKY_N) {
+                    PyErr_Format(PyExc_ValueError,
+                                 "'N' included more than once");
+                    return -1;
+                }
+                sticky |= PY_STICKY_N;
+                break;
+            case 'W':
+            case 'w':
+                if (sticky & PY_STICKY_W) {
+                    PyErr_Format(PyExc_ValueError,
+                                 "'W' included more than once");
+                    return -1;
+                }
+                sticky |= PY_STICKY_W;
+                break;
+            case 'S':
+            case 's':
+                if (sticky & PY_STICKY_S) {
+                    PyErr_Format(PyExc_ValueError,
+                                 "'S' included more than once");
+                    return -1;
+                }
+                sticky |= PY_STICKY_S;
+                break;
+            case 'E':
+            case 'e':
+                if (sticky & PY_STICKY_E) {
+                    PyErr_Format(PyExc_ValueError,
+                                 "'E' included more than once");
+                    return -1;
+                }
+                sticky |= PY_STICKY_E;
+                break;
+            default:
+                PyErr_Format(PyExc_ValueError,
+                    "expected string consisting of 'N', 'W', 'S', and 'E', "
+                    "got '%c'", c);
+                return -1;
+        }
+    }
+    self->sticky = sticky;
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_sticky__doc__[] = "Specifies if the label should stretch if its assigned size is greater than its minimum size. Use a string consisting of 'N', 'W', 'S', 'E' to set this property.";
+
 static PyObject* Label_get_border_width(LabelObject* self, void* closure)
 {
     return PyFloat_FromDouble(self->border_width);
@@ -1567,6 +1656,7 @@ static PyGetSetDef Label_getseters[] = {
     {"disabled_foreground", (getter)Label_get_disabled_foreground, (setter)Label_set_disabled_foreground, Label_disabled_foreground__doc__, NULL},
     {"highlight_background", (getter)Label_get_highlight_background, (setter)Label_set_highlight_background, Label_highlight_background__doc__, NULL},
     {"highlight_color", (getter)Label_get_highlight_color, (setter)Label_set_highlight_color, Label_highlight_color__doc__, NULL},
+    {"sticky", (getter)Label_get_sticky, (setter)Label_set_sticky, Label_sticky__doc__, NULL},
     {"relief", (getter)Label_get_relief, (setter)Label_set_relief, Label_relief__doc__, NULL},
     {"state", (getter)Label_get_state, (setter)Label_set_state, Label_state__doc__, NULL},
     {"take_focus", (getter)Label_get_take_focus, (setter)Label_set_take_focus, Label_take_focus__doc__, NULL},
