@@ -511,8 +511,22 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                                  ((CGFloat)alpha)/USHRT_MAX);
 
     rect = self.frame;
-    rect.origin.x = 0;
-    if ((sticky & PY_STICKY_N) && (sticky &  PY_STICKY_S)) {
+    if ((sticky & (PY_STICKY_W | PY_STICKY_E)) == (PY_STICKY_W | PY_STICKY_E)) {
+        rect.origin.x = 0;
+    }
+    else if (sticky & PY_STICKY_W) {
+        rect.origin.x = 0;
+        rect.size.width = object->minimum_size.width;
+    }
+    else if (sticky & PY_STICKY_S) {
+        rect.origin.x = rect.size.width - object->minimum_size.width;
+        rect.size.width = object->minimum_size.width;
+    }
+    else {
+        rect.origin.x = 0.5 * (rect.size.width - object->minimum_size.width);
+        rect.size.width = object->minimum_size.width;
+    }
+    if ((sticky & (PY_STICKY_N | PY_STICKY_S)) == (PY_STICKY_N | PY_STICKY_S)) {
         rect.origin.y = 0;
     }
     else if (sticky & PY_STICKY_N) {
@@ -564,7 +578,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                     butPtr->indicatorSpace + butPtr->textWidth,
                     butPtr->textHeight, &x, &y);
 */
-    x = 0.5 * rect.size.width - 0.5 * size.width;
+    x = rect.origin.x + 0.5 * rect.size.width - 0.5 * size.width;
     y = rect.origin.y + 0.5 * rect.size.height - 0.5 * size.height;
     _compute_anchor(object, rect.size, size, &x, &y);
 
@@ -593,7 +607,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                                  ((CGFloat)blue)/USHRT_MAX,
                                  ((CGFloat)alpha)/USHRT_MAX);
     CGContextSaveGState(cr);
-    CGContextTranslateCTM(cr, x, rect.size.height + y + rect.origin.y);
+    CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
     CGContextScaleCTM(cr, 1.0, -1.0);
     CTFrameDraw(frame, cr);
     CGContextRestoreGState(cr);
@@ -608,7 +622,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
         ColorObject* color;
         CGFloat inset = object->highlight_thickness;
         CGFloat border_width = object->border_width;
-        x = inset;
+        x = rect.origin.x + inset;
         y = rect.origin.y + inset;
         width = rect.size.width - 2 * inset;
         height = rect.size.height - 2 * inset;
