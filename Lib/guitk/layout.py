@@ -7,16 +7,16 @@ class Grid(gui.Layout):
         assert ncols > 0
         self.nrows = nrows
         self.ncols = ncols
-        self.objects = [[None for j in range(ncols)] for i in range(nrows)]
+        self.widgets = [[None for j in range(ncols)] for i in range(nrows)]
     def __getitem__(self, key):
         i, j = key
-        return self.objects[i][j]
+        return self.widgets[i][j]
     def __setitem__(self, key, value):
         i, j = key
-        obj = self.objects[i][j]
+        obj = self.widgets[i][j]
         if obj:
             obj.remove()
-        self.objects[i][j] = value
+        self.widgets[i][j] = value
         self.add(value)
     def layout(self):
         print("Performing layout")
@@ -26,15 +26,15 @@ class Grid(gui.Layout):
         vexpand = array.array('b', [0]*self.nrows)
         for i in range(self.nrows):
             for j in range(self.ncols):
-                object = self.objects[i][j]
-                if object is None:
+                widget = self.widgets[i][j]
+                if widget is None:
                     continue
-                width, height = object.minimum_size
+                width, height = widget.minimum_size
                 widths[j] = max(widths[j], width)
                 heights[i] = max(heights[i], height)
-                if object.hexpand:
+                if widget.hexpand:
                     hexpand[j] = 1
-                if object.vexpand:
+                if widget.vexpand:
                     vexpand[i] = 1
         width, height = self.size
         shexpand = sum(hexpand)
@@ -57,22 +57,22 @@ class Grid(gui.Layout):
             xs[j] = xs[j-1] + widths[j-1]
         for i in range(self.nrows):
             for j in range(self.ncols):
-                object = self.objects[i][j]
-                if object is None:
+                widget = self.widgets[i][j]
+                if widget is None:
                     continue
-                x, y, w, h = object.place(xs[j], ys[i], widths[j], heights[i])
-                object.origin = (x, y)
-                object.size = (w, h)
+                x, y, w, h = widget.place(xs[j], ys[i], widths[j], heights[i])
+                widget.origin = (x, y)
+                widget.size = (w, h)
     @property
     def minimum_size(self):
         heights = array.array('f', [0]*self.nrows)
         widths = array.array('f', [0]*self.ncols)
         for i in range(self.nrows):
             for j in range(self.ncols):
-                object = self.objects[i][j]
-                if object is None:
+                widget = self.widgets[i][j]
+                if widget is None:
                     continue
-                width, height = object.minimum_size
+                width, height = widget.minimum_size
                 widths[j] = max(widths[j], width)
                 heights[i] = max(heights[i], height)
         width = sum(widths)

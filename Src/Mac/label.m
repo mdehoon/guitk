@@ -45,6 +45,7 @@ typedef enum {PY_STICKY_N = 0x1,
 - (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
 - (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
+- (void)viewWillDraw;
 @end
 
 typedef struct {
@@ -543,6 +544,14 @@ exit:
     return YES;
 }
 
+- (void)viewWillDraw {
+    LabelObject* object = (LabelObject*) _object;
+    CGSize size = object->minimum_size;
+    if (CGSizeEqualToSize(size, CGSizeZero)) {
+        Label_calculate_minimum_size(object);
+    }
+}
+
 /* TkpDisplayButton */
 - (void)drawRect:(NSRect)dirtyRect
 {
@@ -572,10 +581,6 @@ exit:
                            kCFBooleanTrue };
     const Relief relief = object->relief;
 
-    if (CGSizeEqualToSize(object->minimum_size, CGSizeZero)) {
-        /* This may happen if there is no layout manager */
-        if (Label_calculate_minimum_size(object) == false) return;
-    }
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
     cr = [gc CGContext];
@@ -611,7 +616,7 @@ exit:
         rect.origin.x = 0;
         rect.size.width = object->minimum_size.width;
     }
-    else if (sticky & PY_STICKY_S) {
+    else if (sticky & PY_STICKY_E) {
         rect.origin.x = rect.size.width - object->minimum_size.width;
         rect.size.width = object->minimum_size.width;
     }

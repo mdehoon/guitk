@@ -50,7 +50,12 @@ PyTypeObject LayoutType;
     WindowObject* object = window.object;
     if (object->layout_requested) {
         PyObject* result;
-        PyGILState_STATE gstate = PyGILState_Ensure();
+        PyGILState_STATE gstate;
+        /* This will call viewWillDraw on all subviews, allowing them
+         * update their minimum size:
+         */
+        [super viewWillDraw];
+        gstate = PyGILState_Ensure();
         result = PyObject_CallMethod(_object, "layout", NULL);
         if (result)
             Py_DECREF(result);
@@ -59,9 +64,6 @@ PyTypeObject LayoutType;
         PyGILState_Release(gstate);
         object->layout_requested = NO;
     }
-    /* Don't call [super viewWillDraw]; we only want the top view to receive
-     * this notification.
-     */
 }
 
 - (void)drawRect:(NSRect)dirtyRect
