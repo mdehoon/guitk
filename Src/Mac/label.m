@@ -73,13 +73,13 @@ typedef struct {
     long wrap_length;
     bool take_focus;
     bool is_first_responder;
-    PyObject* minimum_size;
+    CGSize minimum_size;
 } LabelObject;
 
 
 /* TkComputeAnchor */
 static void
-_compute_anchor(LabelObject* object, CGSize outer, CGSize inner,
+_compute_anchor(LabelObject* object, const CGSize outer, const CGSize inner,
                 CGFloat* x, CGFloat* y)
 {
     Anchor anchor = object->anchor;
@@ -401,7 +401,7 @@ _draw_3d_horizontal_bevel(CGContextRef cr,
 
 /* Tk_DrawFocusHighlight */
 static void
-_draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat width)
+_draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat width)
 {
 /*
     On X11: TkDrawInsetFocusHighlight(tkwin, gc, width, drawable, 0);
@@ -416,10 +416,9 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
                                  ((CGFloat)alpha)/USHRT_MAX);
-    CGRect outer = CGRectMake(0, 0, size.width, size.height);
-    CGRect inner = CGRectInset(outer, width, width);
+    CGRect inner = CGRectInset(rect, width, width);
     CGContextBeginPath(cr);
-    CGContextAddRect(cr, outer);
+    CGContextAddRect(cr, rect);
     CGContextAddRect(cr, inner);
     CGContextEOFillPath(cr);
 }
@@ -478,6 +477,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
     unsigned short red, green, blue, alpha;
 
     LabelObject* object = (LabelObject*)_object;
+    Sticky sticky = object->sticky;
     CFStringRef keys[] = { kCTFontAttributeName,
                            kCTForegroundColorFromContextAttributeName };
     CFTypeRef values[] = { object->font->font,
@@ -509,7 +509,25 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
                                  ((CGFloat)alpha)/USHRT_MAX);
-    rect = NSRectToCGRect(dirtyRect);
+
+    rect = self.frame;
+    rect.origin.x = 0;
+    if ((sticky & PY_STICKY_N) && (sticky &  PY_STICKY_S)) {
+        rect.origin.y = 0;
+    }
+    else if (sticky & PY_STICKY_N) {
+        rect.origin.y = 0;
+        rect.size.height = object->minimum_size.height;
+    }
+    else if (sticky & PY_STICKY_S) {
+        rect.origin.y = rect.size.height - object->minimum_size.height;
+        rect.size.height = object->minimum_size.height;
+    }
+    else {
+        rect.origin.y = 0.5 * (rect.size.height - object->minimum_size.height);
+        rect.size.height = object->minimum_size.height;
+    }
+
 /*
     Tk_Fill3DRectangle(tkwin, pixmap, border, 0, 0, Tk_Width(tkwin),
             Tk_Height(tkwin), 0, TK_RELIEF_FLAT);
@@ -532,10 +550,9 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
     if (!framesetter) return;
     size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, constraints, &fitRange);
 
-    rect.origin.x = 0;
-    rect.origin.y = 0;
-    rect.size = self.frame.size;
-    path = CGPathCreateWithRect(rect, NULL);
+    width = self.frame.size.width;
+    height = self.frame.size.height;
+    path = CGPathCreateWithRect(CGRectMake(0, 0, rect.size.width, rect.size.height), NULL);
     if (path) {
         frame = CTFramesetterCreateFrame(framesetter, range, path, NULL);
         CFRelease(framesetter);
@@ -548,7 +565,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
                     butPtr->textHeight, &x, &y);
 */
     x = 0.5 * rect.size.width - 0.5 * size.width;
-    y = 0.5 * rect.size.height - 0.5 * size.height;
+    y = rect.origin.y + 0.5 * rect.size.height - 0.5 * size.height;
     _compute_anchor(object, rect.size, size, &x, &y);
 
     switch (object->state) {
@@ -576,7 +593,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
                                  ((CGFloat)blue)/USHRT_MAX,
                                  ((CGFloat)alpha)/USHRT_MAX);
     CGContextSaveGState(cr);
-    CGContextTranslateCTM(cr, x, rect.size.height + y);
+    CGContextTranslateCTM(cr, x, rect.size.height + y + rect.origin.y);
     CGContextScaleCTM(cr, 1.0, -1.0);
     CTFrameDraw(frame, cr);
     CGContextRestoreGState(cr);
@@ -592,7 +609,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
         CGFloat inset = object->highlight_thickness;
         CGFloat border_width = object->border_width;
         x = inset;
-        y = inset;
+        y = rect.origin.y + inset;
         width = rect.size.width - 2 * inset;
         height = rect.size.height - 2 * inset;
         switch (object->state) {
@@ -624,7 +641,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGSize size, CGFloat 
 /*
             Tk_DrawFocusHighlight(tkwin, gc, butPtr->highlightWidth, pixmap);
 */
-            _draw_focus_highlight(cr, color, rect.size, object->highlight_thickness);
+        _draw_focus_highlight(cr, color, rect, object->highlight_thickness);
     }
 }
 
@@ -666,7 +683,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->font = NULL;
     self->anchor = PY_ANCHOR_C;
     self->wrap_length = 0;
-    self->minimum_size = NULL;
+    self->minimum_size = CGSizeZero;
     return (PyObject*)self;
 }
 
@@ -947,10 +964,7 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
     if (!text) return -1;
     if (self->text) CFRelease(self->text);
     self->text = text;
-    if (self->minimum_size) {
-        Py_DECREF(self->minimum_size);
-        self->minimum_size = NULL;
-    }
+    self->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
     [window requestLayout];
@@ -979,10 +993,7 @@ Label_set_font(LabelObject* self, PyObject* value, void* closure)
     Py_INCREF(value);
     Py_DECREF(self->font);
     self->font = (FontObject*) value;
-    if (self->minimum_size) {
-        Py_DECREF(self->minimum_size);
-        self->minimum_size = NULL;
-    }
+    self->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
     [window requestLayout];
@@ -1444,10 +1455,7 @@ Label_set_width(LabelObject* self, PyObject* value, void* closure)
     const CGFloat width = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     self->width = width;
-    if (self->minimum_size) {
-        Py_DECREF(self->minimum_size);
-        self->minimum_size = NULL;
-    }
+    self->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
     [window requestLayout];
@@ -1470,10 +1478,7 @@ Label_set_height(LabelObject* self, PyObject* value, void* closure)
     const CGFloat height = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     self->height = height;
-    if (self->minimum_size) {
-        Py_DECREF(self->minimum_size);
-        self->minimum_size = NULL;
-    }
+    self->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
     [window requestLayout];
@@ -1547,7 +1552,7 @@ Label_set_anchor(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_anchor__doc__[] = "anchor specifying location of the label.";
 
-static PyObject* Label_calculate_minimum_size(LabelObject* self)
+static bool Label_calculate_minimum_size(LabelObject* self)
 {
     CFAttributedStringRef string = NULL;
     CFDictionaryRef attributes = NULL;
@@ -1560,7 +1565,7 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self)
     CFRange fitRange;
     CFStringRef keys[] = { kCTFontAttributeName };
     CFTypeRef values[] = { self->font->font } ;
-    PyObject* result = NULL;
+    bool result = false;
 
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
@@ -1625,7 +1630,9 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self)
 
     width += 2 * (self->padx + self->highlight_thickness + self->border_width);
     height += 2 * (self->pady + self->highlight_thickness + self->border_width);
-    result =  Py_BuildValue("ff", width, height);
+    self->minimum_size.width = width;
+    self->minimum_size.height = height;
+    result = true;
 
 exit:
     if (attributes) CFRelease(attributes);
@@ -1635,13 +1642,12 @@ exit:
 
 static PyObject* Label_get_minimum_size(LabelObject* self, void* closure)
 {
-    PyObject* minimum_size = self->minimum_size;
-    if (minimum_size==NULL) {
-        minimum_size = Label_calculate_minimum_size(self);
-        self->minimum_size = minimum_size;
+    CGSize size = self->minimum_size;
+    if (CGSizeEqualToSize(size, CGSizeZero)) {
+        if (Label_calculate_minimum_size(self) == false) return NULL;
+        size = self->minimum_size;
     }
-    Py_INCREF(minimum_size);
-    return minimum_size;
+    return Py_BuildValue("ff", size.width, size.height);
 }
 
 static char Label_minimum_size__doc__[] = "minimum size needed to show the label.";
