@@ -458,7 +458,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
 /* TkpDisplayButton */
 - (void)drawRect:(NSRect)dirtyRect
 {
-    CFAttributedStringRef string = NULL;
+    CFMutableAttributedStringRef string = NULL;
     CFDictionaryRef attributes = NULL;
     CGContextRef cr;
     NSGraphicsContext* gc;
@@ -469,14 +469,14 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     CGPathRef path;
     CGFloat width;
     CGFloat height;
-    CFRange range = CFRangeMake(0, 0);
     CGSize constraints = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
     CTFrameRef frame = NULL;
-    CTFramesetterRef framesetter;
+    CTFramesetterRef framesetter = NULL;
     CFRange fitRange;
     unsigned short red, green, blue, alpha;
-
     LabelObject* object = (LabelObject*)_object;
+    CFRange range = CFRangeMake(0, CFStringGetLength(object->text));
+
     Sticky sticky = object->sticky;
     CFStringRef keys[] = { kCTFontAttributeName,
                            kCTForegroundColorFromContextAttributeName };
@@ -547,19 +547,34 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
             Tk_Height(tkwin), 0, TK_RELIEF_FLAT);
 */
     CGContextFillRect(cr, rect);
+    string = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
+    if (!string) return;
+    CFAttributedStringReplaceString(string, CFRangeMake(0, 0), object->text);
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
                                     (const void**)&values,
                                     2,
                                     &kCFTypeDictionaryKeyCallBacks,
                                     &kCFTypeDictionaryValueCallBacks);
-    if (!attributes) return;
-    string = CFAttributedStringCreate(kCFAllocatorDefault,
-                                      object->text,
-                                      attributes);
-    CFRelease(attributes);
-    if (!string) return;
-    framesetter = CTFramesetterCreateWithAttributedString(string);
+    if (attributes) {
+        Py_ssize_t underline = object->underline;
+        CFAttributedStringSetAttributes(string, range, attributes, false);
+        CFRelease(attributes);
+        if (underline >= 0) {
+            CTUnderlineStyle value = kCTUnderlineStyleSingle;
+            CFNumberRef number = CFNumberCreate(kCFAllocatorDefault,
+                                                kCFNumberNSIntegerType,
+                                                &value);
+            if (number) {
+                CFAttributedStringSetAttribute(string,
+                                               CFRangeMake(underline, 1),
+                                               kCTUnderlineStyleAttributeName,
+                                               number);
+                CFRelease(number);
+            }
+        }
+        framesetter = CTFramesetterCreateWithAttributedString(string);
+    }
     CFRelease(string);
     if (!framesetter) return;
     size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, constraints, &fitRange);
@@ -1015,6 +1030,46 @@ Label_set_font(LabelObject* self, PyObject* value, void* closure)
 }
 
 static char Label_font__doc__[] = "font for label";
+
+static PyObject* Label_get_underline(LabelObject* self, void* closure)
+{
+    Py_ssize_t underline = self->underline;
+    if (underline == -1) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    return PyLong_FromSsize_t(underline);
+}
+
+static int
+Label_set_underline(LabelObject* self, PyObject* value, void* closure)
+{
+    Py_ssize_t underline;
+    Window* window;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (value == Py_None) underline = -1;
+    else {
+        if (!PyLong_Check(value)) {
+            PyErr_SetString(PyExc_ValueError, "expected an integer.");
+            return -1;
+        }
+        underline = PyLong_AsSsize_t(value);
+        if (underline == -1 && PyErr_Occurred()) return -1;
+        if (underline < 0) {
+            PyErr_SetString(PyExc_ValueError, "expected a positive integer.");
+            return -1;
+        }
+    }
+    self->underline = underline;
+
+    label.needsDisplay = YES;
+    window = (Window*) [label window];
+    [window requestLayout];
+    return 0;
+}
+
+static char Label_underline__doc__[] = "specifies the index of the character to underline.";
 
 static PyObject* Label_get_active_foreground(LabelObject* self, void* closure)
 {
@@ -1669,6 +1724,7 @@ static char Label_minimum_size__doc__[] = "minimum size needed to show the label
 static PyGetSetDef Label_getseters[] = {
     {"text", (getter)Label_get_text, (setter)Label_set_text, Label_text__doc__, NULL},
     {"font", (getter)Label_get_font, (setter)Label_set_font, Label_font__doc__, NULL},
+    {"underline", (getter)Label_get_underline, (setter)Label_set_underline, Label_underline__doc__, NULL},
     {"foreground", (getter)Label_get_foreground, (setter)Label_set_foreground, Label_foreground__doc__, NULL},
     {"background", (getter)Label_get_background, (setter)Label_set_background, Label_background__doc__, NULL},
     {"active_foreground", (getter)Label_get_active_foreground, (setter)Label_set_active_foreground, Label_active_foreground__doc__, NULL},
