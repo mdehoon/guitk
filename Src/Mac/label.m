@@ -977,16 +977,16 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
 */
 
     widget = (WidgetObject*)self;
-    rect.origin.x = 0;
-    rect.origin.y = 0;
-    rect.size.width = 100;
-    rect.size.height = 100;
-    label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
-
     Py_INCREF(font);
-    widget->view = label;
     self->text = text;
     self->font = font;
+
+    if (Label_calculate_minimum_size(self) == false) return -1;
+    rect.origin.x = 0;
+    rect.origin.y = 0;
+    rect.size = self->minimum_size;
+    label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
+    widget->view = label;
 
     Py_INCREF(systemTextColor);
     Py_INCREF(systemTextColor);
@@ -1722,10 +1722,6 @@ static char Label_anchor__doc__[] = "anchor specifying location of the label.";
 static PyObject* Label_get_minimum_size(LabelObject* self, void* closure)
 {
     CGSize size = self->minimum_size;
-    if (CGSizeEqualToSize(size, CGSizeZero)) {
-        if (Label_calculate_minimum_size(self) == false) return NULL;
-        size = self->minimum_size;
-    }
     return Py_BuildValue("ff", size.width, size.height);
 }
 

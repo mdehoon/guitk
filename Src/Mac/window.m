@@ -409,6 +409,7 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
     }
     widget = (WidgetObject*)value;
     view = widget->view;
+    [window setContentSize: view.frame.size];
     [window setContentView: view];
     [window requestLayout];
     Py_DECREF(self->content);
