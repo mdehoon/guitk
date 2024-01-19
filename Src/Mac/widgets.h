@@ -4,6 +4,7 @@
 typedef struct {
     PyObject_HEAD
     NSView* view;
+    CGSize minimum_size;
     char halign;
     char valign;
     BOOL hexpand;

@@ -786,6 +786,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!self) return NULL;
     widget = (WidgetObject*)self;
     widget->view = nil;
+    widget->minimum_size = CGSizeZero;
     self->foreground = NULL;
     self->background = NULL;
     self->active_foreground = NULL;
@@ -1092,6 +1093,7 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
     if (self->text) CFRelease(self->text);
     self->text = text;
     self->minimum_size = CGSizeZero;
+    widget->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
     [window requestLayout];
@@ -1121,6 +1123,7 @@ Label_set_font(LabelObject* self, PyObject* value, void* closure)
     Py_DECREF(self->font);
     self->font = (FontObject*) value;
     self->minimum_size = CGSizeZero;
+    widget->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
     [window requestLayout];
@@ -1623,6 +1626,7 @@ Label_set_width(LabelObject* self, PyObject* value, void* closure)
     if (PyErr_Occurred()) return -1;
     self->width = width;
     self->minimum_size = CGSizeZero;
+    widget->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
     [window requestLayout];
@@ -1646,6 +1650,7 @@ Label_set_height(LabelObject* self, PyObject* value, void* closure)
     if (PyErr_Occurred()) return -1;
     self->height = height;
     self->minimum_size = CGSizeZero;
+    widget->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
     [window requestLayout];
@@ -1721,11 +1726,17 @@ static char Label_anchor__doc__[] = "anchor specifying location of the label.";
 
 static PyObject* Label_get_minimum_size(LabelObject* self, void* closure)
 {
-    CGSize size = self->minimum_size;
-    return Py_BuildValue("ff", size.width, size.height);
+    WidgetObject* widget = (WidgetObject *)self;
+    CGSize size = widget->minimum_size;
+    if (CGSizeEqualToSize(size, CGSizeZero)) {
+        if (Label_calculate_minimum_size(self) == false) return NULL;
+        widget->minimum_size = self->minimum_size;
+        size = widget->minimum_size;
+    }
+    return Py_BuildValue("dd", size.width, size.height);
 }
 
-static char Label_minimum_size__doc__[] = "minimum size needed to show the label.";
+static char Label_minimum_size__doc__[] = "minimum size requested by label.";
 
 static PyGetSetDef Label_getseters[] = {
     {"text", (getter)Label_get_text, (setter)Label_set_text, Label_text__doc__, NULL},

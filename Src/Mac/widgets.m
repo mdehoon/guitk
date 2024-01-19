@@ -232,6 +232,16 @@ static int Widget_set_size(WidgetObject* self, PyObject* value, void* closure)
 
 static char Widget_size__doc__[] = "Widget size";
 
+static PyObject* Widget_get_minimum_size(WidgetObject* self, void* closure)
+{
+    PyErr_Format(PyExc_NotImplementedError,
+                 "derived class '%s' must implement the attribute "
+                 "'minimum_size'.", Py_TYPE(self)->tp_name);
+    return NULL;
+}
+
+static char Widget_minimum_size__doc__[] = "Minimum size requested by widget";
+
 static PyObject* Widget_get_halign(WidgetObject* self, void* closure)
 {
     const char* s;
@@ -381,6 +391,7 @@ static char Widget_vexpand__doc__[] = "Widget should expand vertically";
 static PyGetSetDef Widget_getset[] = {
     {"origin", (getter)Widget_get_origin, (setter)Widget_set_origin, Widget_origin__doc__, NULL},
     {"size", (getter)Widget_get_size, (setter)Widget_set_size, Widget_size__doc__, NULL},
+    {"minimum_size", (getter)Widget_get_minimum_size, NULL, Widget_minimum_size__doc__, NULL},
     {"halign", (getter)Widget_get_halign, (setter)Widget_set_halign, Widget_halign__doc__, NULL},
     {"valign", (getter)Widget_get_valign, (setter)Widget_set_valign, Widget_valign__doc__, NULL},
     {"hexpand", (getter)Widget_get_hexpand, (setter)Widget_set_hexpand, Widget_hexpand__doc__, NULL},
