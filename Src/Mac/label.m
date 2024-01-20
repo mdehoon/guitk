@@ -74,7 +74,6 @@ typedef struct {
     long wrap_length;
     bool take_focus;
     bool is_first_responder;
-    CGSize minimum_size;
 } LabelObject;
 
 
@@ -503,8 +502,6 @@ static bool Label_calculate_minimum_size(LabelObject* self)
 
     width += 2 * (self->padx + self->highlight_thickness + self->border_width);
     height += 2 * (self->pady + self->highlight_thickness + self->border_width);
-    self->minimum_size.width = width;
-    self->minimum_size.height = height;
     widget->minimum_size.width = width;
     widget->minimum_size.height = height;
     result = true;
@@ -548,10 +545,10 @@ exit:
 }
 
 - (void)viewWillDraw {
-    LabelObject* object = (LabelObject*) _object;
-    CGSize size = object->minimum_size;
+    WidgetObject* widget = (WidgetObject*) _object;
+    CGSize size = widget->minimum_size;
     if (CGSizeEqualToSize(size, CGSizeZero)) {
-        Label_calculate_minimum_size(object);
+        Label_calculate_minimum_size((LabelObject*) _object);
     }
 }
 
@@ -575,6 +572,7 @@ exit:
     CFRange fitRange;
     unsigned short red, green, blue, alpha;
     LabelObject* object = (LabelObject*)_object;
+    WidgetObject* widget = (WidgetObject*)_object;
     CFRange range = CFRangeMake(0, CFStringGetLength(object->text));
 
     Sticky sticky = object->sticky;
@@ -610,37 +608,36 @@ exit:
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
                                  ((CGFloat)alpha)/USHRT_MAX);
-
     rect = self.frame;
     if ((sticky & (PY_STICKY_W | PY_STICKY_E)) == (PY_STICKY_W | PY_STICKY_E)) {
         rect.origin.x = 0;
     }
     else if (sticky & PY_STICKY_W) {
         rect.origin.x = 0;
-        rect.size.width = object->minimum_size.width;
+        rect.size.width = widget->minimum_size.width;
     }
     else if (sticky & PY_STICKY_E) {
-        rect.origin.x = rect.size.width - object->minimum_size.width;
-        rect.size.width = object->minimum_size.width;
+        rect.origin.x = rect.size.width - widget->minimum_size.width;
+        rect.size.width = widget->minimum_size.width;
     }
     else {
-        rect.origin.x = 0.5 * (rect.size.width - object->minimum_size.width);
-        rect.size.width = object->minimum_size.width;
+        rect.origin.x = 0.5 * (rect.size.width - widget->minimum_size.width);
+        rect.size.width = widget->minimum_size.width;
     }
     if ((sticky & (PY_STICKY_N | PY_STICKY_S)) == (PY_STICKY_N | PY_STICKY_S)) {
         rect.origin.y = 0;
     }
     else if (sticky & PY_STICKY_N) {
         rect.origin.y = 0;
-        rect.size.height = object->minimum_size.height;
+        rect.size.height = widget->minimum_size.height;
     }
     else if (sticky & PY_STICKY_S) {
-        rect.origin.y = rect.size.height - object->minimum_size.height;
-        rect.size.height = object->minimum_size.height;
+        rect.origin.y = rect.size.height - widget->minimum_size.height;
+        rect.size.height = widget->minimum_size.height;
     }
     else {
-        rect.origin.y = 0.5 * (rect.size.height - object->minimum_size.height);
-        rect.size.height = object->minimum_size.height;
+        rect.origin.y = 0.5 * (rect.size.height - widget->minimum_size.height);
+        rect.size.height = widget->minimum_size.height;
     }
 
 /*
@@ -814,7 +811,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->font = NULL;
     self->anchor = PY_ANCHOR_C;
     self->wrap_length = 0;
-    self->minimum_size = CGSizeZero;
+    // self->minimum_size = CGSizeZero;
     return (PyObject*)self;
 }
 
@@ -988,7 +985,8 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     if (Label_calculate_minimum_size(self) == false) return -1;
     rect.origin.x = 0;
     rect.origin.y = 0;
-    rect.size = self->minimum_size;
+    rect.size = widget->minimum_size;
+
     label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
     widget->view = label;
 
@@ -1095,7 +1093,6 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
     if (!text) return -1;
     if (self->text) CFRelease(self->text);
     self->text = text;
-    self->minimum_size = CGSizeZero;
     widget->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
@@ -1125,7 +1122,6 @@ Label_set_font(LabelObject* self, PyObject* value, void* closure)
     Py_INCREF(value);
     Py_DECREF(self->font);
     self->font = (FontObject*) value;
-    self->minimum_size = CGSizeZero;
     widget->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
@@ -1628,7 +1624,6 @@ Label_set_width(LabelObject* self, PyObject* value, void* closure)
     const CGFloat width = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     self->width = width;
-    self->minimum_size = CGSizeZero;
     widget->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
@@ -1652,7 +1647,6 @@ Label_set_height(LabelObject* self, PyObject* value, void* closure)
     const CGFloat height = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     self->height = height;
-    self->minimum_size = CGSizeZero;
     widget->minimum_size = CGSizeZero;
     label.needsDisplay = YES;
     window = (Window*) [label window];
