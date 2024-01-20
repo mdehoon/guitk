@@ -63,8 +63,7 @@ class Grid(gui.Layout):
                 x, y, w, h = widget.place(xs[j], ys[i], widths[j], heights[i])
                 widget.origin = (x, y)
                 widget.size = (w, h)
-    @property
-    def minimum_size(self):
+    def calculate_minimum_size(self):
         heights = array.array('f', [0]*self.nrows)
         widths = array.array('f', [0]*self.ncols)
         for i in range(self.nrows):
