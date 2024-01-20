@@ -27,5 +27,5 @@ class App(gui.Window):
         print("hi there, everyone")
 
 window = App()
-window.size = (300, 50)
+window.size = window.content.minimum_size
 window.show()

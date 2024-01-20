@@ -104,8 +104,9 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
                 width = minimum_width;
                 break;
             default:
-                PyErr_SetString(PyExc_SystemError,
-                                "halign should be 'f', 'l', 'c', or 'r'");
+                PyErr_Format(PyExc_RuntimeError,
+                             "halign should be 'f', 'l', 'c', or 'r' "
+                             "(got '%d')", self->halign);
                 return NULL;
         }
         switch (self->valign) {
@@ -123,8 +124,9 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
                 height = minimum_height;
                 break;
             default:
-                PyErr_SetString(PyExc_SystemError,
-                                "valign should be 'f', 't', 'c', or 'b'");
+                PyErr_Format(PyExc_RuntimeError,
+                             "valign should be 'f', 't', 'c', or 'b' "
+                             "(got '%d')", self->valign);
                 return NULL;
         }
     }
@@ -184,11 +186,13 @@ static int Widget_set_origin(WidgetObject* self, PyObject* value, void* closure)
     NSView* view = self->view;
     NSWindow* window = [view window];
     if (!PyArg_ParseTuple(value, "ff", &x, &y)) return -1;
+/*
     if (view == [window contentView])
     {
         PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be moved.");
         return -1;
     }
+*/
     point.x = x;
     point.y = y;
     [view setFrameOrigin: point];
@@ -217,11 +221,13 @@ static int Widget_set_size(WidgetObject* self, PyObject* value, void* closure)
     NSView* view = self->view;
     NSWindow* window = [view window];
     if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
+/*
     if (view == [window contentView])
     {
         PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be resized.");
         return -1;
     }
+*/
     rect = view.frame;
     rect.size.width = width;
     rect.size.height = height;
@@ -252,7 +258,9 @@ static PyObject* Widget_get_halign(WidgetObject* self, void* closure)
         case 'r': s = "RIGHT"; break;
         case 'f': s = "FILL"; break;
         default:
-            PyErr_SetString(PyExc_SystemError, "unexpected alignment value.");
+            PyErr_Format(PyExc_RuntimeError,
+                         "halign should be 'f', 'l', 'c', or 'r' (got '%d')",
+                         c);
             return NULL;
     }
     return PyUnicode_FromString(s);
@@ -297,7 +305,9 @@ static PyObject* Widget_get_valign(WidgetObject* self, void* closure)
         case 'b': s = "BOTTOM"; break;
         case 'f': s = "FILL"; break;
         default:
-            PyErr_SetString(PyExc_SystemError, "unexpected alignment value.");
+            PyErr_Format(PyExc_RuntimeError,
+                         "valign should be 'f', 't', 'c', or 'b' (got '%d')",
+                         c);
             return NULL;
     }
     return PyUnicode_FromString(s);

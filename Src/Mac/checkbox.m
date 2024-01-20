@@ -286,7 +286,7 @@ static PyObject* Checkbox_get_state(CheckboxObject* self, void* closure)
     if (state == NSOnState) Py_RETURN_TRUE;
     if (state == NSOffState) Py_RETURN_FALSE;
 #endif
-    PyErr_SetString(PyExc_SystemError, "checkbox state is unknown.");
+    PyErr_SetString(PyExc_RuntimeError, "checkbox state is unknown.");
     return NULL;
 }
 

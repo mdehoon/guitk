@@ -191,11 +191,13 @@ static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
     NSView* view = widget->view;
     NSWindow* window = [view window];
     if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
+/*
     if (view == [window contentView])
     {
         PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be resized.");
         return -1;
     }
+*/
     size.width = width;
     size.height = height;
     [view setFrameSize: size];
