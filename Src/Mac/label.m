@@ -438,6 +438,7 @@ static bool Label_calculate_minimum_size(LabelObject* self)
     CFStringRef keys[] = { kCTFontAttributeName };
     CFTypeRef values[] = { self->font->font } ;
     bool result = false;
+    WidgetObject* widget = (WidgetObject*) self;
 
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
@@ -504,6 +505,8 @@ static bool Label_calculate_minimum_size(LabelObject* self)
     height += 2 * (self->pady + self->highlight_thickness + self->border_width);
     self->minimum_size.width = width;
     self->minimum_size.height = height;
+    widget->minimum_size.width = width;
+    widget->minimum_size.height = height;
     result = true;
 
 exit:
@@ -1730,7 +1733,6 @@ static PyObject* Label_get_minimum_size(LabelObject* self, void* closure)
     CGSize size = widget->minimum_size;
     if (CGSizeEqualToSize(size, CGSizeZero)) {
         if (Label_calculate_minimum_size(self) == false) return NULL;
-        widget->minimum_size = self->minimum_size;
         size = widget->minimum_size;
     }
     return Py_BuildValue("dd", size.width, size.height);
