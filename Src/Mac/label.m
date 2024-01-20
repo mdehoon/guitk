@@ -76,6 +76,7 @@ typedef struct {
     bool is_first_responder;
 } LabelObject;
 
+static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure);
 
 /* TkComputeAnchor */
 static void
@@ -423,95 +424,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     CGContextEOFillPath(cr);
 }
 
-static bool Label_calculate_minimum_size(LabelObject* self)
-{
-    CFAttributedStringRef string = NULL;
-    CFDictionaryRef attributes = NULL;
-    CGSize size;
-    CGFloat width;
-    CGFloat height;
-    CFRange range = CFRangeMake(0, 0);
-    CGSize constraints = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
-    CTFramesetterRef framesetter = NULL;
-    CFRange fitRange;
-    CFStringRef keys[] = { kCTFontAttributeName };
-    CFTypeRef values[] = { self->font->font } ;
-    bool result = false;
-    WidgetObject* widget = (WidgetObject*) self;
-
-    attributes = CFDictionaryCreate(kCFAllocatorDefault,
-                                    (const void**)&keys,
-                                    (const void**)&values,
-                                    1,
-                                    &kCFTypeDictionaryKeyCallBacks,
-                                    &kCFTypeDictionaryValueCallBacks);
-    if (!attributes) {
-        PyErr_SetString(PyExc_MemoryError,
-                        "failed to create attributes dictionary");
-        goto exit;
-    }
-
-    if (self->width == 0 || self->height == 0) {
-        string = CFAttributedStringCreate(kCFAllocatorDefault,
-                                          self->text,
-                                          attributes);
-        if (!string) {
-            PyErr_SetString(PyExc_MemoryError,
-                            "failed to create attributed string");
-            goto exit;
-        }
-        framesetter = CTFramesetterCreateWithAttributedString(string);
-        CFRelease(string);
-        if (!framesetter) {
-            PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
-            goto exit;
-        }
-        size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter,
-                                                            range,
-                                                            NULL,
-                                                            constraints,
-                                                            &fitRange);
-        width = size.width;
-        height = size.height;
-    }
-
-    if (self->width > 0 || self->height > 0) {
-        string = CFAttributedStringCreate(kCFAllocatorDefault,
-                                          CFSTR("0"),
-                                          attributes);
-        if (!string) {
-            PyErr_SetString(PyExc_MemoryError,
-                            "failed to create attributed string");
-            goto exit;
-        }
-        if (framesetter) CFRelease(framesetter);
-        framesetter = CTFramesetterCreateWithAttributedString(string);
-        CFRelease(string);
-        if (!framesetter) {
-            PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
-            goto exit;
-        }
-        size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter,
-                                                            range,
-                                                            NULL,
-                                                            constraints,
-                                                            &fitRange);
-        if (self->width > 0) width = self->width * size.width;
-        if (self->height > 0) height = self->height * size.height;
-    }
-
-    width += 2 * (self->padx + self->highlight_thickness + self->border_width);
-    height += 2 * (self->pady + self->highlight_thickness + self->border_width);
-    widget->minimum_size.width = width;
-    widget->minimum_size.height = height;
-    result = true;
-
-exit:
-    if (attributes) CFRelease(attributes);
-    if (framesetter) CFRelease(framesetter);
-    return result;
-}
-
 @implementation LabelView
 - (PyObject*)object
 {
@@ -548,7 +460,14 @@ exit:
     WidgetObject* widget = (WidgetObject*) _object;
     CGSize size = widget->minimum_size;
     if (CGSizeEqualToSize(size, CGSizeZero)) {
-        Label_calculate_minimum_size((LabelObject*) _object);
+        PyObject* tuple;
+        PyGILState_STATE gstate = PyGILState_Ensure();
+        tuple = Label_calculate_minimum_size((LabelObject*) _object, NULL);
+        if (tuple)
+            Py_DECREF(tuple);
+        else
+            PyErr_Print();
+        PyGILState_Release(gstate);
     }
 }
 
@@ -982,7 +901,11 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     self->text = text;
     self->font = font;
 
-    if (Label_calculate_minimum_size(self) == false) return -1;
+    {
+        PyObject* tuple = Label_calculate_minimum_size(self, NULL);
+        if (tuple == NULL) return -1;
+        Py_DECREF(tuple);
+    }
     rect.origin.x = 0;
     rect.origin.y = 0;
     rect.size = widget->minimum_size;
@@ -1068,11 +991,106 @@ Label_set_position(LabelObject* self, PyObject *args)
     return Py_None;
 }
 
+static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
+{
+    CFAttributedStringRef string = NULL;
+    CFDictionaryRef attributes = NULL;
+    CGSize size;
+    CGFloat width;
+    CGFloat height;
+    CFRange range = CFRangeMake(0, 0);
+    CGSize constraints = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
+    CTFramesetterRef framesetter = NULL;
+    CFRange fitRange;
+    CFStringRef keys[] = { kCTFontAttributeName };
+    CFTypeRef values[] = { self->font->font } ;
+    PyObject* tuple = NULL;
+
+    attributes = CFDictionaryCreate(kCFAllocatorDefault,
+                                    (const void**)&keys,
+                                    (const void**)&values,
+                                    1,
+                                    &kCFTypeDictionaryKeyCallBacks,
+                                    &kCFTypeDictionaryValueCallBacks);
+    if (!attributes) {
+        PyErr_SetString(PyExc_MemoryError,
+                        "failed to create attributes dictionary");
+        return NULL;
+    }
+
+    if (self->width == 0 || self->height == 0) {
+        string = CFAttributedStringCreate(kCFAllocatorDefault,
+                                          self->text,
+                                          attributes);
+        if (!string) {
+            PyErr_SetString(PyExc_MemoryError,
+                            "failed to create attributed string");
+            goto exit;
+        }
+        framesetter = CTFramesetterCreateWithAttributedString(string);
+        CFRelease(string);
+        if (!framesetter) {
+            PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
+            goto exit;
+        }
+        size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter,
+                                                            range,
+                                                            NULL,
+                                                            constraints,
+                                                            &fitRange);
+        width = size.width;
+        height = size.height;
+    }
+
+    if (self->width > 0 || self->height > 0) {
+        string = CFAttributedStringCreate(kCFAllocatorDefault,
+                                          CFSTR("0"),
+                                          attributes);
+        if (!string) {
+            PyErr_SetString(PyExc_MemoryError,
+                            "failed to create attributed string");
+            goto exit;
+        }
+        if (framesetter) CFRelease(framesetter);
+        framesetter = CTFramesetterCreateWithAttributedString(string);
+        CFRelease(string);
+        if (!framesetter) {
+            PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
+            goto exit;
+        }
+        size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter,
+                                                            range,
+                                                            NULL,
+                                                            constraints,
+                                                            &fitRange);
+        if (self->width > 0) width = self->width * size.width;
+        if (self->height > 0) height = self->height * size.height;
+    }
+
+    width += 2 * (self->padx + self->highlight_thickness + self->border_width);
+    height += 2 * (self->pady + self->highlight_thickness + self->border_width);
+
+    tuple = Py_BuildValue("ff", width, height);
+
+exit:
+    if (attributes) CFRelease(attributes);
+    if (framesetter) CFRelease(framesetter);
+    return tuple;
+}
+
+static char
+Label_calculate_minimum_size__doc__[] = "minimum size requested by label.";
+
 static PyMethodDef Label_methods[] = {
     {"set_position",
      (PyCFunction)Label_set_position,
      METH_VARARGS,
      "Moves the label to the new position."
+    },
+    {"calculate_minimum_size",
+     (PyCFunction)Label_calculate_minimum_size,
+     METH_VARARGS,
+     Label_calculate_minimum_size__doc__
     },
     {NULL}  /* Sentinel */
 };
@@ -1721,19 +1739,6 @@ Label_set_anchor(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_anchor__doc__[] = "anchor specifying location of the label.";
 
-static PyObject* Label_get_minimum_size(LabelObject* self, void* closure)
-{
-    WidgetObject* widget = (WidgetObject *)self;
-    CGSize size = widget->minimum_size;
-    if (CGSizeEqualToSize(size, CGSizeZero)) {
-        if (Label_calculate_minimum_size(self) == false) return NULL;
-        size = widget->minimum_size;
-    }
-    return Py_BuildValue("dd", size.width, size.height);
-}
-
-static char Label_minimum_size__doc__[] = "minimum size requested by label.";
-
 static PyGetSetDef Label_getseters[] = {
     {"text", (getter)Label_get_text, (setter)Label_set_text, Label_text__doc__, NULL},
     {"font", (getter)Label_get_font, (setter)Label_set_font, Label_font__doc__, NULL},
@@ -1756,7 +1761,6 @@ static PyGetSetDef Label_getseters[] = {
     {"highlight_thickness", (getter)Label_get_highlight_thickness, (setter)Label_set_highlight_thickness, Label_highlight_thickness__doc__, NULL},
     {"width", (getter)Label_get_width, (setter)Label_set_width, Label_width__doc__, NULL},
     {"height", (getter)Label_get_height, (setter)Label_set_height, Label_height__doc__, NULL},
-    {"minimum_size", (getter)Label_get_minimum_size, (setter)NULL, Label_minimum_size__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 

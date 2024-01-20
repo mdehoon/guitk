@@ -240,10 +240,52 @@ static char Widget_size__doc__[] = "Widget size";
 
 static PyObject* Widget_get_minimum_size(WidgetObject* self, void* closure)
 {
-    PyErr_Format(PyExc_NotImplementedError,
-                 "derived class '%s' must implement the attribute "
-                 "'minimum_size'.", Py_TYPE(self)->tp_name);
-    return NULL;
+    CGSize size = self->minimum_size;
+    if (CGSizeEqualToSize(size, CGSizeZero)) {
+        PyObject* object = (PyObject*)self;
+        PyObject* tuple;
+        PyObject* item;
+        double width, height;
+        PyGILState_STATE gstate;
+        gstate = PyGILState_Ensure();
+        tuple = PyObject_CallMethod(object, "calculate_minimum_size", NULL);
+        if (!tuple) {
+            PyGILState_Release(gstate);
+            return NULL;
+        }
+        if (!PyTuple_Check(tuple)) {
+            PyErr_SetString(PyExc_ValueError,
+                "calculate_minimum_size must return a tuple.");
+            goto exit;
+        }
+        if (PyTuple_GET_SIZE(tuple) != 2) {
+            PyErr_SetString(PyExc_ValueError,
+                "calculate_minimum_size must return a tuple of size 2.");
+            goto exit;
+        }
+        item = PyTuple_GET_ITEM(tuple, 0);
+        width = PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                "width returned by calculate_minimum_size must be numeric.");
+            goto exit;
+        }
+        item = PyTuple_GET_ITEM(tuple, 1);
+        height = PyFloat_AsDouble(item);
+        if (PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                "height returned by calculate_minimum_size must be numeric.");
+            goto exit;
+        }
+        size.width = width;
+        size.height = height;
+exit:
+        Py_DECREF(tuple);
+        PyGILState_Release(gstate);
+        if (CGSizeEqualToSize(size, CGSizeZero)) return NULL;
+        self->minimum_size = size;
+    }
+    return Py_BuildValue("ff", size.width, size.height);
 }
 
 static char Widget_minimum_size__doc__[] = "Minimum size requested by widget";
