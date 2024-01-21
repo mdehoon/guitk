@@ -45,7 +45,6 @@ typedef enum {PY_STICKY_N = 0x1,
 - (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
 - (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
-- (void)viewWillDraw;
 @end
 
 typedef struct {
@@ -454,21 +453,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     object->is_first_responder = false;
     [self setNeedsDisplay:YES];
     return YES;
-}
-
-- (void)viewWillDraw {
-    WidgetObject* widget = (WidgetObject*) _object;
-    CGSize size = widget->minimum_size;
-    if (CGSizeEqualToSize(size, CGSizeZero)) {
-        PyObject* tuple;
-        PyGILState_STATE gstate = PyGILState_Ensure();
-        tuple = Label_calculate_minimum_size((LabelObject*) _object, NULL);
-        if (tuple)
-            Py_DECREF(tuple);
-        else
-            PyErr_Print();
-        PyGILState_Release(gstate);
-    }
 }
 
 /* TkpDisplayButton */

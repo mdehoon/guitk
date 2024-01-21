@@ -51,10 +51,6 @@ PyTypeObject LayoutType;
     if (object->layout_requested) {
         PyObject* result;
         PyGILState_STATE gstate;
-        /* This will call viewWillDraw on all subviews, allowing them
-         * update their minimum size:
-         */
-        [super viewWillDraw];
         gstate = PyGILState_Ensure();
         result = PyObject_CallMethod(_object, "layout", NULL);
         if (result)
@@ -164,7 +160,7 @@ static PyMethodDef Layout_methods[] = {
     {"layout",
      (PyCFunction)Layout_layout,
      METH_NOARGS,
-     "Default method (no-op)."
+     "Calculate the origin and size of each subwidget, based on the requested minimum size of each widget, their relative positions, and the size allocated to the Layout. Default method: no-op."
     },
     {NULL}  /* Sentinel */
 };
