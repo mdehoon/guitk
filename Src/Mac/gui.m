@@ -111,6 +111,12 @@ PyObject* PyInit_gui(void)
 
     PyObject* system_font_names;
 
+    if (NSApp == NULL) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "events must be imported before importing gui.");
+        return NULL;
+    }
+
     module = PyModule_Create(&moduledef);
     if (module==NULL) goto error;
 

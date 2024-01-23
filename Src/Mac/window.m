@@ -39,6 +39,7 @@
     self.releasedWhenClosed = NO;
     [self setAcceptsMouseMovedEvents: YES];
     [self setDelegate: self];
+    fprintf(stderr, "[window contentView] returns %p\n", [self contentView]);
     return self;
 }
 

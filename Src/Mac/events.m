@@ -11,6 +11,19 @@
 #define COMPILING_FOR_10_12
 #endif
 
+@interface ApplicationDelegate: NSObject <NSApplicationDelegate>
+{
+}
+- (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app;
+@end
+
+@implementation ApplicationDelegate
+- (BOOL)applicationSupportsSecureRestorableState:(NSApplication *)app
+{
+    return true;
+}
+@end
+
 
 static CFMachPortRef receivePort = NULL;
 static mach_port_t rawReceivePort = 0;
@@ -18,6 +31,11 @@ static mach_port_t rawReceivePort = 0;
 static void application_connect(void) {
     NSEvent *event;
     [NSApplication sharedApplication];
+
+    ApplicationDelegate* delegate = [[ApplicationDelegate alloc] init];
+    NSApp.delegate = delegate;
+    [delegate release];
+
     while (true) {
 #ifdef COMPILING_FOR_10_12
         event = [NSApp nextEventMatchingMask:NSEventMaskAny
