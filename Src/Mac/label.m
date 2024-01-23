@@ -437,14 +437,11 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     return self;
 }
 
-- (BOOL)acceptsFirstResponder {
-    return YES;
-}
-
 - (BOOL)becomeFirstResponder {
     LabelObject* object = (LabelObject*) _object;
     object->is_first_responder = true;
     [self setNeedsDisplay:YES];
+fprintf(stderr, "label became first responder\n");
     return YES;
 }
 

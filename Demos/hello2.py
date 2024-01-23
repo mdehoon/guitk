@@ -19,6 +19,7 @@ class App(gui.Window):
         grid = layout.Grid(1,2)
         grid[0,0] = button1
         grid[0,1] = button2
+        grid.size = grid.minimum_size
         self.content = grid
         button1.command = self.close
         button2.command = self.say_hi
@@ -27,5 +28,4 @@ class App(gui.Window):
         print("hi there, everyone")
 
 window = App()
-window.size = window.content.minimum_size
 window.show()

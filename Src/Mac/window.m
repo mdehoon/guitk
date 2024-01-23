@@ -24,6 +24,43 @@
 #endif
 
 
+@interface View : NSView
+{
+    WidgetObject* _object;
+}
+@end
+
+@implementation View : NSView
+- (View *)init
+{
+    self->_object = NULL;
+    return [super init];
+}
+
+- (BOOL)acceptsFirstResponder
+{
+    return YES;
+}
+
+- (void)keyDown:(NSEvent *)event {
+    if (event.type == NSEventTypeKeyDown &&
+        [event.charactersIgnoringModifiers isEqualToString:@"\t"] &&
+        (event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask) == NSEventModifierFlagOption) {
+        NSLog(@"option-tab");
+        [[self window] makeFirstResponder: self->_object->view];
+    } else {
+        [super keyDown:event];
+    }
+}
+
+- (void)setContent:(WidgetObject *)object {
+    Py_INCREF(object);
+    Py_XDECREF(self->_object);
+    self->_object = object;
+}
+@end
+
+
 @implementation Window
 @synthesize object = _object;
 
@@ -31,15 +68,18 @@
                      styleMask: (NSUInteger)windowStyle
                         object: (WindowObject*)object
 {
+    View *view;
     self = [self initWithContentRect: rect
                            styleMask: windowStyle
                              backing: NSBackingStoreBuffered
                                defer: YES];
     _object = object;
     self.releasedWhenClosed = NO;
-    [self setAcceptsMouseMovedEvents: YES];
-    [self setDelegate: self];
-    fprintf(stderr, "[window contentView] returns %p\n", [self contentView]);
+    self.acceptsMouseMovedEvents = YES;
+    self.delegate = self;
+    view = [[View alloc] init];
+    self.contentView = view;
+    [view release];
     return self;
 }
 
@@ -56,13 +96,13 @@
 - (void)windowDidBecomeKey:(NSNotification *)notification;
 {
     _object->is_key = true;
-    [[self contentView] setNeedsDisplay:YES];
+    self.contentView.needsDisplay = YES;
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification;
 {
     _object->is_key = false;
-    [[self contentView] setNeedsDisplay:YES];
+    self.contentView.needsDisplay = YES;
 }
 
 - (void)requestLayout
@@ -410,12 +450,14 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
     }
     widget = (WidgetObject*)value;
     view = widget->view;
-    [window setContentSize: view.frame.size];
-    [window setContentView: view];
+    window.contentSize = view.frame.size;
+    if (window.contentView.subviews.count == 1) {
+        NSView* oldView = window.contentView.subviews.firstObject;
+        [oldView removeFromSuperview];
+    }
+    [window.contentView addSubview: view];
+    [((View*)(window.contentView)) setContent: widget];
     [window requestLayout];
-    Py_DECREF(self->content);
-    Py_INCREF(value);
-    self->content = value;
     return 0;
 }
 
@@ -558,7 +600,7 @@ static PyObject* Window_get_width(WindowObject* self, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    frame = [[window contentView] frame];
+    frame = window.contentView.frame;
     width = round(frame.size.width);
     return PyLong_FromLong(width);
 }
@@ -575,10 +617,10 @@ static int Window_set_width(WindowObject* self, PyObject* value, void* closure)
     }
     width = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
-    frame = [[window contentView] frame];
+    frame = window.contentView.frame;
     size = frame.size;
     size.width = width;
-    [window setContentSize: size];
+    window.contentSize = size;
     return 0;
 }
 
@@ -593,7 +635,7 @@ static PyObject* Window_get_height(WindowObject* self, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    frame = [[window contentView] frame];
+    frame = window.contentView.frame;
     height = round(frame.size.height);
     return PyLong_FromLong(height);
 }
@@ -616,7 +658,7 @@ static int Window_set_height(WindowObject* self, PyObject* value, void* closure)
     height = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     size.height = height;
-    [window setContentSize: size];
+    window.contentSize = size;
     [window setFrameTopLeftPoint: point];
     return 0;
 }
@@ -633,7 +675,7 @@ static PyObject* Window_get_size(WindowObject* self, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    frame = [[window contentView] frame];
+    frame = window.contentView.frame;
     width = frame.size.width;
     height = frame.size.height;
     return Py_BuildValue("dd", width, height);
@@ -658,7 +700,7 @@ static int Window_set_size(WindowObject* self, PyObject* value, void* closure)
     if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
     size.width = width;
     size.height = height;
-    [window setContentSize: size];
+    window.contentSize = size;
     [window setFrameTopLeftPoint: point];
     return 0;
 }
