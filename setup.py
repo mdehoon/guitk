@@ -34,6 +34,7 @@ if sys.platform == 'darwin':
                    "Src/Mac/textbox.m",
                    "Src/Mac/listbox.m",
                    "Src/Mac/colors.m",
+                   "Src/Mac/focus.m",
                   ]
     extra_link_args = ['-framework', 'Cocoa']
 else:

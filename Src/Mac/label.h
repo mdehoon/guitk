@@ -2,12 +2,9 @@
 #include <Python.h>
 
 
-@interface LabelView : NSView
+@interface LabelView : WidgetView
 {
-    PyObject* _object;
 }
-@property(readonly) PyObject* object;
-- (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
 - (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
 - (void)viewWillDraw;

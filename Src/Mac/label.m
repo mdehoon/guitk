@@ -37,12 +37,7 @@ typedef enum {PY_STICKY_N = 0x1,
               PY_STICKY_E = 0x8,
              } Sticky;
 
-@interface LabelView : NSView
-{
-    PyObject* _object;
-}
-@property(readonly) PyObject* object;
-- (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
+@interface LabelView : WidgetView
 - (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
 @end
@@ -424,32 +419,22 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
 }
 
 @implementation LabelView
-- (PyObject*)object
-{
-    return (PyObject*)_object;
-}
-
-- (LabelView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
-{
-    self = [super initWithFrame: rect];
-
-    _object = object;
-    return self;
-}
-
 - (BOOL)becomeFirstResponder {
-    LabelObject* object = (LabelObject*) _object;
-    object->is_first_responder = true;
+    ((LabelObject*)object)->is_first_responder = true;
     [self setNeedsDisplay:YES];
-fprintf(stderr, "label became first responder\n");
     return YES;
 }
 
 - (BOOL)resignFirstResponder {
-    LabelObject* object = (LabelObject*) _object;
-    object->is_first_responder = false;
+    ((LabelObject*)object)->is_first_responder = false;
     [self setNeedsDisplay:YES];
     return YES;
+}
+
+- (BOOL)acceptsFirstResponder {
+    LabelObject* label = (LabelObject*)object;
+    if (label->take_focus) return YES;
+    else return NO;
 }
 
 /* TkpDisplayButton */
@@ -471,16 +456,15 @@ fprintf(stderr, "label became first responder\n");
     CTFramesetterRef framesetter = NULL;
     CFRange fitRange;
     unsigned short red, green, blue, alpha;
-    LabelObject* object = (LabelObject*)_object;
-    WidgetObject* widget = (WidgetObject*)_object;
-    CFRange range = CFRangeMake(0, CFStringGetLength(object->text));
+    LabelObject* label = (LabelObject*)object;
+    CFRange range = CFRangeMake(0, CFStringGetLength(label->text));
 
-    Sticky sticky = object->sticky;
+    Sticky sticky = label->sticky;
     CFStringRef keys[] = { kCTFontAttributeName,
                            kCTForegroundColorFromContextAttributeName };
-    CFTypeRef values[] = { object->font->font,
+    CFTypeRef values[] = { label->font->font,
                            kCFBooleanTrue };
-    const Relief relief = object->relief;
+    const Relief relief = label->relief;
 
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
@@ -488,19 +472,19 @@ fprintf(stderr, "label became first responder\n");
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
-    switch (object->state) {
+    switch (label->state) {
         case ACTIVE:
-            red = object->active_background->rgba[0];
-            green = object->active_background->rgba[1];
-            blue = object->active_background->rgba[2];
-            alpha = object->active_background->rgba[3];
+            red = label->active_background->rgba[0];
+            green = label->active_background->rgba[1];
+            blue = label->active_background->rgba[2];
+            alpha = label->active_background->rgba[3];
             break;
         case NORMAL:
         case DISABLED:
-            red = object->background->rgba[0];
-            green = object->background->rgba[1];
-            blue = object->background->rgba[2];
-            alpha = object->background->rgba[3];
+            red = label->background->rgba[0];
+            green = label->background->rgba[1];
+            blue = label->background->rgba[2];
+            alpha = label->background->rgba[3];
             break;
     }
 
@@ -514,30 +498,30 @@ fprintf(stderr, "label became first responder\n");
     }
     else if (sticky & PY_STICKY_W) {
         rect.origin.x = 0;
-        rect.size.width = widget->minimum_size.width;
+        rect.size.width = label->widget.minimum_size.width;
     }
     else if (sticky & PY_STICKY_E) {
-        rect.origin.x = rect.size.width - widget->minimum_size.width;
-        rect.size.width = widget->minimum_size.width;
+        rect.origin.x = rect.size.width - label->widget.minimum_size.width;
+        rect.size.width = label->widget.minimum_size.width;
     }
     else {
-        rect.origin.x = 0.5 * (rect.size.width - widget->minimum_size.width);
-        rect.size.width = widget->minimum_size.width;
+        rect.origin.x = 0.5 * (rect.size.width - label->widget.minimum_size.width);
+        rect.size.width = label->widget.minimum_size.width;
     }
     if ((sticky & (PY_STICKY_N | PY_STICKY_S)) == (PY_STICKY_N | PY_STICKY_S)) {
         rect.origin.y = 0;
     }
     else if (sticky & PY_STICKY_N) {
         rect.origin.y = 0;
-        rect.size.height = widget->minimum_size.height;
+        rect.size.height = label->widget.minimum_size.height;
     }
     else if (sticky & PY_STICKY_S) {
-        rect.origin.y = rect.size.height - widget->minimum_size.height;
-        rect.size.height = widget->minimum_size.height;
+        rect.origin.y = rect.size.height - label->widget.minimum_size.height;
+        rect.size.height = label->widget.minimum_size.height;
     }
     else {
-        rect.origin.y = 0.5 * (rect.size.height - widget->minimum_size.height);
-        rect.size.height = widget->minimum_size.height;
+        rect.origin.y = 0.5 * (rect.size.height - label->widget.minimum_size.height);
+        rect.size.height = label->widget.minimum_size.height;
     }
 
 /*
@@ -547,7 +531,7 @@ fprintf(stderr, "label became first responder\n");
     CGContextFillRect(cr, rect);
     string = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
     if (!string) return;
-    CFAttributedStringReplaceString(string, CFRangeMake(0, 0), object->text);
+    CFAttributedStringReplaceString(string, CFRangeMake(0, 0), label->text);
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
                                     (const void**)&values,
@@ -555,7 +539,7 @@ fprintf(stderr, "label became first responder\n");
                                     &kCFTypeDictionaryKeyCallBacks,
                                     &kCFTypeDictionaryValueCallBacks);
     if (attributes) {
-        Py_ssize_t underline = object->underline;
+        Py_ssize_t underline = label->underline;
         CFAttributedStringSetAttributes(string, range, attributes, false);
         CFRelease(attributes);
         if (underline >= 0) {
@@ -593,26 +577,26 @@ fprintf(stderr, "label became first responder\n");
 */
     x = rect.origin.x + 0.5 * rect.size.width - 0.5 * size.width;
     y = rect.origin.y + 0.5 * rect.size.height - 0.5 * size.height;
-    _compute_anchor(object, rect.size, size, &x, &y);
+    _compute_anchor(label, rect.size, size, &x, &y);
 
-    switch (object->state) {
+    switch (label->state) {
         case NORMAL:
-            red = object->foreground->rgba[0];
-            green = object->foreground->rgba[1];
-            blue = object->foreground->rgba[2];
-            alpha = object->foreground->rgba[3];
+            red = label->foreground->rgba[0];
+            green = label->foreground->rgba[1];
+            blue = label->foreground->rgba[2];
+            alpha = label->foreground->rgba[3];
             break;
         case ACTIVE:
-            red = object->active_foreground->rgba[0];
-            green = object->active_foreground->rgba[1];
-            blue = object->active_foreground->rgba[2];
-            alpha = object->active_foreground->rgba[3];
+            red = label->active_foreground->rgba[0];
+            green = label->active_foreground->rgba[1];
+            blue = label->active_foreground->rgba[2];
+            alpha = label->active_foreground->rgba[3];
             break;
         case DISABLED:
-            red = object->disabled_foreground->rgba[0];
-            green = object->disabled_foreground->rgba[1];
-            blue = object->disabled_foreground->rgba[2];
-            alpha = object->disabled_foreground->rgba[3];
+            red = label->disabled_foreground->rgba[0];
+            green = label->disabled_foreground->rgba[1];
+            blue = label->disabled_foreground->rgba[2];
+            alpha = label->disabled_foreground->rgba[3];
             break;
     }
     CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
@@ -633,19 +617,19 @@ fprintf(stderr, "label became first responder\n");
 */
     if (relief != PY_RELIEF_FLAT) {
         ColorObject* color;
-        CGFloat inset = object->highlight_thickness;
-        CGFloat border_width = object->border_width;
+        CGFloat inset = label->highlight_thickness;
+        CGFloat border_width = label->border_width;
         x = rect.origin.x + inset;
         y = rect.origin.y + inset;
         width = rect.size.width - 2 * inset;
         height = rect.size.height - 2 * inset;
-        switch (object->state) {
+        switch (label->state) {
             case ACTIVE:
-                color = object->active_background;
+                color = label->active_background;
                 break;
             case NORMAL:
             case DISABLED:
-                color = object->background;
+                color = label->background;
                 break;
         }
         /* Tk_Draw3DRectangle */
@@ -656,19 +640,19 @@ fprintf(stderr, "label became first responder\n");
         _draw_3d_horizontal_bevel(cr, color, x, y, width, border_width, true, true, true, relief);
         _draw_3d_horizontal_bevel(cr, color, x, y+height-border_width, width, border_width, false, false, false, relief);
     }
-    if (object->highlight_thickness > 0) {
+    if (label->highlight_thickness > 0) {
         Window* window = (Window*) [self window];
         ColorObject* color;
-        if (window.object->is_key && object->is_first_responder) {
-            color = object->highlight_color;
+        if (window.object->is_key && label->is_first_responder) {
+            color = label->highlight_color;
         }
         else {
-            color = object->highlight_background;
+            color = label->highlight_background;
         }
 /*
             Tk_DrawFocusHighlight(tkwin, gc, butPtr->highlightWidth, pixmap);
 */
-        _draw_focus_highlight(cr, color, rect, object->highlight_thickness);
+        _draw_focus_highlight(cr, color, rect, label->highlight_thickness);
     }
 }
 
@@ -891,8 +875,9 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     rect.origin.y = 0;
     rect.size = widget->minimum_size;
 
-    label = [[LabelView alloc] initWithFrame: rect withObject: (PyObject*)self];
+    label = [[LabelView alloc] initWithFrame: rect];
     widget->view = label;
+    label->object = widget;
 
     Py_INCREF(systemTextColor);
     Py_INCREF(systemTextColor);
@@ -926,7 +911,7 @@ Label_repr(LabelObject* self)
 {
     WidgetObject* widget = (WidgetObject*)self;
     return PyUnicode_FromFormat("Label object %p wrapping NSView %p",
-                               self, widget->view);
+                                self, widget->view);
 }
 
 static void

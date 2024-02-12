@@ -1,4 +1,5 @@
 #include <Python.h>
+#include <Cocoa/Cocoa.h>
 
 extern PyTypeObject WindowType;
 
@@ -7,7 +8,6 @@ extern PyTypeObject WindowType;
 typedef struct {
     PyObject_HEAD
     Window* window;
-    PyObject* content;
     BOOL layout_requested;
     BOOL is_key;
 } WindowObject;

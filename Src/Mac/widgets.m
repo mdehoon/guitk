@@ -16,6 +16,22 @@
 #define CGFloat float
 #endif
 
+
+@implementation WidgetView
+- (void)addSubview:(WidgetView *)view;
+{
+    Py_INCREF((PyObject*)(view->object));
+    [super addSubview: view];
+}
+
+- (void)removeFromSuperview
+{
+    Py_DECREF((PyObject*)object);
+    [super removeFromSuperview];
+}
+@end
+
+
 static PyObject*
 Widget_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -184,10 +200,9 @@ static int Widget_set_origin(WidgetObject* self, PyObject* value, void* closure)
     CGFloat y;
     NSPoint point;
     NSView* view = self->view;
-    NSWindow* window = [view window];
     if (!PyArg_ParseTuple(value, "ff", &x, &y)) return -1;
 /*
-    if (view == [window contentView])
+    if (view == [[view window] contentView])
     {
         PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be moved.");
         return -1;
@@ -219,10 +234,9 @@ static int Widget_set_size(WidgetObject* self, PyObject* value, void* closure)
     double height;
     NSRect rect;
     NSView* view = self->view;
-    NSWindow* window = [view window];
     if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
 /*
-    if (view == [window contentView])
+    if (view == [[view window] contentView])
     {
         PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be resized.");
         return -1;

@@ -1,15 +1,26 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
 
-typedef struct {
+@class WidgetView;
+
+typedef struct WidgetObject {
     PyObject_HEAD
-    NSView* view;
+    WidgetView* view;
     CGSize minimum_size;
     char halign;
     char valign;
     BOOL hexpand;
     BOOL vexpand;
 } WidgetObject;
+
+@interface WidgetView : NSView
+{
+@public
+    WidgetObject* object;
+}
+- (void)addSubview:(WidgetView *)view;
+- (void)removeFromSuperview;
+@end
 
 extern PyTypeObject WidgetType;
 extern PyTypeObject LayoutType;

@@ -78,6 +78,9 @@ Application_get_windows(PyObject* unused, PyObject* args)
 #endif
 }
 
+extern PyObject*
+Application_focus(PyObject* unused, PyObject* args, PyObject* keywords);
+
 static struct PyMethodDef methods[] = {
     {"set_icon",
      (PyCFunction)Application_set_icon,
@@ -88,6 +91,11 @@ static struct PyMethodDef methods[] = {
      (PyCFunction)Application_get_windows,
      METH_NOARGS,
      "Returns a list of windows ordered front-to-back."
+    },
+    {"focus",
+     (PyCFunction)Application_focus,
+     METH_KEYWORDS | METH_VARARGS,
+     "Sets the input focus."
     },
     {NULL,          NULL, 0, NULL} /* sentinel */
 };

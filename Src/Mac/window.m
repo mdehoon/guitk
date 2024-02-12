@@ -25,38 +25,38 @@
 
 
 @interface View : NSView
-{
-    WidgetObject* _object;
-}
+- (BOOL)acceptsFirstResponder;
+- (void)keyDown:(NSEvent *)event;
+- (void)addSubview:(WidgetView *)view;
+- (void)drawRect:(NSRect)rect;
 @end
 
 @implementation View : NSView
-- (View *)init
-{
-    self->_object = NULL;
-    return [super init];
-}
-
 - (BOOL)acceptsFirstResponder
 {
-    return YES;
+    return NO;
 }
 
 - (void)keyDown:(NSEvent *)event {
     if (event.type == NSEventTypeKeyDown &&
         [event.charactersIgnoringModifiers isEqualToString:@"\t"] &&
         (event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask) == NSEventModifierFlagOption) {
-        NSLog(@"option-tab");
-        [[self window] makeFirstResponder: self->_object->view];
+        NSView* view = [self.window.firstResponder nextValidKeyView];
+        [[self window] makeFirstResponder: view];
     } else {
         [super keyDown:event];
     }
 }
 
-- (void)setContent:(WidgetObject *)object {
-    Py_INCREF(object);
-    Py_XDECREF(self->_object);
-    self->_object = object;
+- (void)addSubview:(WidgetView *)view
+{
+    Py_INCREF((PyObject*)(view->object));
+    [super addSubview: view];
+}
+
+- (void)drawRect:(NSRect)rect
+{
+    [super drawRect: rect];
 }
 @end
 
@@ -130,7 +130,6 @@ Window_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     WindowObject *self = (WindowObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     self->window = NULL;
-    self->content = NULL;
     self->layout_requested = false;
     return (PyObject*)self;
 }
@@ -205,9 +204,6 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
 
     [pool release];
 
-    Py_INCREF(Py_None);
-    self->content = Py_None;
-
     return 0;
 }
 
@@ -216,7 +212,7 @@ Window_repr(WindowObject* self)
 {
     Window* window = self->window;
     return PyUnicode_FromFormat("Window object %p wrapping NSWindow %p",
-                               self, window);
+                                self, window);
 }
 
 static void
@@ -228,7 +224,6 @@ Window_dealloc(WindowObject* self)
      */
     NSWindow* window = self->window;
     if (window) [window release];
-    Py_XDECREF(self->content);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -427,7 +422,13 @@ static PyObject* Window_get_content(WindowObject* self, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    object = self->content;
+    if (window.contentView.subviews.count == 1) {
+        NSView* view = window.contentView.subviews.firstObject;
+        object = (PyObject*) ((WidgetView*)view)->object;
+    }
+    else {
+        object = Py_None;
+    }
     Py_INCREF(object);
     return object;
 }
@@ -452,11 +453,9 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
     view = widget->view;
     window.contentSize = view.frame.size;
     if (window.contentView.subviews.count == 1) {
-        NSView* oldView = window.contentView.subviews.firstObject;
-        [oldView removeFromSuperview];
+        [window.contentView.subviews.firstObject removeFromSuperview];
     }
     [window.contentView addSubview: view];
-    [((View*)(window.contentView)) setContent: widget];
     [window requestLayout];
     return 0;
 }

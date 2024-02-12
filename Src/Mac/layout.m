@@ -10,12 +10,10 @@
 #endif
 
 
-@interface LayoutView : NSView
+@interface LayoutView : WidgetView
 {
-    PyObject* _object;
 }
-@property (readonly) PyObject* object;
-- (LayoutView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object;
+- (LayoutView*)initWithFrame:(NSRect)rect;
 - (BOOL)isFlipped;
 - (void)viewWillDraw;
 - (void)drawRect:(NSRect)rect;
@@ -29,13 +27,10 @@ typedef struct {
 PyTypeObject LayoutType;
 
 @implementation LayoutView
-@synthesize object = _object;
-
-- (LayoutView*)initWithFrame:(NSRect)rect withObject:(PyObject*)object
+- (LayoutView*)initWithFrame:(NSRect)rect
 {
     self = [super initWithFrame: rect];
     self.autoresizesSubviews = NO;
-    _object = object;
     return self;
 }
 
@@ -47,18 +42,17 @@ PyTypeObject LayoutType;
 - (void)viewWillDraw
 {
     Window* window = (Window*) [self window];
-    WindowObject* object = window.object;
-    if (object->layout_requested) {
+    if (window.object->layout_requested) {
         PyObject* result;
         PyGILState_STATE gstate;
         gstate = PyGILState_Ensure();
-        result = PyObject_CallMethod(_object, "layout", NULL);
+        result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
         if (result)
             Py_DECREF(result);
         else
             PyErr_Print();
         PyGILState_Release(gstate);
-        object->layout_requested = NO;
+        window.object->layout_requested = NO;
     }
 }
 
@@ -68,17 +62,17 @@ PyTypeObject LayoutType;
     NSGraphicsContext* gc;
     short red, green, blue, alpha;
     CGRect rect;
-    LayoutObject* object = (LayoutObject*)_object;
+    LayoutObject* layout = (LayoutObject*)object;
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
     cr = gc.CGContext;
 #else
     cr = (CGContextRef) [gc graphicsPort];
 #endif
-    red = object->background->rgba[0];
-    green = object->background->rgba[1];
-    blue = object->background->rgba[2];
-    alpha = object->background->rgba[3];
+    red = layout->background->rgba[0];
+    green = layout->background->rgba[1];
+    blue = layout->background->rgba[2];
+    alpha = layout->background->rgba[3];
     CGContextSetRGBFillColor(cr, red/255., green/255., blue/255., alpha/255.);
     rect = NSRectToCGRect(dirtyRect);
     CGContextFillRect(cr, rect);
@@ -89,27 +83,27 @@ PyTypeObject LayoutType;
 static PyObject*
 Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    PyObject* object;
     WidgetObject* widget;
+    LayoutView* view;
     NSRect rect = NSZeroRect;
     LayoutObject *self = (LayoutObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
-    object = (PyObject*)self;
+    view = [[LayoutView alloc] initWithFrame:rect];
     widget = (WidgetObject*)self;
-    widget->view = [[LayoutView alloc] initWithFrame:rect withObject:object];
+    widget->view = view;
+    view->object = widget;
     Py_INCREF(systemWindowBackgroundColor);
     self->background = systemWindowBackgroundColor;
-    
-    return object;
+    return (PyObject*)self;
 }
 
 static PyObject*
 Layout_repr(LayoutObject* self)
 {
     WidgetObject* widget = (WidgetObject*)self;
-    NSView* view = widget->view;
+    WidgetView* view = widget->view;
     return PyUnicode_FromFormat("Layout object %p wrapping NSView %p",
-                               self, view);
+                                self, view);
 }
 
 static void
@@ -135,6 +129,7 @@ Layout_add(LayoutObject* self, PyObject *args)
     }
     if(!PyArg_ParseTuple(args, "O!", &WidgetType, &widget))
         return NULL;
+
 
     view = widget->view;
     [layout addSubview: view];
