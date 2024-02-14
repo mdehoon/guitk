@@ -18,17 +18,6 @@
 
 
 @implementation WidgetView
-- (void)addSubview:(WidgetView *)view;
-{
-    Py_INCREF((PyObject*)(view->object));
-    [super addSubview: view];
-}
-
-- (void)removeFromSuperview
-{
-    Py_DECREF((PyObject*)object);
-    [super removeFromSuperview];
-}
 @end
 
 

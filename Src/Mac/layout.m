@@ -16,6 +16,8 @@
 - (LayoutView*)initWithFrame:(NSRect)rect;
 - (BOOL)isFlipped;
 - (void)viewWillDraw;
+- (void)didAddSubview:(NSView *)subview;
+- (void)willRemoveSubview:(NSView *)subview;
 - (void)drawRect:(NSRect)rect;
 @end
 
@@ -56,6 +58,24 @@ PyTypeObject LayoutType;
     }
 }
 
+- (void)didAddSubview:(NSView *)subview
+{
+    WidgetView* view = (WidgetView*) subview;
+    PyObject* widget;
+    if (view.isHidden) widget = Py_None;
+    else widget = (PyObject*) view->object;
+    Py_INCREF(widget);
+}
+
+- (void)willRemoveSubview:(NSView *)subview;
+{
+    WidgetView* view = (WidgetView*) subview;
+    PyObject* widget;
+    if (view.isHidden) widget = Py_None;
+    else widget = (PyObject*) view->object;
+    Py_DECREF(widget);
+}
+
 - (void)drawRect:(NSRect)dirtyRect
 {
     CGContextRef cr;
@@ -86,6 +106,11 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     WidgetObject* widget;
     LayoutView* view;
     NSRect rect = NSZeroRect;
+    Py_ssize_t index;
+    Py_ssize_t length;
+
+    if (!PyArg_ParseTuple(args, "n", &length)) return NULL;
+
     LayoutObject *self = (LayoutObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     view = [[LayoutView alloc] initWithFrame:rect];
@@ -94,6 +119,11 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     view->object = widget;
     Py_INCREF(systemWindowBackgroundColor);
     self->background = systemWindowBackgroundColor;
+    for (index = 0; index < length; index++) {
+        WidgetView* subview = [[WidgetView alloc] initWithFrame: NSZeroRect];
+        subview.hidden = YES;
+        [view addSubview: subview];
+    }
     return (PyObject*)self;
 }
 
@@ -116,29 +146,163 @@ Layout_dealloc(LayoutObject* self)
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-static PyObject*
-Layout_add(LayoutObject* self, PyObject *args)
+static Py_ssize_t Layout_length(LayoutObject* self)
 {
-    Window* window;
-    NSView* view;
+    Py_ssize_t length;
     WidgetObject* widget = (WidgetObject*)self;
-    NSView* layout = widget->view;
-    if (!layout) {
+    WidgetView* view = widget->view;
+    if (!view) {
+        PyErr_SetString(PyExc_RuntimeError, "layout has not been initialized");
+        return -1;
+    }
+    length = view.subviews.count;
+    return length;
+}
+
+static PyObject*
+Layout_subscript(LayoutObject* self, PyObject* key)
+{
+    Py_ssize_t length;
+    WidgetObject* widget = (WidgetObject*)self;
+    WidgetView* view = widget->view;
+    if (!view) {
         PyErr_SetString(PyExc_RuntimeError, "layout has not been initialized");
         return NULL;
     }
-    if(!PyArg_ParseTuple(args, "O!", &WidgetType, &widget))
+    length = view.subviews.count;
+    if (PyIndex_Check(key)) {
+        Py_ssize_t index = PyNumber_AsSsize_t(key, PyExc_IndexError);
+        if (index == -1 && PyErr_Occurred())
+            return NULL;
+        if (index < 0)
+            index += length;
+        if (index < 0 || index >= length) {
+            PyErr_SetString(PyExc_IndexError, "index out of range");
+            return NULL;
+        }
+        view = (WidgetView*) [view.subviews objectAtIndex: index];
+        if (view.isHidden) widget = (WidgetObject *)Py_None;
+        else widget = view->object;
+        Py_INCREF((PyObject*)widget);
+        return (PyObject*) widget;
+    }
+    else if (PySlice_Check(key)) {
+        Py_ssize_t i, index;
+        Py_ssize_t start, stop, step, slicelength;
+        if (PySlice_GetIndicesEx(key, length, &start, &stop, &step,
+                                 &slicelength) == -1) return NULL;
+        if (slicelength == 0) return PyList_New(0);
+        else {
+            PyObject* result = PyList_New(slicelength);
+            if (!result) return PyErr_NoMemory();
+            for (i = 0, index = start; i < slicelength; i++, index += step) {
+                view = (WidgetView*) [view.subviews objectAtIndex: index];
+                if (view.isHidden) widget = (WidgetObject *)Py_None;
+                else widget = view->object;
+                Py_INCREF((PyObject*) widget);
+                PyList_SET_ITEM(result, i, (PyObject*)widget);
+            }
+            return result;
+        }
+    }
+    else {
+        PyErr_Format(PyExc_TypeError,
+                     "indices must be integers, not %S",
+                     Py_TYPE(key));
         return NULL;
-
-
-    view = widget->view;
-    [layout addSubview: view];
-    window = (Window*) [view window];
-    [window requestLayout];
-
-    Py_INCREF(Py_None);
-    return Py_None;
+    }
 }
+
+static int
+Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
+{
+    Py_ssize_t length;
+    WidgetObject* widget = (WidgetObject*)self;
+    WidgetView* view = widget->view;
+    NSView *oldView, *newView;
+    Window* window = (Window*) [view window];
+    if (!view) {
+        PyErr_SetString(PyExc_RuntimeError, "layout has not been initialized");
+        return -1;
+    }
+    length = view.subviews.count;
+    if (PyIndex_Check(key)) {
+        Py_ssize_t index = PyNumber_AsSsize_t(key, PyExc_IndexError);
+        if (index == -1 && PyErr_Occurred())
+            return -1;
+        if (PyObject_IsInstance(value, (PyObject*) &WidgetType)) {
+            newView = (NSView*) ((WidgetObject *)value)->view;
+        }
+        else if (value == Py_None) {
+            newView = [[NSView alloc] initWithFrame: NSZeroRect];
+            newView.hidden = YES;
+        }
+        else {
+            PyErr_SetString(PyExc_ValueError,
+                            "value must be a widget or None");
+            return -1;
+        }
+        if (index < 0)
+            index += length;
+        if (index < 0 || index >= length) {
+            PyErr_SetString(PyExc_IndexError, "index out of range");
+            return -1;
+        }
+        oldView = (WidgetView*) [view.subviews objectAtIndex: index];
+        [view replaceSubview: oldView with: newView];
+        newView.needsDisplay = YES;
+    }
+    else if (PySlice_Check(key)) {
+        Py_ssize_t index;
+        Py_ssize_t start, stop, step, slicelength;
+        PyObject *iterator;
+        if (PySlice_GetIndicesEx(key, length, &start, &stop, &step,
+                                 &slicelength) == -1) return -1;
+        iterator = PyObject_GetIter(value);
+        if (iterator == NULL) {
+            PyErr_SetString(PyExc_TypeError, "can only assign an iterable");
+            return -1;
+        }
+        for (index = start; index < slicelength; index += step) {
+            widget = (WidgetObject*) PyIter_Next(iterator);
+            if (widget == NULL) {
+                if (!PyErr_Occurred())
+                    PyErr_SetString(PyExc_ValueError, "insufficient widgets");
+                return -1;
+            }
+            if (PyObject_IsInstance((PyObject *)widget,
+                                    (PyObject *)&WidgetType)) {
+                newView = (NSView*) widget->view;
+            }
+            else if (value == Py_None) {
+                newView = [[NSView alloc] initWithFrame: NSZeroRect];
+                newView.hidden = YES;
+            }
+            else {
+                PyErr_SetString(PyExc_ValueError,
+                                "value must be a widget or None");
+                return -1;
+            }
+            NSView *oldView = [view.subviews objectAtIndex: index];
+            [view replaceSubview: oldView with: newView];
+            newView.needsDisplay = YES;
+        }
+    }
+    else {
+        PyErr_Format(PyExc_TypeError,
+                     "indices must be integers or slices, not %S",
+                     Py_TYPE(key));
+        return -1;
+    }
+    [window requestLayout];
+    return 0;
+}
+
+static PyMappingMethods Layout_mapping = {
+    (lenfunc)Layout_length,           /* mp_length */
+    (binaryfunc)Layout_subscript,     /* mp_subscript */
+    (objobjargproc)Layout_ass_subscript,     /* mp_ass_subscript */
+};
 
 static PyObject* Layout_layout(LayoutObject* self)
 {
@@ -147,11 +311,6 @@ static PyObject* Layout_layout(LayoutObject* self)
 }
 
 static PyMethodDef Layout_methods[] = {
-    {"add",
-     (PyCFunction)Layout_add,
-     METH_VARARGS,
-     "Adds a widget to the layout manager."
-    },
     {"layout",
      (PyCFunction)Layout_layout,
      METH_NOARGS,
@@ -179,8 +338,8 @@ static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
     double height;
     NSSize size;
     WidgetObject* widget = (WidgetObject*)self;
-    NSView* view = widget->view;
-    NSWindow* window = [view window];
+    WidgetView* view = widget->view;
+    Window* window = (Window*) [view window];
     if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
 /*
     if (view == [window contentView])
@@ -194,7 +353,7 @@ static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
     [view setFrameSize: size];
     PyGILState_STATE gstate;
     gstate = PyGILState_Ensure();
-    result = PyObject_CallMethod((PyObject*)self, "layout", NULL);
+    result = PyObject_CallMethod((PyObject*)(window.object), "request_layout", NULL);
     if (result)
         Py_DECREF(result);
     else
@@ -250,7 +409,7 @@ PyTypeObject LayoutType = {
     (reprfunc)Layout_repr,      /* tp_repr */
     0,                          /* tp_as_number */
     0,                          /* tp_as_sequence */
-    0,                          /* tp_as_mapping */
+    &Layout_mapping,            /* tp_as_mapping */
     0,                          /* tp_hash */
     0,                          /* tp_call */
     0,                          /* tp_str */

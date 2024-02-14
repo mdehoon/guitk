@@ -18,8 +18,6 @@ typedef struct WidgetObject {
 @public
     WidgetObject* object;
 }
-- (void)addSubview:(WidgetView *)view;
-- (void)removeFromSuperview;
 @end
 
 extern PyTypeObject WidgetType;

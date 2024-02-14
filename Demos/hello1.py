@@ -1,6 +1,3 @@
-# Original Tkinter version is available here:
-# http://effbot.org/tkinterbook/tkinter-hello-tkinter.htm
-
 from guitk import gui
 
 font = gui.Font("Helvetica", 40)
