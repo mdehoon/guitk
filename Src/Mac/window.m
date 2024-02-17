@@ -26,7 +26,6 @@
 
 @interface View : NSView
 - (BOOL)acceptsFirstResponder;
-- (void)keyDown:(NSEvent *)event;
 - (void)addSubview:(WidgetView *)view;
 - (void)drawRect:(NSRect)rect;
 @end
@@ -35,17 +34,6 @@
 - (BOOL)acceptsFirstResponder
 {
     return NO;
-}
-
-- (void)keyDown:(NSEvent *)event {
-    if (event.type == NSEventTypeKeyDown &&
-        [event.charactersIgnoringModifiers isEqualToString:@"\t"] &&
-        (event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask) == NSEventModifierFlagOption) {
-        NSView* view = [self.window.firstResponder nextValidKeyView];
-        [[self window] makeFirstResponder: view];
-    } else {
-        [super keyDown:event];
-    }
 }
 
 - (void)addSubview:(WidgetView *)view
