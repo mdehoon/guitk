@@ -1077,10 +1077,10 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
     if (!text) return -1;
     if (self->text) CFRelease(self->text);
     self->text = text;
-    widget->minimum_size = CGSizeZero;
+    Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
     window = (Window*) [label window];
-    [window requestLayout];
+    if (window) window.object->layout_requested = true;
     return 0;
 }
 
@@ -1106,10 +1106,10 @@ Label_set_font(LabelObject* self, PyObject* value, void* closure)
     Py_INCREF(value);
     Py_DECREF(self->font);
     self->font = (FontObject*) value;
-    widget->minimum_size = CGSizeZero;
+    Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
     window = (Window*) [label window];
-    [window requestLayout];
+    if (window) window.object->layout_requested = true;
     return 0;
 }
 
@@ -1149,7 +1149,7 @@ Label_set_underline(LabelObject* self, PyObject* value, void* closure)
 
     label.needsDisplay = YES;
     window = (Window*) [label window];
-    [window requestLayout];
+    if (window) window.object->layout_requested = true;
     return 0;
 }
 
@@ -1608,10 +1608,10 @@ Label_set_width(LabelObject* self, PyObject* value, void* closure)
     const CGFloat width = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     self->width = width;
-    widget->minimum_size = CGSizeZero;
+    Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
     window = (Window*) [label window];
-    [window requestLayout];
+    if (window) window.object->layout_requested = true;
     return 0;
 }
 
@@ -1631,10 +1631,10 @@ Label_set_height(LabelObject* self, PyObject* value, void* closure)
     const CGFloat height = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     self->height = height;
-    widget->minimum_size = CGSizeZero;
+    Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
     window = (Window*) [label window];
-    [window requestLayout];
+    if (window) window.object->layout_requested = true;
     return 0;
 }
 

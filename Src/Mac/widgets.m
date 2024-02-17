@@ -153,7 +153,7 @@ Widget_remove(WidgetObject* self)
     NSView* view = self->view;
     [view removeFromSuperview];
     window = (Window*) [view window];
-    [window requestLayout];
+    window.object->layout_requested = true;
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -286,7 +286,32 @@ static PyObject* Widget_get_minimum_size(WidgetObject* self, void* closure)
     return Py_BuildValue("ff", size.width, size.height);
 }
 
-static char Widget_minimum_size__doc__[] = "Minimum size requested by widget";
+void Widget_unset_minimum_size(WidgetObject* widget)
+{
+    WidgetView* view = widget->view;
+    Window* window = (Window*) [view window];
+    NSView* top = [window contentView];
+    while (true) {
+        if (CGSizeEqualToSize(widget->minimum_size, CGSizeZero)) break;
+        widget->minimum_size = CGSizeZero;
+        view = (WidgetView *)view.superview;
+        if (view == top) break;
+        widget = view->object;
+    }
+}
+
+static int
+Widget_set_minimum_size(WidgetObject* self, PyObject* value, void* closure)
+{
+    if (value != Py_None) {
+        PyErr_SetString(PyExc_ValueError, "value must be None.");
+        return -1;
+    }
+    Widget_unset_minimum_size(self);
+    return 0;
+}
+
+static char Widget_minimum_size__doc__[] = "Minimum size requested by widget. Setting the minimum size to None discards the cached minimum size on the widget and its ancestors, triggering a recalculation when the minimum size is requested.";
 
 static PyObject* Widget_get_halign(WidgetObject* self, void* closure)
 {
@@ -328,7 +353,7 @@ static int Widget_set_halign(WidgetObject* self, PyObject* value, void* closure)
     self->halign = halign;
     view = self->view;
     window = (Window*) [view window];
-    [window requestLayout];
+    window.object->layout_requested = true;
     view.needsDisplay = YES;
     return 0;
 }
@@ -375,7 +400,7 @@ static int Widget_set_valign(WidgetObject* self, PyObject* value, void* closure)
     self->valign = valign;
     view = self->view;
     window = (Window*) [view window];
-    [window requestLayout];
+    window.object->layout_requested = true;
     view.needsDisplay = YES;
     return 0;
 }
@@ -403,7 +428,7 @@ static int Widget_set_hexpand(WidgetObject* self, PyObject* value, void* closure
     }
     view = self->view;
     window = (Window*) [view window];
-    [window requestLayout];
+    window.object->layout_requested = true;
     view.needsDisplay = YES;
     return 0;
 }
@@ -431,7 +456,7 @@ static int Widget_set_vexpand(WidgetObject* self, PyObject* value, void* closure
     }
     view = self->view;
     window = (Window*) [view window];
-    [window requestLayout];
+    window.object->layout_requested = true;
     view.needsDisplay = YES;
     return 0;
 }
@@ -441,7 +466,7 @@ static char Widget_vexpand__doc__[] = "Widget should expand vertically";
 static PyGetSetDef Widget_getset[] = {
     {"origin", (getter)Widget_get_origin, (setter)Widget_set_origin, Widget_origin__doc__, NULL},
     {"size", (getter)Widget_get_size, (setter)Widget_set_size, Widget_size__doc__, NULL},
-    {"minimum_size", (getter)Widget_get_minimum_size, NULL, Widget_minimum_size__doc__, NULL},
+    {"minimum_size", (getter)Widget_get_minimum_size, (setter)Widget_set_minimum_size, Widget_minimum_size__doc__, NULL},
     {"halign", (getter)Widget_get_halign, (setter)Widget_set_halign, Widget_halign__doc__, NULL},
     {"valign", (getter)Widget_get_valign, (setter)Widget_set_valign, Widget_valign__doc__, NULL},
     {"hexpand", (getter)Widget_get_hexpand, (setter)Widget_set_hexpand, Widget_hexpand__doc__, NULL},

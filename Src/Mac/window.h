@@ -8,8 +8,8 @@ extern PyTypeObject WindowType;
 typedef struct {
     PyObject_HEAD
     Window* window;
-    BOOL layout_requested;
-    BOOL is_key;
+    bool layout_requested;
+    bool is_key;
 } WindowObject;
 
 @interface Window : NSWindow <NSWindowDelegate>
@@ -22,7 +22,6 @@ typedef struct {
                         object: (WindowObject*)object;
 - (void)windowWillClose:(NSNotification *)notification;
 - (void)windowDidResize:(NSNotification *)notification;
-- (void)requestLayout;
 - (void)windowDidBecomeKey:(NSNotification *)notification;
 - (void)windowDidResignKey:(NSNotification *)notification;
 @end

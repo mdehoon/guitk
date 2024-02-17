@@ -241,7 +241,7 @@ Listbox_insert(ListboxObject* self, PyObject *args)
     if (!text) return NULL;
     [self->array insertObject: (NSString*) text atIndex: index];
     [listbox reloadData];
-    [window requestLayout];
+    window.object->layout_requested = true;
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -263,7 +263,7 @@ Listbox_append(ListboxObject* self, PyObject *args)
     if (!text) return NULL;
     [self->array addObject: (NSObject*) text];
     [listbox reloadData];
-    [window requestLayout];
+    window.object->layout_requested = true;
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -292,7 +292,7 @@ Listbox_delete(ListboxObject* self, PyObject *args)
     CFRelease(text);
     [self->array removeObjectAtIndex: index];
     [listbox reloadData];
-    [window requestLayout];
+    window.object->layout_requested = true;
     Py_INCREF(Py_None);
     return Py_None;
 }

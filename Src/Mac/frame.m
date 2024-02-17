@@ -252,7 +252,7 @@ Frame_set_content(FrameObject* self, PyObject* value, void* closure)
     box = (NSBox*) widget->view;
     box.contentView = view;
     window = (Window*) [box window];
-    [window requestLayout];
+    window.object->layout_requested = true;
     Py_DECREF(self->content);
     Py_INCREF(value);
     self->content = value;
@@ -292,7 +292,7 @@ Frame_set_title(FrameObject* self, PyObject* value, void* closure)
         frame.titlePosition = NSAtTop;
     }
     window = (Window*) [frame window];
-    [window requestLayout];
+    window.object->layout_requested = true;
     return 0;
 }
 

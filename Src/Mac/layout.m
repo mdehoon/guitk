@@ -54,7 +54,7 @@ PyTypeObject LayoutType;
         else
             PyErr_Print();
         PyGILState_Release(gstate);
-        window.object->layout_requested = NO;
+        window.object->layout_requested = false;
     }
 }
 
@@ -294,7 +294,7 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
                      Py_TYPE(key));
         return -1;
     }
-    [window requestLayout];
+    if (window) window.object->layout_requested = true;
     return 0;
 }
 
@@ -333,7 +333,6 @@ static PyObject* Layout_get_size(WidgetObject* self, void* closure)
 
 static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
 {
-    PyObject* result;
     double width;
     double height;
     NSSize size;
@@ -351,14 +350,7 @@ static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
     size.width = width;
     size.height = height;
     [view setFrameSize: size];
-    PyGILState_STATE gstate;
-    gstate = PyGILState_Ensure();
-    result = PyObject_CallMethod((PyObject*)(window.object), "request_layout", NULL);
-    if (result)
-        Py_DECREF(result);
-    else
-        PyErr_Print();
-    PyGILState_Release(gstate);
+    if (window) window.object->layout_requested = true;
     return 0;
 }
 

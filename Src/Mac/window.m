@@ -90,7 +90,14 @@
 
 - (void)windowDidResize:(NSNotification *)notification
 {
-    [self requestLayout];
+    NSSize size = self.contentView.frame.size;
+    if (self.contentView.subviews.count == 1) {
+fprintf(stderr, "Got a windowDidResize notification; new size is %f, %f; requesting layout\n", size.width, size.height);
+        NSView* view = self.contentView.subviews.firstObject;
+        [view setFrameSize: size];
+        self.object->layout_requested = true;
+    }
+else fprintf(stderr, "Got a windowDidResize notification; new size is %f, %f; no content yet\n", size.width, size.height);
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification;
@@ -103,11 +110,6 @@
 {
     _object->is_key = false;
     self.contentView.needsDisplay = YES;
-}
-
-- (void)requestLayout
-{
-    _object->layout_requested = true;
 }
 @end
 
@@ -199,7 +201,7 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
                                              encoding: NSUTF8StringEncoding]];
         if (argument) Py_DECREF(argument);
     }
-    self->layout_requested = NO;
+    self->layout_requested = false;
     self->window = window;
 
     [pool release];
@@ -370,7 +372,7 @@ Window_remove_child(WindowObject* self, PyObject *args, PyObject *keywords)
 static PyObject*
 Window_request_layout(WindowObject* self)
 {
-    self->layout_requested = YES;
+    self->layout_requested = true;
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -456,7 +458,7 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
         [window.contentView.subviews.firstObject removeFromSuperview];
     }
     [window.contentView addSubview: view];
-    [window requestLayout];
+    self->layout_requested = true;
     return 0;
 }
 

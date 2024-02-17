@@ -31,3 +31,5 @@ extern PyTypeObject ButtonType;
 extern PyTypeObject CheckboxType;
 extern PyTypeObject TextboxType;
 extern PyTypeObject ListboxType;
+
+void Widget_unset_minimum_size(WidgetObject* self);
