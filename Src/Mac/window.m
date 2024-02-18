@@ -426,6 +426,8 @@ static PyObject* Window_get_content(WindowObject* self, void* closure)
 static int
 Window_set_content(WindowObject* self, PyObject* value, void* closure)
 {
+    PyObject* size;
+    PyGILState_STATE gstate;
     PyTypeObject* type;
     WidgetObject* widget;
     NSView* view;
@@ -441,7 +443,19 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
     }
     widget = (WidgetObject*)value;
     view = widget->view;
-    window.contentSize = view.frame.size;
+    gstate = PyGILState_Ensure();
+    size = PyObject_GetAttrString(value, "minimum_size");
+    if (size) {
+        Py_DECREF(size);
+        PyGILState_Release(gstate);
+    }
+    else {
+        PyErr_Print();
+        PyGILState_Release(gstate);
+        return -1;
+    }
+    window.contentSize = widget->minimum_size;
+    [view setFrameSize: widget->minimum_size];
     if (window.contentView.subviews.count == 1) {
         [window.contentView.subviews.firstObject removeFromSuperview];
     }
