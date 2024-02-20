@@ -1070,7 +1070,6 @@ static int
 Label_set_text(LabelObject* self, PyObject* value, void* closure)
 {
     CFStringRef text;
-    Window* window;
     WidgetObject* widget = (WidgetObject*) self;
     LabelView* label = (LabelView*) (widget->view);
     text = PyString_AsCFString(value);
@@ -1079,8 +1078,6 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
     self->text = text;
     Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
-    window = (Window*) [label window];
-    if (window) window.object->layout_requested = true;
     return 0;
 }
 
@@ -1096,7 +1093,6 @@ static PyObject* Label_get_font(LabelObject* self, void* closure)
 static int
 Label_set_font(LabelObject* self, PyObject* value, void* closure)
 {
-    Window* window;
     WidgetObject* widget = (WidgetObject*) self;
     LabelView* label = (LabelView*) (widget->view);
     if (!PyObject_IsInstance(value, (PyObject *)&FontType)) {
@@ -1108,8 +1104,6 @@ Label_set_font(LabelObject* self, PyObject* value, void* closure)
     self->font = (FontObject*) value;
     Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
-    window = (Window*) [label window];
-    if (window) window.object->layout_requested = true;
     return 0;
 }
 
@@ -1129,7 +1123,6 @@ static int
 Label_set_underline(LabelObject* self, PyObject* value, void* closure)
 {
     Py_ssize_t underline;
-    Window* window;
     WidgetObject* widget = (WidgetObject*) self;
     LabelView* label = (LabelView*) (widget->view);
     if (value == Py_None) underline = -1;
@@ -1148,8 +1141,7 @@ Label_set_underline(LabelObject* self, PyObject* value, void* closure)
     self->underline = underline;
 
     label.needsDisplay = YES;
-    window = (Window*) [label window];
-    if (window) window.object->layout_requested = true;
+    [label requestLayout];
     return 0;
 }
 
@@ -1602,7 +1594,6 @@ static PyObject* Label_get_width(LabelObject* self, void* closure)
 static int
 Label_set_width(LabelObject* self, PyObject* value, void* closure)
 {
-    Window* window;
     WidgetObject* widget = (WidgetObject*) self;
     LabelView* label = (LabelView*) (widget->view);
     const CGFloat width = PyFloat_AsDouble(value);
@@ -1610,8 +1601,6 @@ Label_set_width(LabelObject* self, PyObject* value, void* closure)
     self->width = width;
     Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
-    window = (Window*) [label window];
-    if (window) window.object->layout_requested = true;
     return 0;
 }
 
@@ -1625,7 +1614,6 @@ static PyObject* Label_get_height(LabelObject* self, void* closure)
 static int
 Label_set_height(LabelObject* self, PyObject* value, void* closure)
 {
-    Window* window;
     WidgetObject* widget = (WidgetObject*) self;
     LabelView* label = (LabelView*) (widget->view);
     const CGFloat height = PyFloat_AsDouble(value);
@@ -1633,8 +1621,6 @@ Label_set_height(LabelObject* self, PyObject* value, void* closure)
     self->height = height;
     Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
-    window = (Window*) [label window];
-    if (window) window.object->layout_requested = true;
     return 0;
 }
 

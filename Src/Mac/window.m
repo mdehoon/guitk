@@ -83,7 +83,6 @@
 fprintf(stderr, "Got a windowDidResize notification; new size is %f, %f; requesting layout\n", size.width, size.height);
         NSView* view = self.contentView.subviews.firstObject;
         [view setFrameSize: size];
-        self.object->layout_requested = true;
     }
 else fprintf(stderr, "Got a windowDidResize notification; new size is %f, %f; no content yet\n", size.width, size.height);
 }
@@ -120,7 +119,6 @@ Window_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     WindowObject *self = (WindowObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     self->window = NULL;
-    self->layout_requested = false;
     return (PyObject*)self;
 }
 
@@ -189,7 +187,6 @@ Window_init(WindowObject *self, PyObject *args, PyObject *keywords)
                                              encoding: NSUTF8StringEncoding]];
         if (argument) Py_DECREF(argument);
     }
-    self->layout_requested = false;
     self->window = window;
 
     [pool release];
@@ -357,14 +354,6 @@ Window_remove_child(WindowObject* self, PyObject *args, PyObject *keywords)
     return Py_None;
 }
 
-static PyObject*
-Window_request_layout(WindowObject* self)
-{
-    self->layout_requested = true;
-    Py_INCREF(Py_None);
-    return Py_None;
-}
-
 static PyMethodDef Window_methods[] = {
     {"show",
      (PyCFunction)Window_show,
@@ -396,12 +385,7 @@ static PyMethodDef Window_methods[] = {
      METH_KEYWORDS | METH_VARARGS,
      "Removes a child window."
     },
-    {"request_layout",
-     (PyCFunction)Window_request_layout,
-     METH_NOARGS,
-     "Requests that the layout managers recalculates its layout."
-    },
-    {NULL}  /* Sentinel */
+    {NULL, NULL, 0, NULL}  /* Sentinel */
 };
 
 static PyObject* Window_get_content(WindowObject* self, void* closure)
@@ -460,7 +444,6 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
         [window.contentView.subviews.firstObject removeFromSuperview];
     }
     [window.contentView addSubview: view];
-    self->layout_requested = true;
     return 0;
 }
 
@@ -1218,14 +1201,6 @@ static PyObject* Window_get_children(WindowObject* self, void* closure)
 
 static char Window_children__doc__[] = "child windows (as set by add_children).";
 
-static PyObject* Window_get_layout_requested(WindowObject* self, void* closure)
-{
-    if (self->layout_requested) Py_RETURN_TRUE;
-    Py_RETURN_FALSE;
-}
-
-static char Window_layout_requested__doc__[] = "True if a recalculation of the layout has been requested";
-
 static PyGetSetDef Window_getset[] = {
     {"content", (getter)Window_get_content, (setter)Window_set_content, Window_content__doc__, NULL},
     {"title", (getter)Window_get_title, (setter)Window_set_title, Window_title__doc__, NULL},
@@ -1247,7 +1222,6 @@ static PyGetSetDef Window_getset[] = {
     {"alpha", (getter)Window_get_alpha, (setter)Window_set_alpha, Window_alpha__doc__, NULL},
     {"parent", (getter)Window_get_parent, (setter)NULL, Window_parent__doc__, NULL},
     {"children", (getter)Window_get_children, (setter)NULL, Window_children__doc__, NULL},
-    {"layout_requested", (getter)Window_get_layout_requested, (setter)NULL, Window_layout_requested__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 

@@ -2,6 +2,7 @@
 #include <Cocoa/Cocoa.h>
 #include <string.h>
 #include "widgets.h"
+#include "layout.h"
 #include "window.h"
 
 
@@ -18,6 +19,14 @@
 
 
 @implementation WidgetView
+- (void)requestLayout
+{
+    WidgetView* view = (WidgetView*) [self superview];
+    if (view != self.window.contentView) {
+        LayoutObject* layout = (LayoutObject*) view->object;
+        layout->layout_requested = YES;
+    }
+}
 @end
 
 
@@ -149,11 +158,10 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
 static PyObject*
 Widget_remove(WidgetObject* self)
 {
-    Window* window;
-    NSView* view = self->view;
+    WidgetView* view = self->view;
+    LayoutView* layout = (LayoutView*) [view superview];
     [view removeFromSuperview];
-    window = (Window*) [view window];
-    window.object->layout_requested = true;
+    [layout requestLayout];
     Py_INCREF(Py_None);
     return Py_None;
 }
@@ -291,12 +299,16 @@ void Widget_unset_minimum_size(WidgetObject* widget)
     WidgetView* view = widget->view;
     Window* window = (Window*) [view window];
     NSView* top = [window contentView];
+    LayoutObject* layout;
     while (true) {
         if (CGSizeEqualToSize(widget->minimum_size, CGSizeZero)) break;
         widget->minimum_size = CGSizeZero;
         view = (WidgetView *)view.superview;
         if (view == top) break;
+fprintf(stderr, "Requesting layout on view %p\n", view);
         widget = view->object;
+        layout = (LayoutObject*) widget;
+        layout->layout_requested = YES;
     }
 }
 
@@ -333,8 +345,7 @@ static PyObject* Widget_get_halign(WidgetObject* self, void* closure)
 
 static int Widget_set_halign(WidgetObject* self, PyObject* value, void* closure)
 {
-    NSView* view;
-    Window* window;
+    WidgetView* view;
     char halign = '\0';
     value = PyUnicode_AsASCIIString(value);
     if (!value) return -1;
@@ -352,8 +363,7 @@ static int Widget_set_halign(WidgetObject* self, PyObject* value, void* closure)
     if (self->halign == halign) return 0;
     self->halign = halign;
     view = self->view;
-    window = (Window*) [view window];
-    window.object->layout_requested = true;
+    [view requestLayout];
     view.needsDisplay = YES;
     return 0;
 }
@@ -380,8 +390,7 @@ static PyObject* Widget_get_valign(WidgetObject* self, void* closure)
 
 static int Widget_set_valign(WidgetObject* self, PyObject* value, void* closure)
 {
-    NSView* view;
-    Window* window;
+    WidgetView* view;
     char valign = '\0';
     value = PyUnicode_AsASCIIString(value);
     if (!value) return -1;
@@ -399,8 +408,7 @@ static int Widget_set_valign(WidgetObject* self, PyObject* value, void* closure)
     if (self->valign == valign) return 0;
     self->valign = valign;
     view = self->view;
-    window = (Window*) [view window];
-    window.object->layout_requested = true;
+    [view requestLayout];
     view.needsDisplay = YES;
     return 0;
 }
@@ -415,8 +423,7 @@ static PyObject* Widget_get_hexpand(WidgetObject* self, void* closure)
 
 static int Widget_set_hexpand(WidgetObject* self, PyObject* value, void* closure)
 {
-    NSView* view;
-    Window* window;
+    WidgetView* view;
     const int flag = PyObject_IsTrue(value);
     if (flag) {
         if (self->hexpand) return 0;
@@ -427,8 +434,7 @@ static int Widget_set_hexpand(WidgetObject* self, PyObject* value, void* closure
         self->hexpand = NO;
     }
     view = self->view;
-    window = (Window*) [view window];
-    window.object->layout_requested = true;
+    [view requestLayout];
     view.needsDisplay = YES;
     return 0;
 }
@@ -443,8 +449,7 @@ static PyObject* Widget_get_vexpand(WidgetObject* self, void* closure)
 
 static int Widget_set_vexpand(WidgetObject* self, PyObject* value, void* closure)
 {
-    NSView* view;
-    Window* window;
+    WidgetView* view;
     const int flag = PyObject_IsTrue(value);
     if (flag) {
         if (self->vexpand) return 0;
@@ -455,8 +460,7 @@ static int Widget_set_vexpand(WidgetObject* self, PyObject* value, void* closure
         self->vexpand = NO;
     }
     view = self->view;
-    window = (Window*) [view window];
-    window.object->layout_requested = true;
+    [view requestLayout];
     view.needsDisplay = YES;
     return 0;
 }

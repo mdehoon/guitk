@@ -1,30 +1,14 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
 #include "widgets.h"
+#include "layout.h"
 #include "window.h"
-#include "colors.h"
 
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
 #define COMPILING_FOR_10_10
 #endif
 
-
-@interface LayoutView : WidgetView
-{
-}
-- (LayoutView*)initWithFrame:(NSRect)rect;
-- (BOOL)isFlipped;
-- (void)viewWillDraw;
-- (void)didAddSubview:(NSView *)subview;
-- (void)willRemoveSubview:(NSView *)subview;
-- (void)drawRect:(NSRect)rect;
-@end
-
-typedef struct {
-    WidgetObject widget;
-    ColorObject* background;
-} LayoutObject;
 
 PyTypeObject LayoutType;
 
@@ -43,8 +27,8 @@ PyTypeObject LayoutType;
 
 - (void)viewWillDraw
 {
-    Window* window = (Window*) [self window];
-    if (window.object->layout_requested) {
+    LayoutObject* layout = (LayoutObject*) self->object;
+    if (layout->layout_requested) {
         PyObject* result;
         PyGILState_STATE gstate;
         gstate = PyGILState_Ensure();
@@ -54,8 +38,9 @@ PyTypeObject LayoutType;
         else
             PyErr_Print();
         PyGILState_Release(gstate);
-        window.object->layout_requested = false;
+        layout->layout_requested = false;
     }
+    [super viewWillDraw];
 }
 
 - (void)didAddSubview:(NSView *)subview
@@ -74,6 +59,15 @@ PyTypeObject LayoutType;
     if (view.isHidden) widget = Py_None;
     else widget = (PyObject*) view->object;
     Py_DECREF(widget);
+}
+
+- (void)setFrameSize:(NSSize)newSize
+{
+    if (!NSEqualSizes(self.frame.size, newSize)) {
+        LayoutObject* layout = (LayoutObject*) self->object;
+        layout->layout_requested = true;
+        [super setFrameSize: newSize];
+    }
 }
 
 - (void)drawRect:(NSRect)dirtyRect
@@ -220,7 +214,6 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
     WidgetObject* widget = (WidgetObject*)self;
     WidgetView* view = widget->view;
     NSView *oldView, *newView;
-    Window* window = (Window*) [view window];
     if (!view) {
         PyErr_SetString(PyExc_RuntimeError, "layout has not been initialized");
         return -1;
@@ -294,7 +287,7 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
                      Py_TYPE(key));
         return -1;
     }
-    if (window) window.object->layout_requested = true;
+    self->layout_requested = YES;
     return 0;
 }
 
@@ -337,10 +330,9 @@ static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
     double height;
     NSSize size;
     WidgetObject* widget = (WidgetObject*)self;
-    WidgetView* view = widget->view;
-    Window* window = (Window*) [view window];
     if (!PyArg_ParseTuple(value, "dd", &width, &height)) return -1;
 /*
+    Window* window = (Window*) [view window];
     if (view == [window contentView])
     {
         PyErr_SetString(PyExc_RuntimeError, "Top widget cannot be resized.");
@@ -349,8 +341,7 @@ static int Layout_set_size(LayoutObject* self, PyObject* value, void* closure)
 */
     size.width = width;
     size.height = height;
-    [view setFrameSize: size];
-    if (window) window.object->layout_requested = true;
+    [widget->view setFrameSize: size];
     return 0;
 }
 

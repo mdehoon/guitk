@@ -239,8 +239,7 @@ Frame_set_content(FrameObject* self, PyObject* value, void* closure)
     PyTypeObject* type;
     WidgetObject* widget;
     NSBox* box;
-    Window* window;
-    NSView* view;
+    WidgetView* view;
     type = Py_TYPE(value);
     if (!PyType_IsSubtype(type, &WidgetType)) {
         PyErr_SetString(PyExc_ValueError, "expected a widget or None");
@@ -251,8 +250,7 @@ Frame_set_content(FrameObject* self, PyObject* value, void* closure)
     widget = (WidgetObject*)self;
     box = (NSBox*) widget->view;
     box.contentView = view;
-    window = (Window*) [box window];
-    window.object->layout_requested = true;
+    [view requestLayout];
     Py_DECREF(self->content);
     Py_INCREF(value);
     self->content = value;
@@ -280,7 +278,6 @@ Frame_set_title(FrameObject* self, PyObject* value, void* closure)
     FrameView* frame;
     WidgetObject* widget;
     CFStringRef text;
-    Window* window;
     widget = (WidgetObject*) self;
     frame = (FrameView*)(widget->view);
     if (value == Py_None) {
@@ -291,8 +288,7 @@ Frame_set_title(FrameObject* self, PyObject* value, void* closure)
         frame.title = (NSString *)text;
         frame.titlePosition = NSAtTop;
     }
-    window = (Window*) [frame window];
-    window.object->layout_requested = true;
+    [frame requestLayout];
     return 0;
 }
 

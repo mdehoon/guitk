@@ -8,7 +8,6 @@ extern PyTypeObject WindowType;
 typedef struct {
     PyObject_HEAD
     Window* window;
-    bool layout_requested;
     bool is_key;
 } WindowObject;
 
