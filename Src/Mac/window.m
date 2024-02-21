@@ -24,31 +24,6 @@
 #endif
 
 
-@interface View : NSView
-- (BOOL)acceptsFirstResponder;
-- (void)addSubview:(WidgetView *)view;
-- (void)drawRect:(NSRect)rect;
-@end
-
-@implementation View : NSView
-- (BOOL)acceptsFirstResponder
-{
-    return NO;
-}
-
-- (void)addSubview:(WidgetView *)view
-{
-    Py_INCREF((PyObject*)(view->object));
-    [super addSubview: view];
-}
-
-- (void)drawRect:(NSRect)rect
-{
-    [super drawRect: rect];
-}
-@end
-
-
 @implementation Window
 @synthesize object = _object;
 
@@ -56,7 +31,6 @@
                      styleMask: (NSUInteger)windowStyle
                         object: (WindowObject*)object
 {
-    View *view;
     self = [self initWithContentRect: rect
                            styleMask: windowStyle
                              backing: NSBackingStoreBuffered
@@ -65,26 +39,12 @@
     self.releasedWhenClosed = NO;
     self.acceptsMouseMovedEvents = YES;
     self.delegate = self;
-    view = [[View alloc] init];
-    self.contentView = view;
-    [view release];
     return self;
 }
 
 - (void)windowWillClose:(NSNotification *)notification
 {
     Py_DECREF(_object);
-}
-
-- (void)windowDidResize:(NSNotification *)notification
-{
-    NSSize size = self.contentView.frame.size;
-    if (self.contentView.subviews.count == 1) {
-fprintf(stderr, "Got a windowDidResize notification; new size is %f, %f; requesting layout\n", size.width, size.height);
-        NSView* view = self.contentView.subviews.firstObject;
-        [view setFrameSize: size];
-    }
-else fprintf(stderr, "Got a windowDidResize notification; new size is %f, %f; no content yet\n", size.width, size.height);
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification;
@@ -391,14 +351,15 @@ static PyMethodDef Window_methods[] = {
 static PyObject* Window_get_content(WindowObject* self, void* closure)
 {
     PyObject* object;
+    WidgetView* view;
     NSWindow* window = self->window;
     if (!window) {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    if (window.contentView.subviews.count == 1) {
-        NSView* view = window.contentView.subviews.firstObject;
-        object = (PyObject*) ((WidgetView*)view)->object;
+    view = (WidgetView*) window.contentView;
+    if (view) {
+        object = (PyObject*) (view->object);
     }
     else {
         object = Py_None;
@@ -440,10 +401,11 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
     }
     window.contentSize = widget->minimum_size;
     [view setFrameSize: widget->minimum_size];
-    if (window.contentView.subviews.count == 1) {
-        [window.contentView.subviews.firstObject removeFromSuperview];
+    if (window.contentView) {
+        [window.contentView removeFromSuperview];
     }
-    [window.contentView addSubview: view];
+    Py_INCREF(value);
+    window.contentView = view;
     return 0;
 }
 

@@ -13,6 +13,9 @@
 PyTypeObject LayoutType;
 
 @implementation LayoutView
+
+@synthesize layout_requested;
+
 - (LayoutView*)initWithFrame:(NSRect)rect
 {
     self = [super initWithFrame: rect];
@@ -27,18 +30,16 @@ PyTypeObject LayoutType;
 
 - (void)viewWillDraw
 {
-    LayoutObject* layout = (LayoutObject*) self->object;
-    if (layout->layout_requested) {
+    if (layout_requested) {
         PyObject* result;
-        PyGILState_STATE gstate;
-        gstate = PyGILState_Ensure();
+        PyGILState_STATE gstate = PyGILState_Ensure();
         result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
         if (result)
             Py_DECREF(result);
         else
             PyErr_Print();
         PyGILState_Release(gstate);
-        layout->layout_requested = false;
+        layout_requested = false;
     }
     [super viewWillDraw];
 }
@@ -64,8 +65,7 @@ PyTypeObject LayoutType;
 - (void)setFrameSize:(NSSize)newSize
 {
     if (!NSEqualSizes(self.frame.size, newSize)) {
-        LayoutObject* layout = (LayoutObject*) self->object;
-        layout->layout_requested = true;
+        layout_requested = YES;
         [super setFrameSize: newSize];
     }
 }
@@ -211,8 +211,8 @@ static int
 Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
 {
     Py_ssize_t length;
-    WidgetObject* widget = (WidgetObject*)self;
-    WidgetView* view = widget->view;
+    WidgetObject* widget;
+    LayoutView* view = (LayoutView*) self->widget.view;
     NSView *oldView, *newView;
     if (!view) {
         PyErr_SetString(PyExc_RuntimeError, "layout has not been initialized");
@@ -287,7 +287,7 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
                      Py_TYPE(key));
         return -1;
     }
-    self->layout_requested = YES;
+    view.layout_requested = YES;
     return 0;
 }
 

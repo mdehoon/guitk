@@ -21,11 +21,9 @@
 @implementation WidgetView
 - (void)requestLayout
 {
-    WidgetView* view = (WidgetView*) [self superview];
-    if (view != self.window.contentView) {
-        LayoutObject* layout = (LayoutObject*) view->object;
-        layout->layout_requested = YES;
-    }
+    if (self == self.window.contentView) return;
+    LayoutView* view = (LayoutView*) [self superview];
+    if (view) view.layout_requested = YES;
 }
 @end
 
@@ -297,18 +295,16 @@ static PyObject* Widget_get_minimum_size(WidgetObject* self, void* closure)
 void Widget_unset_minimum_size(WidgetObject* widget)
 {
     WidgetView* view = widget->view;
-    Window* window = (Window*) [view window];
-    NSView* top = [window contentView];
-    LayoutObject* layout;
+    WidgetView* top = (WidgetView*) view.window.contentView;
+    LayoutView* layout;
     while (true) {
         if (CGSizeEqualToSize(widget->minimum_size, CGSizeZero)) break;
         widget->minimum_size = CGSizeZero;
-        view = (WidgetView *)view.superview;
         if (view == top) break;
-fprintf(stderr, "Requesting layout on view %p\n", view);
+        view = (WidgetView *)view.superview;
         widget = view->object;
-        layout = (LayoutObject*) widget;
-        layout->layout_requested = YES;
+        layout = (LayoutView*)view;
+        layout.layout_requested = YES;
     }
 }
 
