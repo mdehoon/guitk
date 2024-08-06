@@ -13,25 +13,32 @@ Image_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 Image_init(ImageObject *self, PyObject *args, PyObject *kwds)
 {
-    NSImage* image;
-    NSString* string;
-    const char* path;
+    PyObject* fmt;
 
-    if (!PyArg_ParseTuple(args, "s", &path)) return -1;
-
-    string = [NSString stringWithCString: path encoding: NSUTF8StringEncoding];
-    image = [NSImage alloc];
-    if (!image) {
-        PyErr_SetString(PyExc_MemoryError, "insufficient memory");
-        return -1;
+    static char* kwlist[] = {"fmt", NULL};
+    if (!PyDict_CheckExact(kwds)) {
     }
-    image = [image initWithContentsOfFile: string];
-    if (!image) {
-        PyErr_SetString(PyExc_ValueError, "failed to create the image");
-        return -1;
+    fmt = PyDict_GetItemString(kwds, "fmt");
+    if (fmt == NULL) {
+        if (!PyTuple_CheckExact(args)) {
+        }
+        if (PyTuple_GET_SIZE(args) == 0) {
+        }
+        fmt = PyTuple_GET_ITEM(args, 0);
     }
-    self->image = image;
-
+    if (fmt == NULL) {
+    }
+    if (!PyUnicode_Check(fmt)) {
+    }
+    if (PyUnicode_CompareWithASCIIString(fmt, "bitmap") == 0) {
+        fprintf(stderr, "fmt = bitmap\n");
+    }
+    else if (PyUnicode_CompareWithASCIIString(fmt, "photo") == 0) {
+        fprintf(stderr, "fmt = photo\n");
+    }
+    else {
+        fprintf(stderr, "fmt unknown\n");
+    }
     return 0;
 }
 
