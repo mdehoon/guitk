@@ -2,44 +2,68 @@
 
 
 static PyObject*
-Image_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+_bitmap_new(PyTypeObject *type, PyObject *args, PyObject *keywords)
 {
-    ImageObject *self = (ImageObject*)type->tp_alloc(type, 0);
-    if (!self) return NULL;
-    self->image = NULL;
-    return (PyObject*)self;
+    /* ImgBmapCreate in tkImgBmap.c */
+    static char* kwlist[] = {"fmt", NULL};
+    fprintf(stderr, "fmt = bitmap\n");
+    ImageObject *obj = (ImageObject*)type->tp_alloc(type, 0);
+    if (!obj) return NULL;
+    obj->image = NULL;
+    return (PyObject*)obj;
 }
 
-static int
-Image_init(ImageObject *self, PyObject *args, PyObject *kwds)
+static PyObject*
+_photo_new(PyTypeObject *type, PyObject *args, PyObject *keywords)
 {
-    PyObject* fmt;
-
+    /* ImgPhotoCreate in tkImgPhoto.c */
     static char* kwlist[] = {"fmt", NULL};
-    if (!PyDict_CheckExact(kwds)) {
-    }
-    fmt = PyDict_GetItemString(kwds, "fmt");
-    if (fmt == NULL) {
-        if (!PyTuple_CheckExact(args)) {
+    fprintf(stderr, "fmt = photo\n");
+    ImageObject *obj = (ImageObject*)type->tp_alloc(type, 0);
+    if (!obj) return NULL;
+    obj->image = NULL;
+    return (PyObject*)obj;
+}
+
+static PyObject*
+Image_new(PyTypeObject *type, PyObject *args, PyObject *keywords)
+{
+    PyObject* fmt = NULL;
+
+    if (keywords != NULL) {
+        if (!PyDict_Check(keywords)) {
+            PyErr_BadInternalCall();
+            return NULL;
         }
-        if (PyTuple_GET_SIZE(args) == 0) {
-        }
-        fmt = PyTuple_GET_ITEM(args, 0);
+        fmt = PyDict_GetItemString(keywords, "fmt");
     }
     if (fmt == NULL) {
+        if (!PyTuple_Check(args)) {
+            PyErr_BadInternalCall();
+            return NULL;
+        }
+        if (PyTuple_GET_SIZE(args) > 0) {
+            fmt = PyTuple_GET_ITEM(args, 0);
+        }
+        if (fmt == NULL) {
+            PyErr_SetString(PyExc_TypeError,
+                            "required argument 'fmt' is missing");
+            return NULL;
+        }
     }
     if (!PyUnicode_Check(fmt)) {
+        PyErr_SetString(PyExc_TypeError, "argument 'fmt' must be a string");
+        return NULL;
     }
     if (PyUnicode_CompareWithASCIIString(fmt, "bitmap") == 0) {
-        fprintf(stderr, "fmt = bitmap\n");
+        return _bitmap_new(type, args, keywords);
     }
-    else if (PyUnicode_CompareWithASCIIString(fmt, "photo") == 0) {
-        fprintf(stderr, "fmt = photo\n");
+    if (PyUnicode_CompareWithASCIIString(fmt, "photo") == 0) {
+        return _photo_new(type, args, keywords);
     }
-    else {
-        fprintf(stderr, "fmt unknown\n");
-    }
-    return 0;
+    PyErr_SetString(PyExc_ValueError,
+                    "argument 'fmt' must be 'bitmap' or 'photo'");
+    return NULL;
 }
 
 static PyObject*
@@ -104,7 +128,7 @@ PyTypeObject ImageType = {
     0,                          /* tp_descr_get */
     0,                          /* tp_descr_set */
     0,                          /* tp_dictoffset */
-    (initproc)Image_init,       /* tp_init */
+    0,                          /* tp_init */
     0,                          /* tp_alloc */
     Image_new,                  /* tp_new */
 };
