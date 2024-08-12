@@ -325,7 +325,7 @@ static PyGetSetDef Color_getseters[] = {
 static char Color_doc[] =
 "Color object.\n";
 
-PyTypeObject ColorType = {
+Py_LOCAL_SYMBOL PyTypeObject ColorType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Color",             /* tp_name */
     sizeof(ColorObject),        /* tp_basicsize */

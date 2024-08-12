@@ -10,8 +10,6 @@
 #endif
 
 
-PyTypeObject LayoutType;
-
 @implementation LayoutView
 
 @synthesize layout_requested;
@@ -379,7 +377,7 @@ static PyGetSetDef Layout_getset[] = {
 static char Layout_doc[] =
 "Layout is the base class for layout managers.\n";
 
-PyTypeObject LayoutType = {
+Py_LOCAL_SYMBOL PyTypeObject LayoutType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "gui.Layout",               /* tp_name */
     sizeof(LayoutObject),       /* tp_basicsize */

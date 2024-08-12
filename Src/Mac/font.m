@@ -613,7 +613,7 @@ static PyGetSetDef SystemFont_getset[] = {
 static char Font_doc[] =
 "A Font object wraps a CTFontRef object.\n";
 
-PyTypeObject FontType = {
+Py_LOCAL_SYMBOL PyTypeObject FontType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "Font",                     /* tp_name */
     sizeof(FontObject),         /* tp_basicsize */
@@ -654,7 +654,7 @@ PyTypeObject FontType = {
     Font_new,                   /* tp_new */
 };
 
-PyTypeObject SystemFontType = {
+Py_LOCAL_SYMBOL PyTypeObject SystemFontType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "SystemFont",               /* tp_name */
     sizeof(SystemFontObject),   /* tp_basicsize */

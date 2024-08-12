@@ -27,7 +27,7 @@ typedef struct {
     ColorObject* background;
 } FrameObject;
 
-PyTypeObject FrameType;
+Py_LOCAL_SYMBOL PyTypeObject FrameType;
 
 @implementation FrameView
 @synthesize object = _object;

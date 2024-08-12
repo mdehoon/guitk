@@ -485,7 +485,7 @@ static PyGetSetDef Listbox_getseters[] = {
 static char Listbox_doc[] =
 "A Listbox object wraps a Cocoa NSTableView object.\n";
 
-PyTypeObject ListboxType = {
+Py_LOCAL_SYMBOL PyTypeObject ListboxType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Listbox",            /* tp_name */
     sizeof(ListboxObject),       /* tp_basicsize */

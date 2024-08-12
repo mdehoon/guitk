@@ -12,8 +12,6 @@
 #define COMPILING_FOR_10_7
 #endif
 
-PyTypeObject SeparatorType;
-
 static PyObject*
 Separator_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -114,7 +112,7 @@ static PyGetSetDef Separator_getset[] = {
 
 static char Separator_doc[] = "Separator.\n";
 
-PyTypeObject SeparatorType = {
+Py_LOCAL_SYMBOL PyTypeObject SeparatorType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "gui.Separator",               /* tp_name */
     sizeof(WidgetObject),       /* tp_basicsize */

@@ -434,7 +434,7 @@ static PyGetSetDef Button_getseters[] = {
 static char Button_doc[] =
 "A Button object wraps a Cocoa NSButton object.\n";
 
-PyTypeObject ButtonType = {
+Py_LOCAL_SYMBOL PyTypeObject ButtonType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Button",            /* tp_name */
     sizeof(ButtonObject),       /* tp_basicsize */

@@ -1190,7 +1190,7 @@ static PyGetSetDef Window_getset[] = {
 static char Window_doc[] =
 "A Window object wraps a Cocoa NSWindow object.\n";
 
-PyTypeObject WindowType = {
+Py_LOCAL_SYMBOL PyTypeObject WindowType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "gui.Window",               /* tp_name */
     sizeof(WindowObject),       /* tp_basicsize */

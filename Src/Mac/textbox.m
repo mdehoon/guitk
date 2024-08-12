@@ -396,7 +396,7 @@ static PyGetSetDef Textbox_getseters[] = {
 static char Textbox_doc[] =
 "A Textbox object wraps a Cocoa NSTextField object.\n";
 
-PyTypeObject TextboxType = {
+Py_LOCAL_SYMBOL PyTypeObject TextboxType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Textbox",            /* tp_name */
     sizeof(TextboxObject),       /* tp_basicsize */

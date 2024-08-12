@@ -431,7 +431,7 @@ static PyGetSetDef Checkbox_getseters[] = {
 static char Checkbox_doc[] =
 "A Checkbox object wraps a Cocoa NSButton object of type NSButtonTypeSwitch.";
 
-PyTypeObject CheckboxType = {
+Py_LOCAL_SYMBOL PyTypeObject CheckboxType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Checkbox",            /* tp_name */
     sizeof(CheckboxObject),       /* tp_basicsize */

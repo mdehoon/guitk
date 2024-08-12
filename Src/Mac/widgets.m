@@ -477,7 +477,7 @@ static PyGetSetDef Widget_getset[] = {
 static char Widget_doc[] =
 "Widget is the base class for objects wrapping a Cocoa NSView.\n";
 
-PyTypeObject WidgetType = {
+Py_LOCAL_SYMBOL PyTypeObject WidgetType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "gui.Widget",               /* tp_name */
     sizeof(WidgetObject),       /* tp_basicsize */

@@ -1719,7 +1719,7 @@ static PyGetSetDef Label_getseters[] = {
 static char Label_doc[] =
 "A Label object wraps a Cocoa NSTextField object.\n";
 
-PyTypeObject LabelType = {
+Py_LOCAL_SYMBOL PyTypeObject LabelType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "_guitk.Label",             /* tp_name */
     sizeof(LabelObject),        /* tp_basicsize */

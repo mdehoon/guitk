@@ -195,7 +195,7 @@ static PyGetSetDef Image_getset[] = {
 static char Image_doc[] =
 "A Image object wraps a Cocoa NSImage object.\n";
 
-PyTypeObject ImageType = {
+Py_LOCAL_SYMBOL PyTypeObject ImageType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "graphics.Image",           /* tp_name */
     sizeof(ImageObject),        /* tp_basicsize */
