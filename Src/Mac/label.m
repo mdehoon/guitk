@@ -2,6 +2,7 @@
 #include "widgets.h"
 #include "window.h"
 #include "colors.h"
+#include "image.h"
 #include "text.h"
 #include "font.h"
 
@@ -707,9 +708,10 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     CFStringRef text = CFSTR("");
     NSRect rect;
     FontObject* font = default_font_object;
+    ImageObject* image = NULL;
 
-    static char* kwlist[] = {"text", "font", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O&O!", kwlist, string_converter, &text, &FontType, &font))
+    static char* kwlist[] = {"text", "font", "image", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O&O!O!", kwlist, string_converter, &text, &FontType, &font, &ImageType, &image))
         return -1;
 
 /*

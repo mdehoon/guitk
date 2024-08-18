@@ -9,3 +9,5 @@ typedef struct {
 } ImageObject;
 
 extern PyTypeObject ImageType;
+
+PyObject* _pbm_new(PyTypeObject *type, PyObject *args, PyObject *keywords);
