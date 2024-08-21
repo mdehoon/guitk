@@ -11,6 +11,8 @@
 #define COMPILING_FOR_10_10
 #endif
 
+typedef enum {LEFT, CENTER, RIGHT} Alignment;
+
 typedef enum {PY_ANCHOR_N,
               PY_ANCHOR_NE,
               PY_ANCHOR_E,
@@ -21,7 +23,12 @@ typedef enum {PY_ANCHOR_N,
               PY_ANCHOR_NW,
               PY_ANCHOR_C} Anchor;
 
-typedef enum {LEFT, CENTER, RIGHT} Alignment;
+typedef enum {PY_COMPOUND_NONE,
+              PY_COMPOUND_BOTTOM,
+              PY_COMPOUND_TOP,
+              PY_COMPOUND_LEFT,
+              PY_COMPOUND_RIGHT,
+              PY_COMPOUND_CENTER} Compound;
 
 typedef enum {PY_RELIEF_RAISED,
               PY_RELIEF_SUNKEN,
@@ -62,6 +69,8 @@ typedef struct {
     double padx;
     double pady;
     Anchor anchor;
+    Compound compound;
+    ImageObject* image;
     State state;
     CFStringRef text;
     FontObject* font;
@@ -450,15 +459,16 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     CGSize size;
     CGRect rect;
     CGPathRef path;
-    CGFloat width;
-    CGFloat height;
+    CGFloat width = 0;
+    CGFloat height = 0;
+    CGFloat imageWidth;
+    CGFloat imageHeight;
     CGSize constraints = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
     CTFrameRef frame = NULL;
     CTFramesetterRef framesetter = NULL;
     CFRange fitRange;
     unsigned short red, green, blue, alpha;
     LabelObject* label = (LabelObject*)object;
-    CFRange range = CFRangeMake(0, CFStringGetLength(label->text));
 
     Sticky sticky = label->sticky;
     CFStringRef keys[] = { kCTFontAttributeName,
@@ -530,92 +540,100 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
             Tk_Height(tkwin), 0, TK_RELIEF_FLAT);
 */
     CGContextFillRect(cr, rect);
-    string = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
-    if (!string) return;
-    CFAttributedStringReplaceString(string, CFRangeMake(0, 0), label->text);
-    attributes = CFDictionaryCreate(kCFAllocatorDefault,
-                                    (const void**)&keys,
-                                    (const void**)&values,
-                                    2,
-                                    &kCFTypeDictionaryKeyCallBacks,
-                                    &kCFTypeDictionaryValueCallBacks);
-    if (attributes) {
-        Py_ssize_t underline = label->underline;
-        CFAttributedStringSetAttributes(string, range, attributes, false);
-        CFRelease(attributes);
-        if (underline >= 0) {
-            CTUnderlineStyle value = kCTUnderlineStyleSingle;
-            CFNumberRef number = CFNumberCreate(kCFAllocatorDefault,
-                                                kCFNumberNSIntegerType,
-                                                &value);
-            if (number) {
-                CFAttributedStringSetAttribute(string,
-                                               CFRangeMake(underline, 1),
-                                               kCTUnderlineStyleAttributeName,
-                                               number);
-                CFRelease(number);
-            }
-        }
-        framesetter = CTFramesetterCreateWithAttributedString(string);
+    /*
+     * Display image or bitmap or text for button.
+     */
+    if (label->image) {
+        width = label->image->width;
+        height = label->image->height;
     }
-    CFRelease(string);
-    if (!framesetter) return;
-    size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, constraints, &fitRange);
+    imageWidth = width;
+    imageHeight = height;
 
-    width = self.frame.size.width;
-    height = self.frame.size.height;
-    path = CGPathCreateWithRect(CGRectMake(0, 0, rect.size.width, rect.size.height), NULL);
-    if (path) {
-        frame = CTFramesetterCreateFrame(framesetter, range, path, NULL);
-        CFRelease(framesetter);
-    }
-    CFRelease(path);
-    if (!frame) return;
+    if (label->text) {
+        CFRange range = CFRangeMake(0, CFStringGetLength(label->text));
+        string = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
+        if (!string) return;
+        CFAttributedStringReplaceString(string, CFRangeMake(0, 0), label->text);
+        attributes = CFDictionaryCreate(kCFAllocatorDefault,
+                                        (const void**)&keys,
+                                        (const void**)&values,
+                                        2,
+                                        &kCFTypeDictionaryKeyCallBacks,
+                                        &kCFTypeDictionaryValueCallBacks);
+        if (attributes) {
+            Py_ssize_t underline = label->underline;
+            CFAttributedStringSetAttributes(string, range, attributes, false);
+            CFRelease(attributes);
+            if (underline >= 0) {
+                CTUnderlineStyle value = kCTUnderlineStyleSingle;
+                CFNumberRef number = CFNumberCreate(kCFAllocatorDefault,
+                                                    kCFNumberNSIntegerType,
+                                                    &value);
+                if (number) {
+                    CFAttributedStringSetAttribute(string,
+                                                   CFRangeMake(underline, 1),
+                                                   kCTUnderlineStyleAttributeName,
+                                                   number);
+                    CFRelease(number);
+                }
+            }
+            framesetter = CTFramesetterCreateWithAttributedString(string);
+        }
+        CFRelease(string);
+        if (!framesetter) return;
+        size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, constraints, &fitRange);
+
+        width = self.frame.size.width;
+        height = self.frame.size.height;
+        path = CGPathCreateWithRect(CGRectMake(0, 0, rect.size.width, rect.size.height), NULL);
+        if (path) {
+            frame = CTFramesetterCreateFrame(framesetter, range, path, NULL);
+            CFRelease(framesetter);
+        }
+        CFRelease(path);
+        if (!frame) return;
 /*
             TkComputeAnchor(butPtr->anchor, tkwin, butPtr->padX, butPtr->padY,
                     butPtr->indicatorSpace + butPtr->textWidth,
                     butPtr->textHeight, &x, &y);
 */
-    x = rect.origin.x + 0.5 * rect.size.width - 0.5 * size.width;
-    y = rect.origin.y + 0.5 * rect.size.height - 0.5 * size.height;
-    _compute_anchor(label, rect.size, size, &x, &y);
+        x = rect.origin.x + 0.5 * rect.size.width - 0.5 * size.width;
+        y = rect.origin.y + 0.5 * rect.size.height - 0.5 * size.height;
+        _compute_anchor(label, rect.size, size, &x, &y);
 
-    switch (label->state) {
-        case NORMAL:
-            red = label->foreground->rgba[0];
-            green = label->foreground->rgba[1];
-            blue = label->foreground->rgba[2];
-            alpha = label->foreground->rgba[3];
-            break;
-        case ACTIVE:
-            red = label->active_foreground->rgba[0];
-            green = label->active_foreground->rgba[1];
-            blue = label->active_foreground->rgba[2];
-            alpha = label->active_foreground->rgba[3];
-            break;
-        case DISABLED:
-            red = label->disabled_foreground->rgba[0];
-            green = label->disabled_foreground->rgba[1];
-            blue = label->disabled_foreground->rgba[2];
-            alpha = label->disabled_foreground->rgba[3];
-            break;
+        switch (label->state) {
+            case NORMAL:
+                red = label->foreground->rgba[0];
+                green = label->foreground->rgba[1];
+                blue = label->foreground->rgba[2];
+                alpha = label->foreground->rgba[3];
+                break;
+            case ACTIVE:
+                red = label->active_foreground->rgba[0];
+                green = label->active_foreground->rgba[1];
+                blue = label->active_foreground->rgba[2];
+                alpha = label->active_foreground->rgba[3];
+                break;
+            case DISABLED:
+                red = label->disabled_foreground->rgba[0];
+                green = label->disabled_foreground->rgba[1];
+                blue = label->disabled_foreground->rgba[2];
+                alpha = label->disabled_foreground->rgba[3];
+                break;
+        }
+        CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
+                                     ((CGFloat)green)/USHRT_MAX,
+                                     ((CGFloat)blue)/USHRT_MAX,
+                                     ((CGFloat)alpha)/USHRT_MAX);
+        CGContextSaveGState(cr);
+        CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
+        CGContextScaleCTM(cr, 1.0, -1.0);
+        CTFrameDraw(frame, cr);
+        CGContextRestoreGState(cr);
+        CFRelease(frame);
     }
-    CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
-                                 ((CGFloat)green)/USHRT_MAX,
-                                 ((CGFloat)blue)/USHRT_MAX,
-                                 ((CGFloat)alpha)/USHRT_MAX);
-    CGContextSaveGState(cr);
-    CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
-    CGContextScaleCTM(cr, 1.0, -1.0);
-    CTFrameDraw(frame, cr);
-    CGContextRestoreGState(cr);
-    CFRelease(frame);
 
-/*
-        Tk_Draw3DRectangle(tkwin, pixmap, border, inset, inset,
-                Tk_Width(tkwin) - 2*inset, Tk_Height(tkwin) - 2*inset,
-                butPtr->borderWidth, relief);
-*/
     if (relief != PY_RELIEF_FLAT) {
         ColorObject* color;
         CGFloat inset = label->highlight_thickness;
@@ -633,7 +651,11 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                 color = label->background;
                 break;
         }
-        /* Tk_Draw3DRectangle */
+/*
+        Tk_Draw3DRectangle(tkwin, pixmap, border, inset, inset,
+                Tk_Width(tkwin) - 2*inset, Tk_Height(tkwin) - 2*inset,
+                butPtr->borderWidth, relief);
+*/
         if (width < 2 * border_width) border_width = width / 2.0;
         if (height < 2 * border_width) border_width = height / 2.0;
         _draw_3d_vertical_bevel(cr, color, x, y, border_width, height, true, relief);
@@ -695,6 +717,8 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->text = NULL;
     self->font = NULL;
     self->anchor = PY_ANCHOR_C;
+    self->image = NULL;
+    self->compound = PY_COMPOUND_NONE;
     self->wrap_length = 0;
     // self->minimum_size = CGSizeZero;
     return (PyObject*)self;
@@ -865,6 +889,8 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
 
     widget = (WidgetObject*)self;
     Py_INCREF(font);
+    if (self->text) CFRelease(self->text);
+    CFRetain(text);
     self->text = text;
     self->font = font;
 
@@ -904,6 +930,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     self->highlight_color = systemWindowBackgroundColor;
 
     self->anchor = PY_ANCHOR_C;
+    self->compound = PY_COMPOUND_NONE;
 
     return 0;
 }
