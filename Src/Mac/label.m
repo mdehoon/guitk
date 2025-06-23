@@ -988,6 +988,7 @@ Label_set_position(LabelObject* self, PyObject *args)
 
 static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
 {
+    /* follows the logic in TkpComputeButtonGeometry */
     CFAttributedStringRef string = NULL;
     CFDictionaryRef attributes = NULL;
     CGSize size;

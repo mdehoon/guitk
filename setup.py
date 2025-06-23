@@ -5,7 +5,6 @@ import sys
 
 try:
     from setuptools import setup
-    from setuptools import Command
     from setuptools import Extension
 except ImportError:
     sys.exit(
@@ -66,6 +65,7 @@ extensions.append(extension)
 
 setup(
       name = "guitk",
+      version = "0.0.0",
       packages = ['guitk'],
       package_dir = {'': 'Lib'},
       ext_modules=extensions,
