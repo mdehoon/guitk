@@ -3,11 +3,7 @@
 
 typedef struct {
     PyObject_HEAD
-    NSImage* image;
-    Py_ssize_t width;
-    Py_ssize_t height;
+    Py_buffer data;
 } ImageObject;
 
 extern PyTypeObject ImageType;
-
-PyObject* _pbm_new(PyTypeObject *type, PyObject *args, PyObject *keywords);

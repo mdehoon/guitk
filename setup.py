@@ -21,7 +21,6 @@ if sys.platform == 'darwin':
     gui_sources = ["Src/Mac/gui.m",
                    "Src/Mac/window.m",
                    "Src/Mac/image.m",
-                   "Src/Mac/image_pbm.m",
                    "Src/Mac/text.m",
                    "Src/Mac/widgets.m",
                    "Src/Mac/layout.m",

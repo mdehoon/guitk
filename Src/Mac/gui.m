@@ -11,6 +11,10 @@
 #define COMPILING_FOR_10_6
 #endif
 
+static void releaseData(void* info, const void* data, unsigned long size) {
+    Py_buffer* buffer = info;
+    PyBuffer_Release(buffer);
+}
 
 static PyObject*
 Application_set_icon(PyObject* unused, PyObject* args, PyObject* keywords)
@@ -22,7 +26,67 @@ Application_set_icon(PyObject* unused, PyObject* args, PyObject* keywords)
     else if (PyArg_ParseTupleAndKeywords(args, keywords, "O!", kwlist,
                                          &ImageType, &argument)) {
         ImageObject* object = (ImageObject*)argument;
-        [NSApp setApplicationIconImage: object->image];
+        Py_buffer* buffer = &object->data;
+        size_t height = buffer->shape[0];
+        size_t width = buffer->shape[1];
+        size_t bitsPerComponent = 0;
+        size_t bitsPerPixel;
+        size_t bytesPerRow;
+        size_t components = 0;
+        CGBitmapInfo bitmapInfo = 0;
+        CGColorSpaceRef space;
+        CGDataProviderRef provider;
+        CGImageRef image;
+        switch (buffer->ndim) {
+            case 2:
+                components = 1;  // grayscale
+                break;
+            case 3:
+                components = 3;  // rgb
+                switch (buffer->shape[2]) {
+                    case 4:
+                        bitmapInfo |= kCGBitmapAlphaInfoMask;
+                    case 3:
+                        break;
+                    default:
+                        return NULL;
+                }
+                break;
+            default:
+                return NULL;
+        }
+        if (buffer->format == NULL || strcmp(buffer->format, "B")  == 0) {
+            bitsPerComponent = 8;
+        }
+        else if (strcmp(buffer->format, "?") == 0) {  // bool
+            bitsPerComponent = 1;  // black and white
+        }
+        if (bitsPerComponent == 8 && components >= 3)
+            space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        else
+            space = CGColorSpaceCreateWithName(kCGColorSpaceExtendedGray);
+        if (!space) return NULL;
+        bitsPerPixel = bitsPerComponent * components;
+        bytesPerRow = bitsPerPixel * width * 8;
+        provider = CGDataProviderCreateWithData(buffer,
+                                                buffer->buf,
+                                                bytesPerRow * height,
+                                                releaseData);
+        image = CGImageCreate(width,
+                              height,
+                              bitsPerComponent,
+                              bitsPerPixel,
+                              bytesPerRow,
+                              space,
+                              bitmapInfo,
+                              provider,
+                              NULL,
+                              true,
+                              kCGRenderingIntentDefault);
+        CGColorSpaceRelease(space);
+        CGDataProviderRelease(provider);
+        NSApp.applicationIconImage = [[NSImage alloc] initWithCGImage: image
+                                                                 size: NSZeroSize];
     } else {
         return NULL;
     }

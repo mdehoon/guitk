@@ -544,8 +544,8 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
      * Display image or bitmap or text for button.
      */
     if (label->image) {
-        width = label->image->width;
-        height = label->image->height;
+        height = label->image->data.shape[0];
+        width = label->image->data.shape[1];
     }
     imageWidth = width;
     imageHeight = height;

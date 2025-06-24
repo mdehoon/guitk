@@ -2,70 +2,55 @@
 #include "colors.h"
 
 
-static PyObject*
-_photo_new(PyTypeObject *type, PyObject *args, PyObject *keywords)
+static int
+data_converter(PyObject* argument, void* pointer)
 {
-    /* ImgPhotoCreate in tkImgPhoto.c */
-    fprintf(stderr, "fmt = photo\n");
-    ImageObject *obj = (ImageObject*)type->tp_alloc(type, 0);
-    if (!obj) return NULL;
-    obj->image = NULL;
-    return (PyObject*)obj;
+    Py_buffer* view = pointer;
+    if (argument == NULL) {
+        PyBuffer_Release(view);
+        return 1;
+    }
+    if (PyObject_GetBuffer(argument, view, PyBUF_FORMAT | PyBUF_ND) != 0)
+        return 0;
+    if (view->itemsize != 1)
+        PyErr_SetString(PyExc_ValueError, "data must consist of single bytes");
+    else if (strcmp(view->format, "B") != 0 && strcmp(view->format, "?") != 0)
+        PyErr_SetString(PyExc_ValueError, "data format must be 'B' or '?'");
+    else if (view->ndim != 2 && view->ndim != 3)
+        PyErr_SetString(PyExc_ValueError, "data must have 2 or 3 dimensions");
+    else
+        return Py_CLEANUP_SUPPORTED;
+    PyBuffer_Release(view);
+    return 0;
 }
 
 static PyObject*
 Image_new(PyTypeObject *type, PyObject *args, PyObject *keywords)
 {
-    PyObject* fmt = NULL;
+    static char *kwlist[] = {"data", NULL};
 
-    if (keywords != NULL) {
-        if (!PyDict_Check(keywords)) {
-            PyErr_BadInternalCall();
-            return NULL;
-        }
-        fmt = PyDict_GetItemString(keywords, "fmt");
-    }
-    if (fmt == NULL) {
-        if (!PyTuple_Check(args)) {
-            PyErr_BadInternalCall();
-            return NULL;
-        }
-        if (PyTuple_GET_SIZE(args) > 0) {
-            fmt = PyTuple_GET_ITEM(args, 0);
-        }
-        if (fmt == NULL) {
-            PyErr_SetString(PyExc_TypeError,
-                            "required argument 'fmt' is missing");
-            return NULL;
-        }
-    }
-    if (!PyUnicode_Check(fmt)) {
-        PyErr_SetString(PyExc_TypeError, "argument 'fmt' must be a string");
+    ImageObject* image = (ImageObject*)PyType_GenericAlloc(&ImageType, 0);
+
+    Py_buffer* data = &image->data;
+
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "O&", kwlist,
+                                     data_converter, data)) {
+        Py_DECREF(image);
         return NULL;
     }
-    if (PyUnicode_CompareWithASCIIString(fmt, "pbm") == 0) {
-        return _pbm_new(type, args, keywords);
-    }
-    if (PyUnicode_CompareWithASCIIString(fmt, "photo") == 0) {
-        return _photo_new(type, args, keywords);
-    }
-    PyErr_SetString(PyExc_ValueError,
-                    "argument 'fmt' must be 'pbm' or 'photo'");
-    return NULL;
+
+    return (PyObject*)image;
 }
 
 static PyObject*
 Image_repr(ImageObject* self)
 {
-    return PyUnicode_FromFormat("Image object %p wrapping NSImage %p",
-                               (void*) self, (void*)(self->image));
+    return PyUnicode_FromFormat("Image object %p", (void*) self);
 }
 
 static void
 Image_dealloc(ImageObject* self)
 {
-    NSImage* image = self->image;
-    if (image) [image release];
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
