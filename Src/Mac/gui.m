@@ -67,7 +67,7 @@ Application_set_icon(PyObject* unused, PyObject* args, PyObject* keywords)
             space = CGColorSpaceCreateWithName(kCGColorSpaceExtendedGray);
         if (!space) return NULL;
         bitsPerPixel = bitsPerComponent * components;
-        bytesPerRow = bitsPerPixel * width * 8;
+        bytesPerRow = bitsPerPixel * width / 8;
         provider = CGDataProviderCreateWithData(buffer,
                                                 buffer->buf,
                                                 bytesPerRow * height,
