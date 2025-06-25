@@ -85,8 +85,11 @@ Application_set_icon(PyObject* unused, PyObject* args, PyObject* keywords)
                               kCGRenderingIntentDefault);
         CGColorSpaceRelease(space);
         CGDataProviderRelease(provider);
-        NSApp.applicationIconImage = [[NSImage alloc] initWithCGImage: image
-                                                                 size: NSZeroSize];
+        NSImage* im = [[NSImage alloc] initWithCGImage: image size: NSZeroSize];
+        NSApp.applicationIconImage = im;
+#if !__has_feature(objc_arc)
+        [im release];
+#endif
     } else {
         return NULL;
     }
