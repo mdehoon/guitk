@@ -544,8 +544,9 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
      * Display image or bitmap or text for button.
      */
     if (label->image) {
-        height = label->image->data.shape[0];
-        width = label->image->data.shape[1];
+        CGImageRef image = label->image->data;
+        width = CGImageGetWidth(image);
+        height = CGImageGetHeight(image);
     }
     imageWidth = width;
     imageHeight = height;
@@ -1751,41 +1752,15 @@ static char Label_doc[] =
 
 Py_LOCAL_SYMBOL PyTypeObject LabelType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_guitk.Label",             /* tp_name */
-    sizeof(LabelObject),        /* tp_basicsize */
-    0,                          /* tp_itemsize */
-    (destructor)Label_dealloc,  /* tp_dealloc */
-    0,                          /* tp_print */
-    0,                          /* tp_getattr */
-    0,                          /* tp_setattr */
-    0,                          /* tp_compare */
-    (reprfunc)Label_repr,       /* tp_repr */
-    0,                          /* tp_as_number */
-    0,                          /* tp_as_sequence */
-    0,                          /* tp_as_mapping */
-    0,                          /* tp_hash */
-    0,                          /* tp_call */
-    0,                          /* tp_str */
-    0,                          /* tp_getattro */
-    0,                          /* tp_setattro */
-    0,                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /* tp_flags */
-    Label_doc,                  /* tp_doc */
-    0,                          /* tp_traverse */
-    0,                          /* tp_clear */
-    0,                          /* tp_richcompare */
-    0,                          /* tp_weaklistoffset */
-    0,                          /* tp_iter */
-    0,                          /* tp_iternext */
-    Label_methods,              /* tp_methods */
-    0,                          /* tp_members */
-    Label_getseters,            /* tp_getset */
-    &WidgetType,                /* tp_base */
-    0,                          /* tp_dict */
-    0,                          /* tp_descr_get */
-    0,                          /* tp_descr_set */
-    0,                          /* tp_dictoffset */
-    (initproc)Label_init,       /* tp_init */
-    0,                          /* tp_alloc */
-    Label_new,                  /* tp_new */
+    .tp_name = "_guitk.Label",
+    .tp_basicsize = sizeof(LabelObject),
+    .tp_dealloc = (destructor)Label_dealloc,
+    .tp_repr = (reprfunc)Label_repr,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_doc = Label_doc,
+    .tp_methods = Label_methods,
+    .tp_getset = Label_getseters,
+    .tp_base = &WidgetType,
+    .tp_init = (initproc)Label_init,
+    .tp_new = Label_new,
 };

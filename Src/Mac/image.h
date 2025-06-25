@@ -3,7 +3,7 @@
 
 typedef struct {
     PyObject_HEAD
-    Py_buffer data;
+    CGImageRef data;
 } ImageObject;
 
 extern PyTypeObject ImageType;
