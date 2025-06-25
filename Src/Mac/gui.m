@@ -14,7 +14,6 @@
 static PyObject*
 Application_set_icon(PyObject* unused, PyObject* args, PyObject* keywords)
 {
-fprintf(stderr, "In APplication_set_icon\n"); fflush(stderr);
     ImageObject* image_object = NULL;
     static char* kwlist[] = {"icon", NULL};
 
@@ -22,14 +21,11 @@ fprintf(stderr, "In APplication_set_icon\n"); fflush(stderr);
                                            &ImageType, &image_object))
         return NULL;
 
-fprintf(stderr, "Image_object = %p\n", image_object); fflush(stderr);
 
     if (image_object) {
         CGImageRef data = image_object->data;
-fprintf(stderr, "CGImageRef = %p\n", data); fflush(stderr);
         NSImage* image = [[NSImage alloc] initWithCGImage: data
                                                      size: NSZeroSize];
-fprintf(stderr, "NSImage = %p\n", image); fflush(stderr);
         NSApp.applicationIconImage = image;
 #if !__has_feature(objc_arc)
         [image release];

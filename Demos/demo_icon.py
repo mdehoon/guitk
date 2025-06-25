@@ -1,5 +1,5 @@
 from guitk import gui
-import numpy as np
+import array
 
 font = gui.Font("Helvetica", 40)
 
@@ -7,19 +7,42 @@ window = gui.Window()
 label = gui.Label("Check out the icon", font)
 window.content = label
 
-image = np.zeros((100,100,3), 'B')
-image[:50,:50] = (0, 0, 255)
-image[:50,50:] = (255, 0, 255)
-image[50:,:50] = (0, 128, 255)
-image[50:,50:] = (128, 128, 0)
-image = gui.Image(image)
-image = np.zeros((100,100,4), 'B')
-image[:50,:50] = (0, 0, 255, 128)
-image[:50,50:] = (255, 0, 255, 128)
-image[50:,:50] = (0, 128, 255, 128)
-image[50:,50:] = (128, 128, 0, 128)
-image = gui.Image(image)
+height = 100
+width = 100
+components = 4
 
-# gui.set_icon(image)
+buffer = array.array('B', [0] * (height * width * components))
+data = memoryview(buffer).cast('B', shape=(height, width, components))
 
-# window.show()
+halfheight = height // 2
+halfwidth = width // 2
+for i in range(halfheight):
+    for j in range(halfwidth):
+        data[i, j, 0] = 0
+        data[i, j, 1] = (j * 5) % 255
+        data[i, j, 2] = 0
+        data[i, j, 3] = 255
+for i in range(halfheight):
+    for j in range(halfwidth, width):
+        data[i, j, 0] = (i * 5) % 255
+        data[i, j, 1] = 0
+        data[i, j, 2] = 0
+        data[i, j, 3] = 255
+for i in range(halfheight, height):
+    for j in range(halfwidth):
+        data[i, j, 0] = 0
+        data[i, j, 1] = 0
+        data[i, j, 2] = 255
+        data[i, j, 3] = 0
+for i in range(halfheight, height):
+    for j in range(halfwidth, width):
+        data[i, j, 0] = 128
+        data[i, j, 1] = 128
+        data[i, j, 2] = 0
+        data[i, j, 3] = 128
+
+image = gui.Image(data)
+
+gui.set_icon(image)
+
+window.show()
