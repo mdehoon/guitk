@@ -66,6 +66,5 @@ setup(
       name = "guitk",
       version = "0.0.0",
       packages = ['guitk'],
-      package_dir = {'': 'Lib'},
       ext_modules=extensions,
       )
