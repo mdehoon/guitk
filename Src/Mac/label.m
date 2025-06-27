@@ -499,6 +499,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
             break;
     }
 
+
     CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
@@ -950,10 +951,9 @@ Label_dealloc(LabelObject* self)
     WidgetObject* widget = (WidgetObject*)self;
     LabelView* label = (LabelView*) (widget->view);
     CFStringRef text = self->text;
-    FontObject* font = self->font;
     if (label) [label release];
-    if (font) Py_DECREF(font);
     if (text) CFRelease(text);
+    Py_XDECREF(self->font);
     Py_XDECREF(self->foreground);
     Py_XDECREF(self->background);
     Py_XDECREF(self->active_foreground);
@@ -961,6 +961,7 @@ Label_dealloc(LabelObject* self)
     Py_XDECREF(self->disabled_foreground);
     Py_XDECREF(self->highlight_background);
     Py_XDECREF(self->highlight_color);
+    Py_XDECREF(self->image);
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -1177,6 +1178,36 @@ Label_set_underline(LabelObject* self, PyObject* value, void* closure)
 }
 
 static char Label_underline__doc__[] = "specifies the index of the character to underline.";
+
+static PyObject* Label_get_image(LabelObject* self, void* closure)
+{
+    PyObject* image = (PyObject*) self->image;
+    if (!image) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    Py_INCREF(image);
+    return image;
+}
+
+static int
+Label_set_image(LabelObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (!PyObject_IsInstance(value, (PyObject *)&ImageType)) {
+        PyErr_SetString(PyExc_ValueError, "expected an Image object");
+        return -1;
+    }
+    Py_INCREF(value);
+    Py_XDECREF(self->image);
+    self->image = (ImageObject*) value;
+    Widget_unset_minimum_size(widget);
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_image__doc__[] = "the image associated with the label, if any";
 
 static PyObject* Label_get_active_foreground(LabelObject* self, void* closure)
 {
@@ -1725,6 +1756,7 @@ static char Label_anchor__doc__[] = "anchor specifying location of the label.";
 static PyGetSetDef Label_getseters[] = {
     {"text", (getter)Label_get_text, (setter)Label_set_text, Label_text__doc__, NULL},
     {"font", (getter)Label_get_font, (setter)Label_set_font, Label_font__doc__, NULL},
+    {"image", (getter)Label_get_image, (setter)Label_set_image, Label_image__doc__, NULL},
     {"underline", (getter)Label_get_underline, (setter)Label_set_underline, Label_underline__doc__, NULL},
     {"foreground", (getter)Label_get_foreground, (setter)Label_set_foreground, Label_foreground__doc__, NULL},
     {"background", (getter)Label_get_background, (setter)Label_set_background, Label_background__doc__, NULL},

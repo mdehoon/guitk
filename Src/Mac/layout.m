@@ -28,6 +28,7 @@
 
 - (void)viewWillDraw
 {
+    fprintf(stderr, "In viewWillDraw for NSView %p with layout_requested %d\n", self, layout_requested);
     if (layout_requested) {
         PyObject* result;
         PyGILState_STATE gstate = PyGILState_Ensure();
