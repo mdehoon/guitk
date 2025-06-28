@@ -18,12 +18,46 @@
 #endif
 
 
+static PyObject* Widget_get_minimum_size(WidgetObject* self, void* closure);
+
 @implementation WidgetView
 - (void)requestLayout
 {
     if (self == self.window.contentView) return;
     LayoutView* view = (LayoutView*) [self superview];
     if (view) view.layout_requested = YES;
+}
+
+- (void)updateConstraints
+{
+    fprintf(stderr, "In updateConstraints for widget with NSView %p\n", self);
+    [super updateConstraints];
+    fprintf(stderr, "Leaving updateConstraints for widget with NSView %p\n", self);
+}
+
+- (void)layoutSubtreeIfNeeded
+{
+    fprintf(stderr, "In layoutSubtreeIfNeeded for widget with NSView %p\n", self);
+    [super layoutSubtreeIfNeeded];
+    fprintf(stderr, "Leaving layoutSubtreeIfNeeded for widget with NSView %p\n", self);
+}
+
+- (void)viewWillDraw
+{
+    fprintf(stderr, "In viewWillDraw for widget with NSView %p\n", self);
+    {
+        PyGILState_STATE gstate = PyGILState_Ensure();
+        PyObject* size;
+        size = Widget_get_minimum_size(object, NULL);
+        if (size)
+            Py_DECREF(size);
+        else
+            PyErr_Print();
+        PyGILState_Release(gstate);
+    }
+
+    [super viewWillDraw];
+    fprintf(stderr, "Leaving viewWillDraw for widget with NSView %p\n", self);
 }
 @end
 

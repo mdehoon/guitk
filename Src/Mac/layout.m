@@ -26,9 +26,23 @@
     return YES;
 }
 
+- (void) layout
+{
+    fprintf(stderr, "In layout for LayoutView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
+    [super layout];
+    fprintf(stderr, "Leaving layout for LayoutView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
+}
+
+- (void) updateConstraints
+{
+    fprintf(stderr, "In updateConstraints for LayoutView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
+    [super updateConstraints];
+    fprintf(stderr, "Leaving updateConstraints for LayoutView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
+}
+
 - (void)viewWillDraw
 {
-    fprintf(stderr, "In viewWillDraw for NSView %p with layout_requested %d\n", self, layout_requested);
+    fprintf(stderr, "In viewWillDraw for NSView %p\n", self);
     if (layout_requested) {
         PyObject* result;
         PyGILState_STATE gstate = PyGILState_Ensure();
@@ -41,6 +55,7 @@
         layout_requested = false;
     }
     [super viewWillDraw];
+    fprintf(stderr, "After viewWillDraw for NSView %p\n", self);
 }
 
 - (void)didAddSubview:(NSView *)subview
@@ -76,6 +91,7 @@
     short red, green, blue, alpha;
     CGRect rect;
     LayoutObject* layout = (LayoutObject*)object;
+    fprintf(stderr, "In drawRect for NSView %p\n", self);
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
     cr = gc.CGContext;
@@ -90,6 +106,7 @@
     rect = NSRectToCGRect(dirtyRect);
     CGContextFillRect(cr, rect);
     [super drawRect:dirtyRect];
+    fprintf(stderr, "Leaving drawRect for NSView %p\n", self);
 }
 @end
 

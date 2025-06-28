@@ -25,6 +25,28 @@
 
 
 @implementation Window
+
+- (void) displayIfNeeded
+{
+    fprintf(stderr, "In Window displayIfNeeded\n"); fflush(stderr);
+    [super displayIfNeeded];
+    fprintf(stderr, "Leaving Window displayIfNeeded\n"); fflush(stderr);
+}
+
+- (void) layoutIfNeeded
+{
+    fprintf(stderr, "In Window layoutIfNeeded\n"); fflush(stderr);
+    [super layoutIfNeeded];
+    fprintf(stderr, "Leaving Window layoutIfNeeded\n"); fflush(stderr);
+}
+
+- (void) updateConstraintsIfNeeded
+{
+    fprintf(stderr, "In Window updateConstraintsIfNeeded\n"); fflush(stderr);
+    [super updateConstraintsIfNeeded];
+    fprintf(stderr, "Leaving Window updateConstraintsIfNeeded\n"); fflush(stderr);
+}
+
 @synthesize object = _object;
 
 - (Window*)initWithContentRect: (NSRect)rect

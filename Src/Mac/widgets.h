@@ -19,6 +19,7 @@ typedef struct WidgetObject {
     WidgetObject* object;
 }
 - (void)requestLayout;
+- (void)viewWillDraw;
 @end
 
 extern PyTypeObject WidgetType;

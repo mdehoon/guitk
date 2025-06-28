@@ -7,5 +7,4 @@
 }
 - (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
-- (void)viewWillDraw;
 @end
