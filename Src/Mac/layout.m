@@ -26,38 +26,6 @@
     return YES;
 }
 
-- (void) layout
-{
-    fprintf(stderr, "In layout for LayoutView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
-    [super layout];
-    fprintf(stderr, "Leaving layout for LayoutView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
-}
-
-- (void) updateConstraints
-{
-    fprintf(stderr, "In updateConstraints for LayoutView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
-    [super updateConstraints];
-    fprintf(stderr, "Leaving updateConstraints for LayoutView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
-}
-
-- (void)viewWillDraw
-{
-    fprintf(stderr, "In viewWillDraw for NSView %p\n", self);
-    if (layout_requested) {
-        PyObject* result;
-        PyGILState_STATE gstate = PyGILState_Ensure();
-        result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
-        if (result)
-            Py_DECREF(result);
-        else
-            PyErr_Print();
-        PyGILState_Release(gstate);
-        layout_requested = false;
-    }
-    [super viewWillDraw];
-    fprintf(stderr, "After viewWillDraw for NSView %p\n", self);
-}
-
 - (void)didAddSubview:(NSView *)subview
 {
     WidgetView* view = (WidgetView*) subview;
@@ -315,6 +283,22 @@ static PyMappingMethods Layout_mapping = {
 
 static PyObject* Layout_layout(LayoutObject* self)
 {
+    WidgetView* parent = self->widget.view;
+    NSView* subview;
+    WidgetView* child;
+    PyObject* object;
+    for (subview in parent.subviews) {
+        child = (WidgetView*)subview;
+        object = child->object;
+        if (PyObject_IsInstance(object, &LayoutType)) {
+            PyObject* result;
+            result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
+            if (result)
+                 Py_DECREF(result);
+            else
+                 PyErr_Print();
+        }
+    }
     Py_INCREF(Py_None);
     return Py_None;
 }

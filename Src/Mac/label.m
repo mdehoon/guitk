@@ -48,7 +48,6 @@ typedef enum {PY_STICKY_N = 0x1,
 @interface LabelView : WidgetView
 - (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
-- (void) layout;
 @end
 
 typedef struct {
@@ -684,20 +683,6 @@ fprintf(stderr, "In drawRect for %p\n", self);
 fprintf(stderr, "Leaving drawRect for %p\n", self);
 }
 
-- (void) updateConstraints
-{
-    fprintf(stderr, "In updateConstraints for LabelView %p with object %p; needsLayout is %d; counter = %d\n", self, object, self.needsLayout);
-    [super updateConstraints];
-    fprintf(stderr, "Leaving updateConstraints for LabelView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
-}
-
-- (void) layout
-{
-    fprintf(stderr, "In layout for LabelView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
-    [super layout];
-    fprintf(stderr, "Leaving layout for LabelView %p with object %p; needsLayout is %d\n", self, object, self.needsLayout);
-}
-
 - (BOOL)isFlipped
 {
     return YES;
@@ -1125,11 +1110,9 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
     if (!text) return -1;
     if (self->text) CFRelease(self->text);
     self->text = text;
+    fprintf(stderr, "In Label_set_text for NSView %p with object %p; setting Widget_unset_minimum_size\n", label, self);
     Widget_unset_minimum_size(widget);
-    fprintf(stderr, "In Label_set_text for NSView %p with object %p; setting needsLayout for layout %p to %d\n", label, self, label.superview, label.superview.needsLayout);
-    label.superview.needsLayout = YES;
-    label.needsUpdateConstraints = YES;
-    fprintf(stderr, "In Label_set_text for NSView %p with object %p; after setting needsLayout for layout %p to %d\n", label, self, label.superview, label.superview.needsLayout);
+    fprintf(stderr, "In Label_set_text for NSView %p with object %p; after calling Widget_unset_minimum_size\n", label, self);
     label.needsDisplay = YES;
     return 0;
 }
@@ -1192,9 +1175,8 @@ Label_set_underline(LabelObject* self, PyObject* value, void* closure)
         }
     }
     self->underline = underline;
-
+    Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
-    [label requestLayout];
     return 0;
 }
 

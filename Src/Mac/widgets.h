@@ -18,8 +18,6 @@ typedef struct WidgetObject {
 @public
     WidgetObject* object;
 }
-- (void)requestLayout;
-- (void)viewWillDraw;
 @end
 
 extern PyTypeObject WidgetType;
@@ -35,3 +33,4 @@ extern PyTypeObject TextboxType;
 extern PyTypeObject ListboxType;
 
 void Widget_unset_minimum_size(WidgetObject* self);
+PyObject* Widget_get_minimum_size(WidgetObject* self, void* closure);

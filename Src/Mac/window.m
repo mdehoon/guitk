@@ -25,28 +25,37 @@
 
 
 @implementation Window
-
 - (void) displayIfNeeded
 {
-    fprintf(stderr, "In Window displayIfNeeded\n"); fflush(stderr);
+    fprintf(stderr, "In Window displayIfNeeded, calling Widget_get_minimum_size\n"); fflush(stderr);
+    WidgetView* view = (WidgetView*) [self contentView];
+    WidgetObject* object = (WidgetObject*) view->object;
+    if (CGSizeEqualToSize(object->minimum_size, CGSizeZero))
+        fprintf(stderr, "minimum size is zero\n");
+    else
+        fprintf(stderr, "minimum size is not zero\n");
+    PyGILState_STATE gstate = PyGILState_Ensure();
+    PyObject* size;
+    size = Widget_get_minimum_size(object, NULL);
+    if (size)
+        Py_DECREF(size);
+    else
+        PyErr_Print();
+    if (PyObject_IsInstance(object, &LayoutType)) {
+        PyObject* result;
+        result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
+        if (result)
+             Py_DECREF(result);
+        else
+             PyErr_Print();
+    }
+    else {
+        // FIXME content is a widget; place it
+    }
+    PyGILState_Release(gstate);
     [super displayIfNeeded];
     fprintf(stderr, "Leaving Window displayIfNeeded\n"); fflush(stderr);
 }
-
-- (void) layoutIfNeeded
-{
-    fprintf(stderr, "In Window layoutIfNeeded\n"); fflush(stderr);
-    [super layoutIfNeeded];
-    fprintf(stderr, "Leaving Window layoutIfNeeded\n"); fflush(stderr);
-}
-
-- (void) updateConstraintsIfNeeded
-{
-    fprintf(stderr, "In Window updateConstraintsIfNeeded\n"); fflush(stderr);
-    [super updateConstraintsIfNeeded];
-    fprintf(stderr, "Leaving Window updateConstraintsIfNeeded\n"); fflush(stderr);
-}
-
 @synthesize object = _object;
 
 - (Window*)initWithContentRect: (NSRect)rect
