@@ -476,6 +476,7 @@ fprintf(stderr, "In drawRect for %p\n", self);
     CFTypeRef values[] = { label->font->font,
                            kCFBooleanTrue };
     const Relief relief = label->relief;
+    CGImageRef image = NULL;
 
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
@@ -545,7 +546,7 @@ fprintf(stderr, "In drawRect for %p\n", self);
      * Display image or bitmap or text for button.
      */
     if (label->image) {
-        CGImageRef image = label->image->data;
+        image = label->image->data;
         width = CGImageGetWidth(image);
         height = CGImageGetHeight(image);
     }
@@ -678,6 +679,14 @@ fprintf(stderr, "In drawRect for %p\n", self);
             Tk_DrawFocusHighlight(tkwin, gc, butPtr->highlightWidth, pixmap);
 */
         _draw_focus_highlight(cr, color, rect, label->highlight_thickness);
+    }
+    if (image) {
+        CGRect rect;
+        rect.origin.x = 0;
+        rect.origin.y = 0;
+        rect.size.width = imageWidth;
+        rect.size.height = imageHeight;
+        CGContextDrawImage(cr, rect, image);
     }
 fprintf(stderr, "Leaving drawRect for %p\n", self);
 }
@@ -1264,13 +1273,19 @@ Label_set_image(LabelObject* self, PyObject* value, void* closure)
 {
     WidgetObject* widget = (WidgetObject*) self;
     LabelView* label = (LabelView*) (widget->view);
-    if (!PyObject_IsInstance(value, (PyObject *)&ImageType)) {
+    if (Py_IsNone(value)) {
+        Py_XDECREF(self->image);
+        self->image = NULL;
+    }
+    else if (PyObject_IsInstance(value, (PyObject *)&ImageType)) {
+        Py_INCREF(value);
+        Py_XDECREF(self->image);
+        self->image = (ImageObject*) value;
+    }
+    else {
         PyErr_SetString(PyExc_ValueError, "expected an Image object");
         return -1;
     }
-    Py_INCREF(value);
-    Py_XDECREF(self->image);
-    self->image = (ImageObject*) value;
     Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
     return 0;
