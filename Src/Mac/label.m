@@ -80,7 +80,6 @@ typedef struct {
     bool is_first_responder;
 } LabelObject;
 
-static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure);
 
 /* TkComputeAnchor */
 static void
@@ -1107,6 +1106,31 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
                                                             &fitRange);
         if (self->width > 0) width = self->width * size.width;
         if (self->height > 0) height = self->height * size.height;
+    }
+
+    if (self->image) {
+        CGImageRef image = self->image->data;
+        size_t image_width = CGImageGetWidth(image);
+        size_t image_height = CGImageGetHeight(image);
+
+        switch (self->compound) {
+            case PY_COMPOUND_TOP:
+            case PY_COMPOUND_BOTTOM:
+                height += self->pady + image_height;
+                width = (width > image_width ? width : image_width);
+                break;
+            case PY_COMPOUND_LEFT:
+            case PY_COMPOUND_RIGHT:
+                height = (height > image_height ? height : image_height);
+                width += self->padx + image_width;
+                break;
+            case PY_COMPOUND_CENTER:
+                height = (height > image_height ? height : image_height);
+                width = (width > image_width ? width : image_width);
+                break;
+            default:
+                break;
+        }
     }
 
     width += 2 * (self->padx + self->highlight_thickness + self->border_width);
