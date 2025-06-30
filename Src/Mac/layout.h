@@ -9,7 +9,6 @@ typedef struct {
 @property BOOL layout_requested;
 - (LayoutView*)initWithFrame:(NSRect)rect;
 - (BOOL)isFlipped;
-- (void)viewWillDraw;
 - (void)didAddSubview:(NSView *)subview;
 - (void)willRemoveSubview:(NSView *)subview;
 - (void)setFrameSize:(NSSize)newSize;

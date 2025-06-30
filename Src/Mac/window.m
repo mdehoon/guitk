@@ -41,7 +41,7 @@
         Py_DECREF(size);
     else
         PyErr_Print();
-    if (PyObject_IsInstance(object, &LayoutType)) {
+    if (PyObject_IsInstance((PyObject*)object, (PyObject*)&LayoutType)) {
         PyObject* result;
         result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
         if (result)

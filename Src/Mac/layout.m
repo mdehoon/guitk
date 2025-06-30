@@ -289,8 +289,8 @@ static PyObject* Layout_layout(LayoutObject* self)
     PyObject* object;
     for (subview in parent.subviews) {
         child = (WidgetView*)subview;
-        object = child->object;
-        if (PyObject_IsInstance(object, &LayoutType)) {
+        object = (PyObject*)child->object;
+        if (PyObject_IsInstance(object, (PyObject*)&LayoutType)) {
             PyObject* result;
             result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
             if (result)

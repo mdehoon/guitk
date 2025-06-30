@@ -898,11 +898,6 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     self->text = text;
     self->font = font;
 
-    {
-        PyObject* tuple = Label_calculate_minimum_size(self, NULL);
-        if (tuple == NULL) return -1;
-        Py_DECREF(tuple);
-    }
     rect.origin.x = 0;
     rect.origin.y = 0;
     rect.size = widget->minimum_size;
