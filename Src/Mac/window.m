@@ -28,31 +28,34 @@
 - (void) displayIfNeeded
 {
     fprintf(stderr, "In Window displayIfNeeded, calling Widget_get_minimum_size\n"); fflush(stderr);
-    WidgetView* view = (WidgetView*) [self contentView];
-    WidgetObject* object = (WidgetObject*) view->object;
-    if (CGSizeEqualToSize(object->minimum_size, CGSizeZero))
-        fprintf(stderr, "minimum size is zero\n");
-    else
-        fprintf(stderr, "minimum size is not zero\n");
-    PyGILState_STATE gstate = PyGILState_Ensure();
-    PyObject* size;
-    size = Widget_get_minimum_size(object, NULL);
-    if (size)
-        Py_DECREF(size);
-    else
-        PyErr_Print();
-    if (PyObject_IsInstance((PyObject*)object, (PyObject*)&LayoutType)) {
-        PyObject* result;
-        result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
-        if (result)
-             Py_DECREF(result);
+    NSView *view = [self contentView];
+    if ([view isKindOfClass: [WidgetView class]]) {
+        WidgetObject* object = (WidgetObject*) ((WidgetView*)view)->object;
+        if (CGSizeEqualToSize(object->minimum_size, CGSizeZero))
+            fprintf(stderr, "minimum size is zero\n");
         else
-             PyErr_Print();
+            fprintf(stderr, "minimum size is not zero\n");
+        PyGILState_STATE gstate = PyGILState_Ensure();
+        PyObject* size;
+        size = Widget_get_minimum_size(object, NULL);
+        if (size)
+            Py_DECREF(size);
+        else
+            PyErr_Print();
+        if (PyObject_IsInstance((PyObject*)object, (PyObject*)&LayoutType)) {
+            PyObject* result;
+            result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
+            if (result)
+                 Py_DECREF(result);
+            else
+                 PyErr_Print();
+        }
+        else {
+            // FIXME content is a widget; place it
+        }
+        PyGILState_Release(gstate);
     }
-    else {
-        // FIXME content is a widget; place it
-    }
-    PyGILState_Release(gstate);
+    // otherwise, this window was not yet loaded.
     [super displayIfNeeded];
     fprintf(stderr, "Leaving Window displayIfNeeded\n"); fflush(stderr);
 }

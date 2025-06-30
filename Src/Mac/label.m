@@ -729,6 +729,43 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 static int
+compound_converter(PyObject* argument, void* pointer)
+{
+    const char* value;
+    Compound* compound = pointer;
+    if (argument == NULL) return 1;
+    if (!PyUnicode_Check(argument)) {
+        PyErr_SetString(PyExc_ValueError, "expected a string");
+        return 0;
+    }
+    value = PyUnicode_AsUTF8(argument);
+    if (!value) return 0;
+    if (PyOS_stricmp(value, "N")==0
+     || PyOS_stricmp(value, "NONE")==0) *compound = PY_COMPOUND_NONE;
+    else if (PyOS_stricmp(value, "B")==0
+          || PyOS_stricmp(value, "BOTTOM")==0) *compound = PY_COMPOUND_BOTTOM;
+    else if (PyOS_stricmp(value, "T")==0
+          || PyOS_stricmp(value, "TOP")==0) *compound = PY_COMPOUND_TOP;
+    else if (PyOS_stricmp(value, "B")==0
+          || PyOS_stricmp(value, "BOTTOM")==0) *compound = PY_COMPOUND_BOTTOM;
+    else if (PyOS_stricmp(value, "L")==0
+          || PyOS_stricmp(value, "LEFT")==0) *compound = PY_COMPOUND_LEFT;
+    else if (PyOS_stricmp(value, "R")==0
+          || PyOS_stricmp(value, "RIGHT")==0) *compound = PY_COMPOUND_RIGHT;
+    else if (PyOS_stricmp(value, "C")==0
+          || PyOS_stricmp(value, "CENTER")==0) *compound = PY_COMPOUND_CENTER;
+    else {
+        PyErr_Format(PyExc_ValueError,
+            "expected 'NONE', 'N', 'BOTTOM', 'B', 'TOP', 'T', "
+            "'LEFT', 'L', 'RIGHT', 'R', 'CENTER', or 'C' "
+            "(case-insensitive), got '%s'", value);
+        return 0;
+    }
+    return Py_CLEANUP_SUPPORTED;
+}
+
+
+static int
 Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
 {
     WidgetObject* widget;
@@ -737,10 +774,16 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     NSRect rect;
     FontObject* font = default_font_object;
     ImageObject* image = NULL;
+    Compound compound = PY_COMPOUND_NONE;
 
-    static char* kwlist[] = {"text", "font", "image", NULL};
-    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O&O!O!", kwlist, string_converter, &text, &FontType, &font, &ImageType, &image))
+    static char* kwlist[] = {"text", "font", "image", "compound", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O&O!O!O&", kwlist,
+                                     string_converter, &text,
+                                     &FontType, &font,
+                                     &ImageType, &image,
+                                     compound_converter, &compound))
         return -1;
+
 
 /*
     TkWindow* parentPtr;
@@ -898,6 +941,11 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     self->text = text;
     self->font = font;
 
+    Py_XDECREF(self->image);
+    if (image) Py_INCREF(image);
+    self->image = image;
+    self->compound = compound;
+
     rect.origin.x = 0;
     rect.origin.y = 0;
     rect.size = widget->minimum_size;
@@ -929,7 +977,6 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     self->highlight_color = systemWindowBackgroundColor;
 
     self->anchor = PY_ANCHOR_C;
-    self->compound = PY_COMPOUND_NONE;
 
     return 0;
 }
@@ -1751,6 +1798,41 @@ Label_set_anchor(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_anchor__doc__[] = "anchor specifying location of the label.";
 
+static PyObject* Label_get_compound(LabelObject* self, void* closure)
+{
+    switch (self->compound) {
+        case PY_COMPOUND_NONE: return PyUnicode_FromString("NONE");
+        case PY_COMPOUND_BOTTOM: return PyUnicode_FromString("BOTTOM");
+        case PY_COMPOUND_TOP: return PyUnicode_FromString("TOP");
+        case PY_COMPOUND_LEFT: return PyUnicode_FromString("LEFT");
+        case PY_COMPOUND_RIGHT: return PyUnicode_FromString("RIGHT");
+        case PY_COMPOUND_CENTER: return PyUnicode_FromString("CENTER");
+        default:
+            PyErr_Format(PyExc_RuntimeError,
+                "expected NONE (%d), BOTTOM (%d), TOP (%d), "
+                "LEFT (%d), RIGHT (%d), or CENTER (%d)",
+                PY_COMPOUND_NONE, PY_COMPOUND_BOTTOM, PY_COMPOUND_TOP,
+                PY_COMPOUND_LEFT, PY_COMPOUND_RIGHT, PY_COMPOUND_CENTER,
+                self->compound);
+            return NULL;
+    }
+}
+
+static int
+Label_set_compound(LabelObject* self, PyObject* value, void* closure)
+{
+    if (compound_converter(value, &self->compound)) {
+        WidgetObject* widget = (WidgetObject*) self;
+        LabelView* label = (LabelView*) (widget->view);
+        label.needsDisplay = YES;
+        return 0;
+    }
+    return -1;
+}
+
+static char Label_compound__doc__[] = "for compound labels, the location of the image relative to the text.";
+
+
 static PyGetSetDef Label_getseters[] = {
     {"text", (getter)Label_get_text, (setter)Label_set_text, Label_text__doc__, NULL},
     {"font", (getter)Label_get_font, (setter)Label_set_font, Label_font__doc__, NULL},
@@ -1768,6 +1850,7 @@ static PyGetSetDef Label_getseters[] = {
     {"state", (getter)Label_get_state, (setter)Label_set_state, Label_state__doc__, NULL},
     {"take_focus", (getter)Label_get_take_focus, (setter)Label_set_take_focus, Label_take_focus__doc__, NULL},
     {"anchor", (getter)Label_get_anchor, (setter)Label_set_anchor, Label_anchor__doc__, NULL},
+    {"compound", (getter)Label_get_compound, (setter)Label_set_compound, Label_compound__doc__, NULL},
     {"border_width", (getter)Label_get_border_width, (setter)Label_set_border_width, Label_border_width__doc__, NULL},
     {"padx", (getter)Label_get_padx, (setter)Label_set_padx, Label_padx__doc__, NULL},
     {"pady", (getter)Label_get_pady, (setter)Label_set_pady, Label_pady__doc__, NULL},
