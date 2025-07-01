@@ -462,7 +462,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     CGFloat height = 0;
     CGFloat imageWidth;
     CGFloat imageHeight;
-    CGSize constraints = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
     CTFrameRef frame = NULL;
     CTFramesetterRef framesetter = NULL;
     CFRange fitRange;
@@ -501,7 +500,8 @@ fprintf(stderr, "In drawRect for %p\n", self);
             break;
     }
 
-
+CFShow(label->text);
+fprintf(stderr, "minimum size is %f, %f\n", label->widget.minimum_size.width, label->widget.minimum_size.height);
     CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
@@ -589,7 +589,7 @@ fprintf(stderr, "In drawRect for %p\n", self);
         // (and then clipped manually).
         CFRelease(string);
         if (!framesetter) return;
-        size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, constraints, &fitRange);
+        size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, self.bounds.size, &fitRange);
 
         width = self.frame.size.width;
         height = self.frame.size.height;
