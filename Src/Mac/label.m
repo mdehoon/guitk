@@ -449,7 +449,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
 /* TkpDisplayButton */
 - (void)drawRect:(NSRect)dirtyRect
 {
-fprintf(stderr, "In drawRect for %p\n", self);
     CFMutableAttributedStringRef string = NULL;
     CFDictionaryRef attributes = NULL;
     CGContextRef cr;
@@ -469,6 +468,8 @@ fprintf(stderr, "In drawRect for %p\n", self);
     CFRange fitRange;
     unsigned short red, green, blue, alpha;
     LabelObject* label = (LabelObject*)object;
+
+fprintf(stderr, "In drawRect for %p\n", self);
 
     Sticky sticky = label->sticky;
     CFStringRef keys[] = { kCTFontAttributeName,
@@ -583,6 +584,9 @@ fprintf(stderr, "In drawRect for %p\n", self);
             }
             framesetter = CTFramesetterCreateWithAttributedString(string);
         }
+        // Use CTLineRef line = CTLineCreateWithAttributedString(string); to
+        // ensure that the string is not wrapped, and is written completely
+        // (and then clipped manually).
         CFRelease(string);
         if (!framesetter) return;
         size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, constraints, &fitRange);
@@ -595,7 +599,17 @@ fprintf(stderr, "In drawRect for %p\n", self);
             CFRelease(framesetter);
         }
         CFRelease(path);
+
         if (!frame) return;
+
+        if (label->compound != PY_COMPOUND_NONE && label->image && label->text)
+        {
+            switch (label->compound) {
+                case PY_COMPOUND_TOP:
+                case PY_COMPOUND_BOTTOM:
+  // FIXME calculate position if there is both text and image
+            }
+        }
 /*
             TkComputeAnchor(butPtr->anchor, tkwin, butPtr->padX, butPtr->padY,
                     butPtr->indicatorSpace + butPtr->textWidth,
@@ -604,6 +618,7 @@ fprintf(stderr, "In drawRect for %p\n", self);
         x = rect.origin.x + 0.5 * rect.size.width - 0.5 * size.width;
         y = rect.origin.y + 0.5 * rect.size.height - 0.5 * size.height;
         _compute_anchor(label, rect.size, size, &x, &y);
+fprintf(stderr, "HIER rect.size = %f, %f size = %f, %f x = %f y = %f\n", rect.size.width, rect.size.height, size.width, size.height, x, y);
 
         switch (label->state) {
             case NORMAL:
@@ -630,9 +645,10 @@ fprintf(stderr, "In drawRect for %p\n", self);
                                      ((CGFloat)blue)/USHRT_MAX,
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextSaveGState(cr);
+        CGContextClipToRect(cr, self.bounds);
         CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
         CGContextScaleCTM(cr, 1.0, -1.0);
-        CTFrameDraw(frame, cr);
+        CTFrameDraw(frame, cr);   // or CTLineDraw(line, cr);
         CGContextRestoreGState(cr);
         CFRelease(frame);
     }
@@ -778,7 +794,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
 {
     WidgetObject* widget;
     LabelView *label;
-    CFStringRef text = CFSTR("");
+    CFStringRef text = NULL;
     NSRect rect;
     FontObject* font = default_font_object;
     ImageObject* image = NULL;
@@ -945,7 +961,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     widget = (WidgetObject*)self;
     Py_INCREF(font);
     if (self->text) CFRelease(self->text);
-    CFRetain(text);
+    if (text) CFRetain(text);
     self->text = text;
     self->font = font;
 
@@ -1068,7 +1084,7 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         return NULL;
     }
 
-    if (self->width == 0 || self->height == 0) {
+    if (self->text && (self->width == 0 || self->height == 0)) {
         string = CFAttributedStringCreate(kCFAllocatorDefault,
                                           self->text,
                                           attributes);
@@ -1142,8 +1158,10 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         }
     }
 
-    width += 2 * (self->padx + self->highlight_thickness + self->border_width);
-    height += 2 * (self->pady + self->highlight_thickness + self->border_width);
+    if (width > 0 && height > 0) {
+        width += 2 * (self->padx + self->highlight_thickness + self->border_width);
+        height += 2 * (self->pady + self->highlight_thickness + self->border_width);
+    }
 
     tuple = Py_BuildValue("ff", width, height);
 
@@ -1172,7 +1190,10 @@ static PyMethodDef Label_methods[] = {
 
 static PyObject* Label_get_text(LabelObject* self, void* closure)
 {
-    return PyString_FromCFString(self->text);
+    if (self->text) return PyString_FromCFString(self->text);
+
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 static int
@@ -1181,10 +1202,13 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
     CFStringRef text;
     WidgetObject* widget = (WidgetObject*) self;
     LabelView* label = (LabelView*) (widget->view);
-    text = PyString_AsCFString(value);
-    if (!text) return -1;
-    if (self->text) CFRelease(self->text);
-    self->text = text;
+    if (Py_IsNone(value)) self->text = NULL;
+    else {
+        text = PyString_AsCFString(value);
+        if (!text) return -1;
+        if (self->text) CFRelease(self->text);
+        self->text = text;
+    }
     fprintf(stderr, "In Label_set_text for NSView %p with object %p; setting Widget_unset_minimum_size\n", label, self);
     Widget_unset_minimum_size(widget);
     fprintf(stderr, "In Label_set_text for NSView %p with object %p; after calling Widget_unset_minimum_size\n", label, self);
