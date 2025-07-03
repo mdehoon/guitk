@@ -75,7 +75,7 @@ typedef struct {
     CFStringRef text;
     FontObject* font;
     Py_ssize_t underline;
-    long wrap_length;
+    size_t wraplength;
     bool take_focus;
     bool is_first_responder;
 } LabelObject;
@@ -747,7 +747,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->anchor = PY_ANCHOR_C;
     self->image = NULL;
     self->compound = PY_COMPOUND_NONE;
-    self->wrap_length = 0;
+    self->wraplength = 0;
     // self->minimum_size = CGSizeZero;
     return (PyObject*)self;
 }
@@ -1072,6 +1072,8 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
     CFTypeRef values[] = { self->font->font } ;
     PyObject* tuple = NULL;
 
+    if (self->wraplength > 0) constraints.width = self->wraplength;
+
     attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                     (const void**)&keys,
                                     (const void**)&values,
@@ -1163,6 +1165,7 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         height += 2 * (self->pady + self->highlight_thickness + self->border_width);
     }
 
+fprintf(stderr, "minimum size = %f %f\n", width, height);
     tuple = Py_BuildValue("ff", width, height);
 
 exit:
@@ -1280,6 +1283,35 @@ Label_set_underline(LabelObject* self, PyObject* value, void* closure)
 }
 
 static char Label_underline__doc__[] = "specifies the index of the character to underline.";
+
+static PyObject* Label_get_wraplength(LabelObject* self, void* closure)
+{
+    const size_t wraplength = self->wraplength;
+    if (wraplength == 0) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    return PyLong_FromSize_t(wraplength);
+}
+
+static int
+Label_set_wraplength(LabelObject* self, PyObject* value, void* closure)
+{
+    size_t wraplength;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (value == Py_None) wraplength = 0;
+    else {
+        wraplength = PyLong_AsSize_t(value);
+        if (wraplength == (size_t)-1 && PyErr_Occurred()) return -1;
+    }
+    self->wraplength = wraplength;
+    Widget_unset_minimum_size(widget);
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_wraplength__doc__[] = "maximum line length (in pixels); longer lines will be wrapped.";
 
 static PyObject* Label_get_image(LabelObject* self, void* closure)
 {
@@ -1901,6 +1933,7 @@ static PyGetSetDef Label_getseters[] = {
     {"font", (getter)Label_get_font, (setter)Label_set_font, Label_font__doc__, NULL},
     {"image", (getter)Label_get_image, (setter)Label_set_image, Label_image__doc__, NULL},
     {"underline", (getter)Label_get_underline, (setter)Label_set_underline, Label_underline__doc__, NULL},
+    {"wraplength", (getter)Label_get_wraplength, (setter)Label_set_wraplength, Label_wraplength__doc__, NULL},
     {"foreground", (getter)Label_get_foreground, (setter)Label_set_foreground, Label_foreground__doc__, NULL},
     {"background", (getter)Label_get_background, (setter)Label_set_background, Label_background__doc__, NULL},
     {"active_foreground", (getter)Label_get_active_foreground, (setter)Label_set_active_foreground, Label_active_foreground__doc__, NULL},
