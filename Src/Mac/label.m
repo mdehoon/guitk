@@ -468,8 +468,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     unsigned short red, green, blue, alpha;
     LabelObject* label = (LabelObject*)object;
 
-fprintf(stderr, "In drawRect for %p\n", self);
-
     Sticky sticky = label->sticky;
     CFStringRef keys[] = { kCTFontAttributeName,
                            kCTForegroundColorFromContextAttributeName };
@@ -501,40 +499,42 @@ fprintf(stderr, "In drawRect for %p\n", self);
     }
 
 CFShow(label->text);
-fprintf(stderr, "minimum size is %f, %f\n", label->widget.minimum_size.width, label->widget.minimum_size.height);
+fprintf(stderr, "view size is width=%f, height=%f\r\n", self.bounds.size.width, self.bounds.size.height);
+fprintf(stderr, "minimum size width=%f, height=%f\r\n", label->widget.minimum_size.width, label->widget.minimum_size.height);
     CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
                                  ((CGFloat)alpha)/USHRT_MAX);
-    rect = self.frame;
     if ((sticky & (PY_STICKY_W | PY_STICKY_E)) == (PY_STICKY_W | PY_STICKY_E)) {
         rect.origin.x = 0;
+        rect.size.width = self.frame.size.width;
     }
     else if (sticky & PY_STICKY_W) {
         rect.origin.x = 0;
         rect.size.width = label->widget.minimum_size.width;
     }
     else if (sticky & PY_STICKY_E) {
-        rect.origin.x = rect.size.width - label->widget.minimum_size.width;
+        rect.origin.x = self.frame.size.width - label->widget.minimum_size.width;
         rect.size.width = label->widget.minimum_size.width;
     }
     else {
-        rect.origin.x = 0.5 * (rect.size.width - label->widget.minimum_size.width);
+        rect.origin.x = 0.5 * (self.frame.size.width - label->widget.minimum_size.width);
         rect.size.width = label->widget.minimum_size.width;
     }
     if ((sticky & (PY_STICKY_N | PY_STICKY_S)) == (PY_STICKY_N | PY_STICKY_S)) {
         rect.origin.y = 0;
+        rect.size.height = self.frame.size.height;
     }
     else if (sticky & PY_STICKY_N) {
         rect.origin.y = 0;
         rect.size.height = label->widget.minimum_size.height;
     }
     else if (sticky & PY_STICKY_S) {
-        rect.origin.y = rect.size.height - label->widget.minimum_size.height;
+        rect.origin.y = self.frame.size.height - label->widget.minimum_size.height;
         rect.size.height = label->widget.minimum_size.height;
     }
     else {
-        rect.origin.y = 0.5 * (rect.size.height - label->widget.minimum_size.height);
+        rect.origin.y = 0.5 * (self.frame.size.height - label->widget.minimum_size.height);
         rect.size.height = label->widget.minimum_size.height;
     }
 
@@ -591,9 +591,12 @@ fprintf(stderr, "minimum size is %f, %f\n", label->widget.minimum_size.width, la
         if (!framesetter) return;
         size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, self.bounds.size, &fitRange);
 
-        width = self.frame.size.width;
-        height = self.frame.size.height;
-        path = CGPathCreateWithRect(CGRectMake(0, 0, rect.size.width, rect.size.height), NULL);
+        // width = self.frame.size.width;
+        // height = self.frame.size.height;
+        width = rect.size.width;
+        height = rect.size.height;
+        if (label->wraplength > 0) width = label->wraplength;
+        path = CGPathCreateWithRect(CGRectMake(0, 0, width, height), NULL);
         if (path) {
             frame = CTFramesetterCreateFrame(framesetter, range, path, NULL);
             CFRelease(framesetter);
@@ -617,8 +620,9 @@ fprintf(stderr, "minimum size is %f, %f\n", label->widget.minimum_size.width, la
 */
         x = rect.origin.x + 0.5 * rect.size.width - 0.5 * size.width;
         y = rect.origin.y + 0.5 * rect.size.height - 0.5 * size.height;
+fprintf(stderr, "HIER x = %f y = %f; rect.origin.y = %f rect.size.height = %f size.height = %f\r\n", x, y, rect.origin.y, rect.size.height, size.height);
         _compute_anchor(label, rect.size, size, &x, &y);
-fprintf(stderr, "HIER rect.size = %f, %f size = %f, %f x = %f y = %f\n", rect.size.width, rect.size.height, size.width, size.height, x, y);
+fprintf(stderr, "DAAR rect.size width=%f, height=%f size width=%f, height=%f x = %f y = %f\r\n", rect.size.width, rect.size.height, size.width, size.height, x, y);
 
         switch (label->state) {
             case NORMAL:
@@ -646,7 +650,9 @@ fprintf(stderr, "HIER rect.size = %f, %f size = %f, %f x = %f y = %f\n", rect.si
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextSaveGState(cr);
         CGContextClipToRect(cr, self.bounds);
-        CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
+fprintf(stderr, "Translating to x + rect.origin.x = %f, rect.size.height + y + rect.origin.y = %f + %f + %f = %f\r\n", x + rect.origin.x, rect.size.height, y, rect.origin.y, rect.size.height + y + rect.origin.y);
+ //       CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
+    CGContextTranslateCTM(cr, x + rect.origin.x, self.bounds.size.height);
         CGContextScaleCTM(cr, 1.0, -1.0);
         CTFrameDraw(frame, cr);   // or CTLineDraw(line, cr);
         CGContextRestoreGState(cr);
@@ -704,7 +710,6 @@ fprintf(stderr, "HIER rect.size = %f, %f size = %f, %f x = %f y = %f\n", rect.si
         rect.size.height = imageHeight;
         CGContextDrawImage(cr, rect, image);
     }
-fprintf(stderr, "Leaving drawRect for %p\n", self);
 }
 
 - (BOOL)isFlipped
@@ -1165,7 +1170,6 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         height += 2 * (self->pady + self->highlight_thickness + self->border_width);
     }
 
-fprintf(stderr, "minimum size = %f %f\n", width, height);
     tuple = Py_BuildValue("ff", width, height);
 
 exit:
@@ -1212,9 +1216,7 @@ Label_set_text(LabelObject* self, PyObject* value, void* closure)
         if (self->text) CFRelease(self->text);
         self->text = text;
     }
-    fprintf(stderr, "In Label_set_text for NSView %p with object %p; setting Widget_unset_minimum_size\n", label, self);
     Widget_unset_minimum_size(widget);
-    fprintf(stderr, "In Label_set_text for NSView %p with object %p; after calling Widget_unset_minimum_size\n", label, self);
     label.needsDisplay = YES;
     return 0;
 }

@@ -59,7 +59,6 @@
     short red, green, blue, alpha;
     CGRect rect;
     LayoutObject* layout = (LayoutObject*)object;
-    fprintf(stderr, "In drawRect for NSView %p\n", self);
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
     cr = gc.CGContext;
@@ -74,7 +73,6 @@
     rect = NSRectToCGRect(dirtyRect);
     CGContextFillRect(cr, rect);
     [super drawRect:dirtyRect];
-    fprintf(stderr, "Leaving drawRect for NSView %p\n", self);
 }
 @end
 

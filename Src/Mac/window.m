@@ -27,14 +27,9 @@
 @implementation Window
 - (void) displayIfNeeded
 {
-    fprintf(stderr, "In Window displayIfNeeded, calling Widget_get_minimum_size\n"); fflush(stderr);
     NSView *view = [self contentView];
     if ([view isKindOfClass: [WidgetView class]]) {
         WidgetObject* object = (WidgetObject*) ((WidgetView*)view)->object;
-        if (CGSizeEqualToSize(object->minimum_size, CGSizeZero))
-            fprintf(stderr, "minimum size is zero\n");
-        else
-            fprintf(stderr, "minimum size is not zero\n");
         PyGILState_STATE gstate = PyGILState_Ensure();
         PyObject* size;
         size = Widget_get_minimum_size(object, NULL);
@@ -57,7 +52,6 @@
     }
     // otherwise, this window was not yet loaded.
     [super displayIfNeeded];
-    fprintf(stderr, "Leaving Window displayIfNeeded\n"); fflush(stderr);
 }
 @synthesize object = _object;
 
