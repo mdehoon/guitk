@@ -307,41 +307,15 @@ Timer_repr(TimerObject* self)
 
 static PyTypeObject TimerType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "events.Timer",            /*tp_name*/
-    sizeof(TimerObject),       /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
-    (destructor)Timer_dealloc, /*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /*tp_compare*/
-    (reprfunc)Timer_repr,      /*tp_repr*/ 
-    0,                         /*tp_as_number*/
-    0,                         /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
-    0,                         /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /* tp_flags */
-    "Timer object",            /*tp_doc */
-    0,                         /* tp_traverse */
-    0,                         /* tp_clear */
-    0,                         /* tp_richcompare */
-    0,                         /* tp_weaklistoffset */
-    0,                         /* tp_iter */
-    0,                         /* tp_iternext */
-    Timer_methods,             /* tp_methods */
-    0,                         /* tp_members */
-    Timer_getset,              /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
-    (initproc)Timer_init,      /* tp_init */
+    .tp_name = "events.Timer",
+    .tp_basicsize = sizeof(TimerObject),
+    .tp_dealloc = (destructor)Timer_dealloc,
+    .tp_repr = (reprfunc)Timer_repr,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_doc = "Timer object",
+    .tp_methods = Timer_methods,
+    .tp_getset = Timer_getset,
+    .tp_init = (initproc)Timer_init,
 };
 
 static PyObject*
@@ -496,7 +470,8 @@ Notifier_start(NotifierObject *self, PyObject *args, PyObject *kwds)
         case READABLE: flags = kCFFileDescriptorReadCallBack; break;
         case WRITABLE: flags = kCFFileDescriptorWriteCallBack; break;
         default:
-            PyErr_SetString(PyExc_TypeError, "event should be events.readable or events.writable");
+            PyErr_SetString(PyExc_TypeError,
+                "event should be events.readable or events.writable");
             return NULL;
     }
     runloop = CFRunLoopGetMain();
@@ -531,7 +506,8 @@ Notifier_stop(NotifierObject* self, PyObject *args)
 {
     CFFileDescriptorRef fdref = self->fdref;
     if (!fdref) {
-        PyErr_SetString(PyExc_RuntimeError, "notifier has not been initialized.");
+        PyErr_SetString(PyExc_RuntimeError,
+            "notifier has not been initialized.");
         return NULL;
     }
     CFFileDescriptorInvalidate(fdref);
@@ -560,7 +536,8 @@ static PyObject* Notifier_get_fd(NotifierObject* self, void* closure)
     int fd;
     CFFileDescriptorRef fdref = self->fdref;
     if (!fdref) {
-        PyErr_SetString(PyExc_RuntimeError, "notifier has not been initialized.");
+        PyErr_SetString(PyExc_RuntimeError,
+            "notifier has not been initialized.");
         return NULL;
     }
     fd = CFFileDescriptorGetNativeDescriptor(fdref);
@@ -592,53 +569,29 @@ Notifier_repr(NotifierObject* self)
     if (!fdref)
         return PyUnicode_FromFormat("Notifier object %p (not initialized)", p);
     fd = CFFileDescriptorGetNativeDescriptor(fdref);
-    return PyUnicode_FromFormat("Notifier object %p for file descriptor %d", p, fd);
+    return PyUnicode_FromFormat("Notifier object %p for file descriptor %d",
+                                p, fd);
 }
 
 static PyTypeObject NotifierType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "events.Notifier",         /*tp_name*/
-    sizeof(NotifierObject),    /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
-    (destructor)Notifier_dealloc, /*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /*tp_compare*/
-    (reprfunc)Notifier_repr,   /*tp_repr*/ 
-    0,                         /*tp_as_number*/
-    0,                         /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
-    0,                         /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /* tp_flags */
-    "Notifier object",         /*tp_doc */
-    0,                         /* tp_traverse */
-    0,                         /* tp_clear */
-    0,                         /* tp_richcompare */
-    0,                         /* tp_weaklistoffset */
-    0,                         /* tp_iter */
-    0,                         /* tp_iternext */
-    Notifier_methods,          /* tp_methods */
-    0,                         /* tp_members */
-    Notifier_getset,           /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
-    (initproc)Notifier_init,   /* tp_init */
+    .tp_name = "events.Notifier",
+    .tp_basicsize = sizeof(NotifierObject),
+    .tp_dealloc = (destructor)Notifier_dealloc,
+    .tp_repr = (reprfunc)Notifier_repr,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_doc = "Notifier object",
+    .tp_methods = Notifier_methods,
+    .tp_getset = Notifier_getset,
+    .tp_init = (initproc)Notifier_init,
 };
 
 static PyObject*
 PyEvents_CreateNotifier(PyObject* unused, PyObject* args, PyObject* kwds)
 {
     int fd;               /* Handle of stream to watch. */
-    int event = READABLE; /* events we are interested in; READABLE or WRITABLE */
+    int event = READABLE; /* events we are interested in;
+                           * READABLE or WRITABLE */
     PyObject* callback;
     CFOptionFlags flags;
     CFFileDescriptorRef fdref;
@@ -648,7 +601,8 @@ PyEvents_CreateNotifier(PyObject* unused, PyObject* args, PyObject* kwds)
     PyObject* object;
     PyTypeObject* type = &NotifierType;
     static char* kwlist[] = {"callback", "fd", "event", NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwds, "Oi|i", kwlist, &callback, &fd, &event))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "Oi|i", kwlist,
+                                     &callback, &fd, &event))
         return NULL;
     if (!PyCallable_Check(callback)) {
         PyErr_SetString(PyExc_TypeError, "Callback should be callable");
@@ -658,7 +612,8 @@ PyEvents_CreateNotifier(PyObject* unused, PyObject* args, PyObject* kwds)
         case READABLE: flags = kCFFileDescriptorReadCallBack; break;
         case WRITABLE: flags = kCFFileDescriptorWriteCallBack; break;
         default:
-            PyErr_SetString(PyExc_TypeError, "event should be events.readable or events.writable");
+            PyErr_SetString(PyExc_TypeError,
+                "event should be events.readable or events.writable");
             return NULL;
     }
     NotifierObject *self = (NotifierObject*)type->tp_alloc(type, 0);
@@ -874,15 +829,12 @@ static void freeevents(void* module)
 }
 
 static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT,         /* m_base */
-    "events",                      /* m_name */
-    "events module for Mac OS X",  /* m_doc */
-    -1,                            /* m_size */
-    methods,                       /* m_methods */
-    NULL,                          /* m_reload */
-    NULL,                          /* m_traverse */
-    NULL,                          /* m_clear */
-    freeevents                     /* m_free */
+    .m_base = PyModuleDef_HEAD_INIT,
+    .m_name = "events",
+    .m_doc = "events module for Mac OS X",
+    .m_size = -1,
+    .m_methods = methods,
+    .m_free = freeevents,
 };
 
 PyObject* PyInit_events(void)

@@ -83,7 +83,11 @@ def on_activate(app):
     win.present()
 
 app = Gtk.Application(application_id='com.example.App')
-app.connect('activate', on_activate)
+# app.connect('activate', on_activate)
+win = MyWindow(application=app)
+win.present()
 
 
-app.run(None)
+
+# app.run(None)
+import guitk
