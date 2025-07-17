@@ -1,8 +1,9 @@
 import gi
-import sys
+import guitk
 
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib
+
 
 
 class MyWindow(Gtk.ApplicationWindow):
@@ -80,11 +81,8 @@ class MyWindow(Gtk.ApplicationWindow):
 
 def on_activate(app):
     # Create window
+    print("activating")
     win = MyWindow(application=app)
-    def on_close(window):
-        loop.quit()
-        return False
-    win.connect('close-request', on_close)
     win.present()
 
 app = Gtk.Application(application_id='com.example.App')
@@ -92,8 +90,3 @@ app.connect('activate', on_activate)
 
 app.register(None)
 app.activate()
-
-# app.run(None)
-
-loop = GLib.MainLoop()
-loop.run()
