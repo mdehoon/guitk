@@ -1,15 +1,17 @@
 import gi
-import guitk
+from guitk.gui import *
+from guitk.layout import Grid
 
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, GLib
 
+from numpy.random import random, randint
 
 
 class MyWindow(Gtk.ApplicationWindow):
 
     def __init__(self, **kargs):
-        super().__init__(**kargs, title='Hello World')
+        super().__init__(**kargs, title='GTK')
 
         grid = Gtk.Grid()
         grid.set_vexpand(True)
@@ -81,12 +83,121 @@ class MyWindow(Gtk.ApplicationWindow):
 
 def on_activate(app):
     # Create window
+    global gtk_win
     print("activating")
-    win = MyWindow(application=app)
-    win.present()
+    gtk_win = MyWindow(application=app)
+    gtk_win.present()
 
 app = Gtk.Application(application_id='com.example.App')
 app.connect('activate', on_activate)
 
 app.register(None)
 app.activate()
+
+guitk_win = Window()
+guitk_win.size = (700, 500)
+guitk_win.title = "guitk"
+
+label1 = Label(text="One")
+label1.background=Color('red')
+label1.font = Font("Helvetica", 64)
+label1.hexpand = True
+label1.sticky = 'WE'
+
+label2 = Label(text="Two")
+label2.background=Color('pink')
+label2.font = Font("Helvetica", 64)
+
+label3 = Label(text="Three")
+label3.background=Color('Orange')
+label3.font = Font("Helvetica", 64)
+
+label4 = Label(text="Four")
+label4.background=Color('green')
+label4.font = Font("Helvetica", 64)
+
+label5 = Label(text="Five")
+label5.background=Color('blue')
+label5.font = Font("Helvetica", 64)
+
+label6 = Label(text="Six")
+label6.background=Color('lightblue')
+label6.font = Font("Helvetica", 64)
+label6.sticky = 'NSWE'
+label6.hexpand = True
+label6.vexpand = True
+
+
+grid = Grid(2,3)
+grid[0,0] = label1
+grid[1,0] = label2
+grid[0,1] = label3
+grid[1,1] = label4
+grid[0,2] = label5
+grid[1,2] = label6
+
+grid[0,0].hexpand = True
+grid[0,2].hexpand = True
+grid[0,2].vexpand = True
+
+guitk_win.content = grid
+guitk_win.show()
+
+
+def config(number, attribute, value):
+    if number == 1:
+        label = label1
+    elif number == 2:
+        label = label2
+    elif number == 3:
+        label = label3
+    elif number == 4:
+        label = label4
+    elif number == 5:
+        label = label5
+    elif number == 6:
+        label = label6
+    setattr(label, attribute, value)
+    if number == 1:
+        label = gtk_win.label1
+    elif number == 2:
+        label = gtk_win.label2
+    elif number == 3:
+        label = gtk_win.label3
+    elif number == 4:
+        label = gtk_win.label4
+    elif number == 5:
+        label = gtk_win.label5
+    elif number == 6:
+        label = gtk_win.label6
+    attribute = "set_" + attribute
+    method = getattr(label, attribute)
+    method(value)
+
+def randomize():
+    attributes = ("xalign", "yalign", "halign", "valign", "hexpand", "vexpand")
+    for number in range(1, 7):
+        flag = 0  # randint(2)
+        if flag:
+            value = random()
+            config(number, "xalign", value)
+            print("label%d xalign = %f" % (number, value))
+        flag = 0  # randint(2)
+        if flag:
+            value = random()
+            config(number, "yalign", value)
+            print("label%d xalign = %f" % (number, value))
+        flag = randint(2)
+        if flag:
+            config(number, "hexpand", True)
+            print("label%d hexpand = True" % number)
+        else:
+            config(number, "hexpand", False)
+            print("label%d hexpand = False" % number)
+        flag = randint(2)
+        if flag:
+            config(number, "vexpand", True)
+            print("label%d vexpand = True" % number)
+        else:
+            config(number, "vexpand", False)
+            print("label%d vexpand = False" % number)
