@@ -11,6 +11,10 @@ typedef struct WidgetObject {
     char valign;
     BOOL hexpand;
     BOOL vexpand;
+    double margin_left;
+    double margin_right;
+    double margin_top;
+    double margin_bottom;
 } WidgetObject;
 
 @interface WidgetView : NSView

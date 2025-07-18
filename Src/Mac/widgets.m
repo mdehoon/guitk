@@ -32,6 +32,10 @@ Widget_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->valign = 'f';
     self->hexpand = NO;
     self->vexpand = NO;
+    self->margin_left = 0;
+    self->margin_right = 0;
+    self->margin_top = 0;
+    self->margin_bottom = 0;
     return (PyObject*)self;
 }
 
@@ -448,6 +452,107 @@ static int Widget_set_vexpand(WidgetObject* self, PyObject* value, void* closure
 
 static char Widget_vexpand__doc__[] = "Widget should expand vertically";
 
+static PyObject* Widget_get_margin_left(WidgetObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->margin_left);
+}
+
+static int
+Widget_set_margin_left(WidgetObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    WidgetView* view;
+    const CGFloat margin_left = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    if (margin_left < 0) {
+        PyErr_SetString(PyExc_ValueError,
+                        "margin_left must be non-negative");
+        return -1;
+    }
+    self->margin_left = margin_left;
+    view = self->view;
+    view.needsDisplay = YES;
+    return 0;
+}
+
+static char Widget_margin_left__doc__[] = "margin on the left side of the widget.";
+
+static PyObject* Widget_get_margin_right(WidgetObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->margin_right);
+}
+
+static int
+Widget_set_margin_right(WidgetObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    WidgetView* view;
+    const CGFloat margin_right = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    if (margin_right < 0) {
+        PyErr_SetString(PyExc_ValueError,
+                        "margin_right must be non-negative");
+        return -1;
+    }
+    self->margin_right = margin_right;
+    view = self->view;
+    view.needsDisplay = YES;
+    return 0;
+}
+
+static char Widget_margin_right__doc__[] = "margin on the right side of the widget.";
+
+static PyObject* Widget_get_margin_top(WidgetObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->margin_top);
+}
+
+static int
+Widget_set_margin_top(WidgetObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    WidgetView* view;
+    const CGFloat margin_top = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    if (margin_top < 0) {
+        PyErr_SetString(PyExc_ValueError,
+                        "margin_top must be non-negative");
+        return -1;
+    }
+    self->margin_top = margin_top;
+    view = self->view;
+    view.needsDisplay = YES;
+    return 0;
+}
+
+static char Widget_margin_top__doc__[] = "margin on the top side of the widget.";
+
+static PyObject* Widget_get_margin_bottom(WidgetObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->margin_bottom);
+}
+
+static int
+Widget_set_margin_bottom(WidgetObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    WidgetView* view;
+    const CGFloat margin_bottom = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    if (margin_bottom < 0) {
+        PyErr_SetString(PyExc_ValueError,
+                        "margin_bottom must be non-negative");
+        return -1;
+    }
+    self->margin_bottom = margin_bottom;
+    view = self->view;
+    view.needsDisplay = YES;
+    return 0;
+}
+
+static char Widget_margin_bottom__doc__[] = "margin on the bottom side of the widget.";
+
+
 static PyGetSetDef Widget_getset[] = {
     {"origin", (getter)Widget_get_origin, (setter)Widget_set_origin, Widget_origin__doc__, NULL},
     {"size", (getter)Widget_get_size, (setter)Widget_set_size, Widget_size__doc__, NULL},
@@ -456,6 +561,10 @@ static PyGetSetDef Widget_getset[] = {
     {"valign", (getter)Widget_get_valign, (setter)Widget_set_valign, Widget_valign__doc__, NULL},
     {"hexpand", (getter)Widget_get_hexpand, (setter)Widget_set_hexpand, Widget_hexpand__doc__, NULL},
     {"vexpand", (getter)Widget_get_vexpand, (setter)Widget_set_vexpand, Widget_vexpand__doc__, NULL},
+    {"margin_left", (getter)Widget_get_margin_left, (setter)Widget_set_margin_left, Widget_margin_left__doc__, NULL},
+    {"margin_right", (getter)Widget_get_margin_right, (setter)Widget_set_margin_right, Widget_margin_right__doc__, NULL},
+    {"margin_top", (getter)Widget_get_margin_top, (setter)Widget_set_margin_top, Widget_margin_top__doc__, NULL},
+    {"margin_bottom", (getter)Widget_get_margin_bottom, (setter)Widget_set_margin_bottom, Widget_margin_bottom__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 

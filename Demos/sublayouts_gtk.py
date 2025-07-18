@@ -178,18 +178,22 @@ def randomize():
         # margin_start
         value = randint(20) * randint(2)
         gtk_label.set_margin_start(value)
-        # guitk_label.margin_left = value
+        guitk_label.margin_left = value
+        words.append(f"margin_left={guitk_label.margin_left:.1f}")
         # margin_end
         value = randint(20) * randint(2)
         gtk_label.set_margin_end(value)
-        # guitk_label.margin_right = value
+        guitk_label.margin_right = value
+        words.append(f"margin_right={guitk_label.margin_right:.1f}")
         # margin_top
         value = randint(20) * randint(2)
         gtk_label.set_margin_top(value)
-        # guitk_label.margin_top = value
+        guitk_label.margin_top = value
+        words.append(f"margin_top={guitk_label.margin_top:.1f}")
         # margin_bottom
         value = randint(20) * randint(2)
         gtk_label.set_margin_bottom(value)
-        # guitk_label.margin_bottom = value
+        guitk_label.margin_bottom = value
+        words.append(f"margin_bottom={guitk_label.margin_bottom:.1f}")
         line = f"label{number}: " + ", ".join(words)
         print(line)
