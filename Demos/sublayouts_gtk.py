@@ -2,8 +2,8 @@ import gi
 from guitk.gui import *
 from guitk.layout import Grid
 
-gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk, GLib
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, Gdk
 
 from numpy.random import random, randint
 
@@ -14,7 +14,7 @@ class MyWindow(Gtk.ApplicationWindow):
         super().__init__(**kargs, title='GTK')
 
         grid = Gtk.Grid()
-        self.set_child(grid)
+        self.add(grid)
 
         self.label1 = self.create_label(1, text="One", color="red")
         grid.attach(self.label1, 0, 0, 1, 1)
@@ -37,11 +37,11 @@ class MyWindow(Gtk.ApplicationWindow):
     def create_label(self, number, text, color):
         label = Gtk.Label(label=text)
         key = "cutom-label%d" % number
-        label.set_css_classes([key])
+        label.get_style_context().add_class(key)
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b"""
             .%s {
-                font-family: "Helvetica";
+                font-family: Helvetica;
                 font-size: 64pt;
                 background-color: %s;
                 color: black;
@@ -49,26 +49,20 @@ class MyWindow(Gtk.ApplicationWindow):
             }
         """ % (key.encode(), color.encode()))
         # Apply the CSS to the display
-        Gtk.StyleContext.add_provider_for_display(
-            self.get_display(),
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
             css_provider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            Gtk.STYLE_PROVIDER_PRIORITY_USER
         )
         return label
 
 
-def on_activate(app):
-    # Create window
-    global gtk_win
-    print("activating")
-    gtk_win = MyWindow(application=app)
-    gtk_win.present()
+gtk_win = MyWindow()
+gtk_win.connect("destroy", Gtk.main_quit)
+gtk_win.show_all()
 
-app = Gtk.Application(application_id='com.example.App')
-app.connect('activate', on_activate)
-
-app.register(None)
-app.activate()
+# app.register(None)
+# app.activate()
 
 guitk_win = Window()
 guitk_win.size = (700, 500)
