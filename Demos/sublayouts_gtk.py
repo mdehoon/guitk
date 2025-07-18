@@ -139,48 +139,57 @@ def get_labels(number):
 def randomize():
     attributes = ("xalign", "yalign", "halign", "valign", "hexpand", "vexpand")
     for number in range(1, 7):
+        words = []
         guitk_label, gtk_label = get_labels(number)
         # halign
         index = randint(4)
         gtk_values = (Gtk.Align.FILL, Gtk.Align.START, Gtk.Align.END, Gtk.Align.CENTER)
         guitk_values = ("FILL", "LEFT", "RIGHT", "CENTER")
         gtk_label.set_halign(gtk_values[index])
-        # guitk_label.halign = guitk_values[index]
+        guitk_label.halign = guitk_values[index]
+        words.append(f"halign='{guitk_label.halign}'")
         # valign
         index = randint(4)
         gtk_values = (Gtk.Align.FILL, Gtk.Align.START, Gtk.Align.END, Gtk.Align.CENTER)
         guitk_values = ("FILL", "TOP", "BOTTOM", "CENTER")
         gtk_label.set_valign(gtk_values[index])
-        # guitk_label.valign = guitk_values[index]
+        guitk_label.valign = guitk_values[index]
+        words.append(f"valign='{guitk_label.valign}'")
         # hexpand
         flag = (randint(2) == 0)
         gtk_label.set_hexpand(flag)
         guitk_label.hexpand = flag
+        words.append(f"hexpand={guitk_label.hexpand}")
         # vexpand
         flag = (randint(2) == 0)
         gtk_label.set_vexpand(flag)
         guitk_label.vexpand = flag
+        words.append(f"vexpand={guitk_label.vexpand}")
         # xalign
         value = random()
         gtk_label.set_xalign(value)
-        # guitk_label.xalign = value
+        guitk_label.xalign = value
+        words.append(f"xalign={guitk_label.xalign:.3f}")
         # yalign
         value = random()
         gtk_label.set_yalign(value)
-        # guitk_label.yalign = value
+        guitk_label.yalign = value
+        words.append(f"yalign={guitk_label.yalign:.3f}")
         # margin_start
-        value = randint(20)
+        value = randint(20) * randint(2)
         gtk_label.set_margin_start(value)
         # guitk_label.margin_left = value
         # margin_end
-        value = randint(20)
+        value = randint(20) * randint(2)
         gtk_label.set_margin_end(value)
         # guitk_label.margin_right = value
         # margin_top
-        value = randint(20)
+        value = randint(20) * randint(2)
         gtk_label.set_margin_top(value)
         # guitk_label.margin_top = value
         # margin_bottom
-        value = randint(20)
+        value = randint(20) * randint(2)
         gtk_label.set_margin_bottom(value)
         # guitk_label.margin_bottom = value
+        line = f"label{number}: " + ", ".join(words)
+        print(line)

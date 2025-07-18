@@ -65,6 +65,8 @@ typedef struct {
     double highlight_thickness;
     Alignment alignment;
     Relief relief;
+    double xalign;
+    double yalign;
     Sticky sticky;
     double padx;
     double pady;
@@ -498,9 +500,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
             break;
     }
 
-CFShow(label->text);
-fprintf(stderr, "view size is width=%f, height=%f\r\n", self.bounds.size.width, self.bounds.size.height);
-fprintf(stderr, "minimum size width=%f, height=%f\r\n", label->widget.minimum_size.width, label->widget.minimum_size.height);
     CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
@@ -620,9 +619,7 @@ fprintf(stderr, "minimum size width=%f, height=%f\r\n", label->widget.minimum_si
 */
         x = rect.origin.x + 0.5 * rect.size.width - 0.5 * size.width;
         y = rect.origin.y + 0.5 * rect.size.height - 0.5 * size.height;
-fprintf(stderr, "HIER x = %f y = %f; rect.origin.y = %f rect.size.height = %f size.height = %f\r\n", x, y, rect.origin.y, rect.size.height, size.height);
         _compute_anchor(label, rect.size, size, &x, &y);
-fprintf(stderr, "DAAR rect.size width=%f, height=%f size width=%f, height=%f x = %f y = %f\r\n", rect.size.width, rect.size.height, size.width, size.height, x, y);
 
         switch (label->state) {
             case NORMAL:
@@ -650,7 +647,6 @@ fprintf(stderr, "DAAR rect.size width=%f, height=%f size width=%f, height=%f x =
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextSaveGState(cr);
         CGContextClipToRect(cr, self.bounds);
-fprintf(stderr, "Translating to x + rect.origin.x = %f, rect.size.height + y + rect.origin.y = %f + %f + %f = %f\r\n", x + rect.origin.x, rect.size.height, y, rect.origin.y, rect.size.height + y + rect.origin.y);
  //       CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
     CGContextTranslateCTM(cr, x + rect.origin.x, self.bounds.size.height);
         CGContextScaleCTM(cr, 1.0, -1.0);
@@ -739,6 +735,8 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->alignment = CENTER;
     self->padx = 1.0;
     self->pady = 1.0;
+    self->xalign = 0.5;
+    self->yalign = 0.5;
     self->relief = PY_RELIEF_FLAT;
     self->sticky = 0;
     self->state = NORMAL;
@@ -1733,6 +1731,54 @@ Label_set_border_width(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_border_width__doc__[] = "width of the 3-D border to draw around the outside of the label.";
 
+static PyObject* Label_get_xalign(LabelObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->xalign);
+}
+
+static int
+Label_set_xalign(LabelObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    const CGFloat xalign = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    if (xalign < 0 || xalign > 1) {
+        PyErr_SetString(PyExc_ValueError,
+                        "xalign must be between 0 and 1");
+        return -1;
+    }
+    self->xalign = xalign;
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_xalign__doc__[] = "horizontal alignment of the text with respect to the label.";
+
+static PyObject* Label_get_yalign(LabelObject* self, void* closure)
+{
+    return PyFloat_FromDouble(self->yalign);
+}
+
+static int
+Label_set_yalign(LabelObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    const CGFloat yalign = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    if (yalign < 0 || yalign > 1) {
+        PyErr_SetString(PyExc_ValueError,
+                        "yalign must be between 0 and 1");
+        return -1;
+    }
+    self->yalign = yalign;
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_yalign__doc__[] = "vertical alignment of the text with respect to the label.";
+
 static PyObject* Label_get_padx(LabelObject* self, void* closure)
 {
     return PyFloat_FromDouble(self->padx);
@@ -1952,6 +1998,8 @@ static PyGetSetDef Label_getseters[] = {
     {"border_width", (getter)Label_get_border_width, (setter)Label_set_border_width, Label_border_width__doc__, NULL},
     {"padx", (getter)Label_get_padx, (setter)Label_set_padx, Label_padx__doc__, NULL},
     {"pady", (getter)Label_get_pady, (setter)Label_set_pady, Label_pady__doc__, NULL},
+    {"xalign", (getter)Label_get_xalign, (setter)Label_set_xalign, Label_xalign__doc__, NULL},
+    {"yalign", (getter)Label_get_yalign, (setter)Label_set_yalign, Label_yalign__doc__, NULL},
     {"highlight_thickness", (getter)Label_get_highlight_thickness, (setter)Label_set_highlight_thickness, Label_highlight_thickness__doc__, NULL},
     {"width", (getter)Label_get_width, (setter)Label_set_width, Label_width__doc__, NULL},
     {"height", (getter)Label_get_height, (setter)Label_set_height, Label_height__doc__, NULL},

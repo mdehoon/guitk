@@ -18,7 +18,6 @@ class Grid(gui.Layout):
         k = i * self.ncols + j
         super().__setitem__(k, value)
     def layout(self):
-        print("Performing layout for grid\r\n", self)
         heights = array.array('f', [0]*self.nrows)
         widths = array.array('f', [0]*self.ncols)
         hexpand = array.array('b', [0]*self.ncols)
@@ -59,7 +58,6 @@ class Grid(gui.Layout):
             if widget is None:
                 continue
             x, y, w, h = widget.place(xs[j], ys[i], widths[j], heights[i])
-            print("Placing widget at coordinates (%d, %d) at position %f, %f\r\n" % (i, j, x, y))
             widget.origin = (x, y)
             widget.size = (w, h)
             if isinstance(widget, gui.Layout):

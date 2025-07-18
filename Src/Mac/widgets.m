@@ -290,12 +290,8 @@ void Widget_unset_minimum_size(WidgetObject* widget)
     WidgetView* top = (WidgetView*) view.window.contentView;
     while (true) {
         if (CGSizeEqualToSize(widget->minimum_size, CGSizeZero)) break;
-        fprintf(stderr, "Setting minimum_size to CGSizeZero for widget %p with NSView %p\n", widget, view);
         widget->minimum_size = CGSizeZero;
-        if (view == top) {
-            fprintf(stderr, "Reached the top\n");
-            break;
-        }
+        if (view == top) break;
         view = (WidgetView *)view.superview;
         widget = view->object;
     }
