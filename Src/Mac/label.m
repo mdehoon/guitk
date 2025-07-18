@@ -1074,6 +1074,7 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
     CFStringRef keys[] = { kCTFontAttributeName };
     CFTypeRef values[] = { self->font->font } ;
     PyObject* tuple = NULL;
+    WidgetObject* widget = (WidgetObject*) self;
 
     if (self->wraplength > 0) constraints.width = self->wraplength;
 
@@ -1165,7 +1166,9 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
 
     if (width > 0 && height > 0) {
         width += 2 * (self->padx + self->highlight_thickness + self->border_width);
+        width += widget->margin_left + widget->margin_right;
         height += 2 * (self->pady + self->highlight_thickness + self->border_width);
+        height += widget->margin_top + widget->margin_bottom;
     }
 
     tuple = Py_BuildValue("ff", width, height);
@@ -1792,6 +1795,7 @@ Label_set_padx(LabelObject* self, PyObject* value, void* closure)
     const CGFloat padx = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     self->padx = padx;
+    Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
     return 0;
 }
@@ -1811,6 +1815,7 @@ Label_set_pady(LabelObject* self, PyObject* value, void* closure)
     const CGFloat pady = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     self->pady = pady;
+    Widget_unset_minimum_size(widget);
     label.needsDisplay = YES;
     return 0;
 }

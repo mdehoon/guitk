@@ -470,6 +470,7 @@ Widget_set_margin_left(WidgetObject* self, PyObject* value, void* closure)
         return -1;
     }
     self->margin_left = margin_left;
+    Widget_unset_minimum_size(self);
     view = self->view;
     view.needsDisplay = YES;
     return 0;
@@ -495,6 +496,7 @@ Widget_set_margin_right(WidgetObject* self, PyObject* value, void* closure)
         return -1;
     }
     self->margin_right = margin_right;
+    Widget_unset_minimum_size(self);
     view = self->view;
     view.needsDisplay = YES;
     return 0;
@@ -520,6 +522,7 @@ Widget_set_margin_top(WidgetObject* self, PyObject* value, void* closure)
         return -1;
     }
     self->margin_top = margin_top;
+    Widget_unset_minimum_size(self);
     view = self->view;
     view.needsDisplay = YES;
     return 0;
@@ -545,6 +548,7 @@ Widget_set_margin_bottom(WidgetObject* self, PyObject* value, void* closure)
         return -1;
     }
     self->margin_bottom = margin_bottom;
+    Widget_unset_minimum_size(self);
     view = self->view;
     view.needsDisplay = YES;
     return 0;

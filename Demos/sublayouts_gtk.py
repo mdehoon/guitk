@@ -45,7 +45,6 @@ class MyWindow(Gtk.ApplicationWindow):
                 font-size: 64pt;
                 background-color: %s;
                 color: black;
-                padding: 10px;
             }
         """ % (key.encode(), color.encode()))
         # Apply the CSS to the display
@@ -189,5 +188,13 @@ def randomize():
         gtk_label.set_margin_bottom(value)
         guitk_label.margin_bottom = value
         words.append(f"margin_bottom={guitk_label.margin_bottom:.1f}")
+        line = f"label{number}: " + ", ".join(words)
+        # padding
+        padding_x = randint(20) * randint(2)
+        padding_y = randint(20) * randint(2)
+        gtk_label.set_padding(padding_x, padding_y)
+        guitk_label.padx = padding_x
+        guitk_label.pady = padding_y
+        words.append(f"padding={padding_x, padding_y}")
         line = f"label{number}: " + ", ".join(words)
         print(line)
