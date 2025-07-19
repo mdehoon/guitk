@@ -67,7 +67,8 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
                                      &x, &y, &width, &height))
         return NULL;
 
-    if (self->halign!='f' || self->valign!='f') {
+    fprintf(stderr, "placing widget at x = %f y = %f width = %f height = %f\r\n\n", x, y, width, height); fflush(stderr);
+    if (1 || self->halign!='f' || self->valign!='f') {
         CGFloat minimum_width, minimum_height;
         PyObject* item;
         PyObject* object = (PyObject*)self;
@@ -99,6 +100,7 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
         }
         Py_DECREF(minimum_size);
 
+fprintf(stderr, "width = %f, minimum_width = %f, halign = %c\r\n", width, minimum_width, self->halign);
         switch (self->halign) {
             case 'f':
                 break;

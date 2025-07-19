@@ -469,6 +469,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     CFRange fitRange;
     unsigned short red, green, blue, alpha;
     LabelObject* label = (LabelObject*)object;
+    WidgetObject* widget = (WidgetObject*)label;
 
     Sticky sticky = label->sticky;
     CFStringRef keys[] = { kCTFontAttributeName,
@@ -504,9 +505,9 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
                                  ((CGFloat)alpha)/USHRT_MAX);
-    if ((sticky & (PY_STICKY_W | PY_STICKY_E)) == (PY_STICKY_W | PY_STICKY_E)) {
-        rect.origin.x = 0;
-        rect.size.width = self.frame.size.width;
+    if (1 || (sticky & (PY_STICKY_W | PY_STICKY_E)) == (PY_STICKY_W | PY_STICKY_E)) {
+        rect.origin.x = widget->margin_left;
+        rect.size.width = self.frame.size.width - widget->margin_left - widget->margin_right;
     }
     else if (sticky & PY_STICKY_W) {
         rect.origin.x = 0;
