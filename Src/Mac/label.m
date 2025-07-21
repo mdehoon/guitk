@@ -582,28 +582,27 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                     CFRelease(number);
                 }
             }
-            framesetter = CTFramesetterCreateWithAttributedString(string);
+            // framesetter = CTFramesetterCreateWithAttributedString(string);
         }
-        // Use CTLineRef line = CTLineCreateWithAttributedString(string); to
-        // ensure that the string is not wrapped, and is written completely
+        CTLineRef line = CTLineCreateWithAttributedString(string);
+        // use this to ensure that the string is not wrapped, and is written completely
         // (and then clipped manually).
         CFRelease(string);
-        if (!framesetter) return;
-        size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, self.bounds.size, &fitRange);
+        // if (!framesetter) return;
+        // size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, self.bounds.size, &fitRange);
 
         // width = self.frame.size.width;
         // height = self.frame.size.height;
         width = rect.size.width;
         height = rect.size.height;
         if (label->wraplength > 0) width = label->wraplength;
-        path = CGPathCreateWithRect(CGRectMake(0, 0, width, height), NULL);
-        if (path) {
-            frame = CTFramesetterCreateFrame(framesetter, range, path, NULL);
-            CFRelease(framesetter);
-        }
-        CFRelease(path);
-
-        if (!frame) return;
+        // path = CGPathCreateWithRect(CGRectMake(0, 0, width, height), NULL);
+        // if (path) {
+            // frame = CTFramesetterCreateFrame(framesetter, range, path, NULL);
+            // CFRelease(framesetter);
+        // }
+        // CFRelease(path);
+        // if (!frame) return;
 
         if (label->compound != PY_COMPOUND_NONE && label->image && label->text)
         {
@@ -618,9 +617,20 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                     butPtr->indicatorSpace + butPtr->textWidth,
                     butPtr->textHeight, &x, &y);
 */
-        x = rect.origin.x + 0.5 * rect.size.width - 0.5 * size.width;
-        y = rect.origin.y + 0.5 * rect.size.height - 0.5 * size.height;
+
+        CGFloat ascent;
+        CGFloat descent;
+        CGFloat leading;
+        width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+        height = ascent + descent;
+        size.width = width;
+        size.height = height;
+fprintf(stderr, "rect.origin.x = %f, rect.size.width = %f, size.width = %f\r\n", rect.origin.x, rect.size.width, size.width);
+
+        x = rect.origin.x + 0.5 * rect.size.width - 0.5 * width;
+        y = rect.origin.y + 0.5 * rect.size.height - 0.5 * height;
         _compute_anchor(label, rect.size, size, &x, &y);
+fprintf(stderr, "after _compute_anchor: x = %f, y = %f\r\n", x, y);
 
         switch (label->state) {
             case NORMAL:
@@ -648,12 +658,14 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextSaveGState(cr);
         CGContextClipToRect(cr, self.bounds);
- //       CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
-    CGContextTranslateCTM(cr, x + rect.origin.x, self.bounds.size.height);
+        CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
+  //  CGContextTranslateCTM(cr, x + rect.origin.x, self.bounds.size.height);
         CGContextScaleCTM(cr, 1.0, -1.0);
-        CTFrameDraw(frame, cr);   // or CTLineDraw(line, cr);
+        // CTFrameDraw(frame, cr);
+        CTLineDraw(line, cr);
         CGContextRestoreGState(cr);
-        CFRelease(frame);
+        // CFRelease(frame);
+        CFRelease(line);
     }
 
     if (relief != PY_RELIEF_FLAT) {
@@ -734,8 +746,8 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->border_width = 1.0;
     self->highlight_thickness = 0.0;
     self->alignment = CENTER;
-    self->padx = 1.0;
-    self->pady = 1.0;
+    self->padx = 0.0;
+    self->pady = 0.0;
     self->xalign = 0.5;
     self->yalign = 0.5;
     self->relief = PY_RELIEF_FLAT;
@@ -1100,6 +1112,13 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
                             "failed to create attributed string");
             goto exit;
         }
+        CGFloat ascent;
+        CGFloat descent;
+        CGFloat leading;
+        CTLineRef line = CTLineCreateWithAttributedString(string);
+        width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+        CFRelease(line);
+        height = ascent + descent;
         framesetter = CTFramesetterCreateWithAttributedString(string);
         CFRelease(string);
         if (!framesetter) {
@@ -1111,10 +1130,11 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
                                                             NULL,
                                                             constraints,
                                                             &fitRange);
-        width = size.width;
-        height = size.height;
+        fprintf(stderr, "HIER: height = %f, size.height = %f\n", height, size.height);
+        // height = size.height;
     }
 
+/*
     if (self->width > 0 || self->height > 0) {
         string = CFAttributedStringCreate(kCFAllocatorDefault,
                                           CFSTR("0"),
@@ -1139,7 +1159,9 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         if (self->width > 0) width = self->width * size.width;
         if (self->height > 0) height = self->height * size.height;
     }
+*/
 
+    fprintf(stderr, "DAAR width = %f height = %f\n", width, height);
     if (self->image) {
         CGImageRef image = self->image->data;
         size_t image_width = CGImageGetWidth(image);
@@ -1170,6 +1192,8 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         width += widget->margin_left + widget->margin_right;
         height += 2 * (self->pady + self->highlight_thickness + self->border_width);
         height += widget->margin_top + widget->margin_bottom;
+        self->width = width;
+        self->height = height;
     }
 
     tuple = Py_BuildValue("ff", width, height);

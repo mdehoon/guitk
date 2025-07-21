@@ -7,6 +7,8 @@ from gi.repository import Gtk, Gdk
 
 from numpy.random import random, randint
 
+fontname = "Helvetiva"
+
 
 class MyWindow(Gtk.ApplicationWindow):
 
@@ -41,12 +43,12 @@ class MyWindow(Gtk.ApplicationWindow):
         css_provider = Gtk.CssProvider()
         css_provider.load_from_data(b"""
             .%s {
-                font-family: Helvetica;
+                font-family: %s;
                 font-size: 64pt;
                 background-color: %s;
                 color: black;
             }
-        """ % (key.encode(), color.encode()))
+        """ % (key.encode(), fontname.encode(), color.encode()))
         # Apply the CSS to the display
         Gtk.StyleContext.add_provider_for_screen(
             Gdk.Screen.get_default(),
@@ -70,7 +72,7 @@ guitk_win.title = "guitk"
 def create_guitk_label(text, color):
     label = Label(text=text)
     label.background=Color(color)
-    label.font = Font("Helvetica", 64)
+    label.font = Font(fontname, 64)
     label.hexpand = False
     label.vexpand = False
     label.halign = "FILL"
