@@ -579,41 +579,13 @@ static char Widget_doc[] =
 
 Py_LOCAL_SYMBOL PyTypeObject WidgetType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "gui.Widget",               /* tp_name */
-    sizeof(WidgetObject),       /* tp_basicsize */
-    0,                          /* tp_itemsize */
-    (destructor)Widget_dealloc, /* tp_dealloc */
-    0,                          /* tp_print */
-    0,                          /* tp_getattr */
-    0,                          /* tp_setattr */
-    0,                          /* tp_compare */
-    (reprfunc)Widget_repr,      /* tp_repr */
-    0,                          /* tp_as_number */
-    0,                          /* tp_as_sequence */
-    0,                          /* tp_as_mapping */
-    0,                          /* tp_hash */
-    0,                          /* tp_call */
-    0,                          /* tp_str */
-    0,                          /* tp_getattro */
-    0,                          /* tp_setattro */
-    0,                          /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /* tp_flags */
-    Widget_doc,                 /* tp_doc */
-    0,                          /* tp_traverse */
-    0,                          /* tp_clear */
-    0,                          /* tp_richcompare */
-    0,                          /* tp_weaklistoffset */
-    0,                          /* tp_iter */
-    0,                          /* tp_iternext */
-    Widget_methods,             /* tp_methods */
-    0,                          /* tp_members */
-    Widget_getset,              /* tp_getset */
-    0,                          /* tp_base */
-    0,                          /* tp_dict */
-    0,                          /* tp_descr_get */
-    0,                          /* tp_descr_set */
-    0,                          /* tp_dictoffset */
-    0,                          /* tp_init */
-    0,                          /* tp_alloc */
-    Widget_new,                 /* tp_new */
+    .tp_name = "gui.Widget",
+    .tp_basicsize = sizeof(WidgetObject),
+    .tp_dealloc = (destructor)Widget_dealloc,
+    .tp_repr = (reprfunc)Widget_repr,
+    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .tp_doc = Widget_doc,
+    .tp_methods = Widget_methods,
+    .tp_getset = Widget_getset,
+    .tp_new = Widget_new,
 };

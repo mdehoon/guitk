@@ -31,15 +31,18 @@
     if ([view isKindOfClass: [WidgetView class]]) {
         WidgetObject* object = (WidgetObject*) ((WidgetView*)view)->object;
         PyGILState_STATE gstate = PyGILState_Ensure();
-        PyObject* minimum_size;
-        minimum_size = Widget_get_minimum_size(object, NULL);
-        if (minimum_size) {
-            NSRect frame = self.frame;
-            CGSize size = object->minimum_size;
-            if (frame.size.width < size.width) frame.size.width = size.width;
-            if (frame.size.height < size.height) frame.size.height = size.height;
-            Py_DECREF(minimum_size);
-            [self setFrame: frame display: YES];
+        PyObject* result;
+        result = Widget_get_minimum_size(object, NULL);
+        if (result) {
+            NSRect rect = self.contentView.frame;
+            CGSize minimum_size = object->minimum_size;
+            if (rect.size.width < minimum_size.width) rect.size.width = minimum_size.width;
+            if (rect.size.height < minimum_size.height) rect.size.height = minimum_size.height;
+            Py_DECREF(result);
+            NSRect frame = [self frameRectForContentRect:rect];
+            frame.origin = self.frame.origin;
+            frame.origin.y -= frame.size.height - self.frame.size.height;
+            [self setFrame: frame display: NO];
         }
         else
             PyErr_Print();

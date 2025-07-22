@@ -39,11 +39,6 @@ typedef enum {PY_RELIEF_RAISED,
 
 typedef enum {NORMAL, ACTIVE, DISABLED} State;
 
-typedef enum {PY_STICKY_N = 0x1,
-              PY_STICKY_W = 0x2,
-              PY_STICKY_S = 0x4,
-              PY_STICKY_E = 0x8,
-             } Sticky;
 
 @interface LabelView : WidgetView
 - (BOOL)isFlipped;
@@ -67,7 +62,6 @@ typedef struct {
     Relief relief;
     double xalign;
     double yalign;
-    Sticky sticky;
     double padx;
     double pady;
     Anchor anchor;
@@ -471,7 +465,8 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     LabelObject* label = (LabelObject*)object;
     WidgetObject* widget = (WidgetObject*)label;
 
-    Sticky sticky = label->sticky;
+fprintf(stderr, "In drawRect\n"); fflush(stderr);
+
     CFStringRef keys[] = { kCTFontAttributeName,
                            kCTForegroundColorFromContextAttributeName };
     CFTypeRef values[] = { label->font->font,
@@ -505,43 +500,61 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
                                  ((CGFloat)alpha)/USHRT_MAX);
-    if (1 || (sticky & (PY_STICKY_W | PY_STICKY_E)) == (PY_STICKY_W | PY_STICKY_E)) {
-        rect.origin.x = widget->margin_left;
-        rect.size.width = self.frame.size.width - widget->margin_left - widget->margin_right;
+
+    CGFloat text_height = widget->minimum_size.height
+                        - 2 * (label->pady + label->highlight_thickness + label->border_width)
+                        - (widget->margin_top + widget->margin_bottom);
+    CGFloat text_width = widget->minimum_size.width
+                       - 2 * (label->padx + label->highlight_thickness + label->border_width)
+                       - (widget->margin_left + widget->margin_right);
+    switch (widget->valign) {
+        case 'f':
+            rect.origin.y = widget->margin_top;
+            rect.size.height = self.frame.size.height - widget->margin_top - widget->margin_bottom;
+            break;
+        case 't':
+            rect.size.height = text_height + 2 * label->pady;
+            rect.origin.y = widget->margin_top;
+            break;
+        case 'b':
+            rect.size.height = text_height + 2 * label->pady;
+            rect.origin.y = self.frame.size.height - widget->margin_bottom - rect.size.height;
+            break;
+        case 'c':
+            rect.size.height = text_height + 2 * label->pady;
+            rect.origin.y = widget->margin_top
+                          + 0.5 * self.frame.size.height
+                          - 0.5 * widget->minimum_size.height
+                          + label->highlight_thickness + label->border_width;
+            break;
     }
-    else if (sticky & PY_STICKY_W) {
-        rect.origin.x = 0;
-        rect.size.width = label->widget.minimum_size.width;
-    }
-    else if (sticky & PY_STICKY_E) {
-        rect.origin.x = self.frame.size.width - label->widget.minimum_size.width;
-        rect.size.width = label->widget.minimum_size.width;
-    }
-    else {
-        rect.origin.x = 0.5 * (self.frame.size.width - label->widget.minimum_size.width);
-        rect.size.width = label->widget.minimum_size.width;
-    }
-    if ((sticky & (PY_STICKY_N | PY_STICKY_S)) == (PY_STICKY_N | PY_STICKY_S)) {
-        rect.origin.y = 0;
-        rect.size.height = self.frame.size.height;
-    }
-    else if (sticky & PY_STICKY_N) {
-        rect.origin.y = 0;
-        rect.size.height = label->widget.minimum_size.height;
-    }
-    else if (sticky & PY_STICKY_S) {
-        rect.origin.y = self.frame.size.height - label->widget.minimum_size.height;
-        rect.size.height = label->widget.minimum_size.height;
-    }
-    else {
-        rect.origin.y = 0.5 * (self.frame.size.height - label->widget.minimum_size.height);
-        rect.size.height = label->widget.minimum_size.height;
+    switch (widget->halign) {
+        case 'f':
+            rect.origin.x = widget->margin_left;
+            rect.size.width = self.frame.size.width - widget->margin_left - widget->margin_right;
+            break;
+        case 'l':
+            rect.size.width = text_width + 2 * label->padx;
+            rect.origin.x = widget->margin_left;
+            break;
+        case 'r':
+            rect.size.width = text_width + 2 * label->padx;
+            rect.origin.x = self.frame.size.width - widget->margin_right - rect.size.width;
+            break;
+        case 'c':
+            rect.size.width = text_width + 2 * label->padx;
+            rect.origin.x = widget->margin_left
+                          + 0.5 * self.frame.size.width
+                          - 0.5 * widget->minimum_size.width
+                          + label->highlight_thickness + label->border_width;
+            break;
     }
 
 /*
     Tk_Fill3DRectangle(tkwin, pixmap, border, 0, 0, Tk_Width(tkwin),
             Tk_Height(tkwin), 0, TK_RELIEF_FLAT);
 */
+fprintf(stderr, "rect.size.width = %f, rect.origin.x = %f\n", rect.size.width, rect.origin.x);
     CGContextFillRect(cr, rect);
     /*
      * Display image or bitmap or text for button.
@@ -743,7 +756,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->disabled_foreground = NULL;
     self->highlight_background = NULL;
     self->highlight_color = NULL;
-    self->border_width = 1.0;
+    self->border_width = 0.0;
     self->highlight_thickness = 0.0;
     self->alignment = CENTER;
     self->padx = 0.0;
@@ -751,7 +764,6 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->xalign = 0.5;
     self->yalign = 0.5;
     self->relief = PY_RELIEF_FLAT;
-    self->sticky = 0;
     self->state = NORMAL;
     self->take_focus = false;
     self->is_first_responder = false;
@@ -1659,87 +1671,6 @@ Label_set_relief(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_relief__doc__[] = "desired 3D effect of the label ('NORMAL', 'ACTIVE', or 'DISABLED').";
 
-static PyObject* Label_get_sticky(LabelObject* self, void* closure)
-{
-    char str[4];
-    Sticky sticky = self->sticky;
-    Py_ssize_t i = 0;
-    if (sticky & PY_STICKY_N) str[i++] = 'N';
-    if (sticky & PY_STICKY_W) str[i++] = 'W';
-    if (sticky & PY_STICKY_S) str[i++] = 'S';
-    if (sticky & PY_STICKY_E) str[i++] = 'E';
-    return PyUnicode_FromStringAndSize(str, i);
-}
-
-static int
-Label_set_sticky(LabelObject* self, PyObject* value, void* closure)
-{
-    char c;
-    const char* str;
-    Py_ssize_t i;
-    Py_ssize_t length;
-    Sticky sticky = 0;
-    WidgetObject* widget = (WidgetObject*) self;
-    LabelView* label = (LabelView*) (widget->view);
-    if (!PyUnicode_Check(value)) {
-        PyErr_SetString(PyExc_ValueError, "expected a string");
-        return -1;
-    }
-    length = PyUnicode_GET_LENGTH(value);
-    str = PyUnicode_AsUTF8(value);
-    for (i = 0; i < length; i++) {
-        c = str[i];
-        switch(c) {
-            case 'N':
-            case 'n':
-                if (sticky & PY_STICKY_N) {
-                    PyErr_Format(PyExc_ValueError,
-                                 "'N' included more than once");
-                    return -1;
-                }
-                sticky |= PY_STICKY_N;
-                break;
-            case 'W':
-            case 'w':
-                if (sticky & PY_STICKY_W) {
-                    PyErr_Format(PyExc_ValueError,
-                                 "'W' included more than once");
-                    return -1;
-                }
-                sticky |= PY_STICKY_W;
-                break;
-            case 'S':
-            case 's':
-                if (sticky & PY_STICKY_S) {
-                    PyErr_Format(PyExc_ValueError,
-                                 "'S' included more than once");
-                    return -1;
-                }
-                sticky |= PY_STICKY_S;
-                break;
-            case 'E':
-            case 'e':
-                if (sticky & PY_STICKY_E) {
-                    PyErr_Format(PyExc_ValueError,
-                                 "'E' included more than once");
-                    return -1;
-                }
-                sticky |= PY_STICKY_E;
-                break;
-            default:
-                PyErr_Format(PyExc_ValueError,
-                    "expected string consisting of 'N', 'W', 'S', and 'E', "
-                    "got '%c'", c);
-                return -1;
-        }
-    }
-    self->sticky = sticky;
-    label.needsDisplay = YES;
-    return 0;
-}
-
-static char Label_sticky__doc__[] = "Specifies if the label should stretch if its assigned size is greater than its minimum size. Use a string consisting of 'N', 'W', 'S', 'E' to set this property.";
-
 static PyObject* Label_get_border_width(LabelObject* self, void* closure)
 {
     return PyFloat_FromDouble(self->border_width);
@@ -2019,7 +1950,6 @@ static PyGetSetDef Label_getseters[] = {
     {"disabled_foreground", (getter)Label_get_disabled_foreground, (setter)Label_set_disabled_foreground, Label_disabled_foreground__doc__, NULL},
     {"highlight_background", (getter)Label_get_highlight_background, (setter)Label_set_highlight_background, Label_highlight_background__doc__, NULL},
     {"highlight_color", (getter)Label_get_highlight_color, (setter)Label_set_highlight_color, Label_highlight_color__doc__, NULL},
-    {"sticky", (getter)Label_get_sticky, (setter)Label_set_sticky, Label_sticky__doc__, NULL},
     {"relief", (getter)Label_get_relief, (setter)Label_set_relief, Label_relief__doc__, NULL},
     {"state", (getter)Label_get_state, (setter)Label_set_state, Label_state__doc__, NULL},
     {"take_focus", (getter)Label_get_take_focus, (setter)Label_set_take_focus, Label_take_focus__doc__, NULL},
