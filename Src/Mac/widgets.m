@@ -62,95 +62,96 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
     double y;
     double width;
     double height;
+    CGFloat minimum_width, minimum_height;
+    PyObject* item;
+    PyObject* object = (PyObject*)self;
+    PyObject* minimum_size;
+    CGRect frame;
+
     static char* kwlist[] = {"x", "y", "width", "height", NULL};
+
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "dddd", kwlist,
                                      &x, &y, &width, &height))
         return NULL;
 
-    fprintf(stderr, "placing widget at x = %f y = %f width = %f height = %f\r\n\n", x, y, width, height); fflush(stderr);
-    if (1 || self->halign!='f' || self->valign!='f') {
-        CGFloat minimum_width, minimum_height;
-        PyObject* item;
-        PyObject* object = (PyObject*)self;
-        PyObject* minimum_size = PyObject_GetAttrString(object, "minimum_size");
-        if (minimum_size == NULL) return NULL;
-        if (!PyTuple_Check(minimum_size)) {
-            PyErr_SetString(PyExc_ValueError,
-                "minimum_size should return a tuple.");
-            return NULL;
-        }
-        if (PyTuple_GET_SIZE(minimum_size) != 2) {
-            PyErr_SetString(PyExc_ValueError,
-                "minimum_size should return a tuple of size 2.");
-            return NULL;
-        }
-        item = PyTuple_GET_ITEM(minimum_size, 0);
-        minimum_width = PyFloat_AsDouble(item);
-        if (PyErr_Occurred()) {
-            PyErr_SetString(PyExc_ValueError,
-                "width returned by minimum_size should be numeric.");
-            return NULL;
-        }
-        item = PyTuple_GET_ITEM(minimum_size, 1);
-        minimum_height = PyFloat_AsDouble(item);
-        if (PyErr_Occurred()) {
-            PyErr_SetString(PyExc_ValueError,
-                "height returned by minimum_size should be numeric.");
-            return NULL;
-        }
-        Py_DECREF(minimum_size);
-
-fprintf(stderr, "width = %f, minimum_width = %f, halign = %c\r\n", width, minimum_width, self->halign);
-        switch (self->halign) {
-            case 'f':
-                break;
-            case 'l':
-                width = minimum_width;
-                break;
-            case 'c':
-                x += 0.5 * (width - minimum_width);
-                width = minimum_width;
-                break;
-            case 'r':
-                x += width - minimum_width;
-                width = minimum_width;
-                break;
-            default:
-                PyErr_Format(PyExc_RuntimeError,
-                             "halign should be 'f', 'l', 'c', or 'r' "
-                             "(got '%d')", self->halign);
-                return NULL;
-        }
-        switch (self->valign) {
-            case 'f':
-                break;
-            case 't':
-                height = minimum_height;
-                break;
-            case 'c':
-                y += 0.5 * (height - minimum_height);
-                height = minimum_height;
-                break;
-            case 'b':
-                y += height - minimum_height;
-                height = minimum_height;
-                break;
-            default:
-                PyErr_Format(PyExc_RuntimeError,
-                             "valign should be 'f', 't', 'c', or 'b' "
-                             "(got '%d')", self->valign);
-                return NULL;
-        }
+    minimum_size = PyObject_GetAttrString(object, "minimum_size");
+    if (minimum_size == NULL) return NULL;
+    if (!PyTuple_Check(minimum_size)) {
+        PyErr_SetString(PyExc_ValueError,
+            "minimum_size should return a tuple.");
+        return NULL;
     }
-    width += x;
-    x = floor(x);
-    width -= x;
-    width = ceil(width);
-    height += y;
-    y = floor(y);
-    height -= y;
-    height = ceil(height);
-    return Py_BuildValue("dddd", x, y, width, height);
+    if (PyTuple_GET_SIZE(minimum_size) != 2) {
+        PyErr_SetString(PyExc_ValueError,
+            "minimum_size should return a tuple of size 2.");
+        return NULL;
+    }
+    item = PyTuple_GET_ITEM(minimum_size, 0);
+    minimum_width = PyFloat_AsDouble(item);
+    if (PyErr_Occurred()) {
+        PyErr_SetString(PyExc_ValueError,
+            "width returned by minimum_size should be numeric.");
+        return NULL;
+    }
+    item = PyTuple_GET_ITEM(minimum_size, 1);
+    minimum_height = PyFloat_AsDouble(item);
+    if (PyErr_Occurred()) {
+        PyErr_SetString(PyExc_ValueError,
+            "height returned by minimum_size should be numeric.");
+        return NULL;
+    }
+    Py_DECREF(minimum_size);
+
+    switch (self->halign) {
+        case 'f':
+            break;
+        case 'l':
+            width = minimum_width;
+            break;
+        case 'c':
+            x += 0.5 * (width - minimum_width);
+            width = minimum_width;
+            break;
+        case 'r':
+            x += width - minimum_width;
+            width = minimum_width;
+            break;
+        default:
+            PyErr_Format(PyExc_RuntimeError,
+                         "halign should be 'f', 'l', 'c', or 'r' "
+                         "(got '%d')", self->halign);
+            return NULL;
+    }
+    switch (self->valign) {
+        case 'f':
+            break;
+        case 't':
+            height = minimum_height;
+            break;
+        case 'c':
+            y += 0.5 * (height - minimum_height);
+            height = minimum_height;
+            break;
+        case 'b':
+            y += height - minimum_height;
+            height = minimum_height;
+            break;
+        default:
+            PyErr_Format(PyExc_RuntimeError,
+                         "valign should be 'f', 't', 'c', or 'b' "
+                         "(got '%d')", self->valign);
+            return NULL;
+    }
+
+    frame.origin.x = x;
+    frame.origin.y = y;
+    frame.size.width = width;
+    frame.size.height = height;
+
+    self->view.frame = frame;
+
+    Py_INCREF(Py_None);
+    return Py_None;
 }
 
 static PyObject*

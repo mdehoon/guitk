@@ -465,8 +465,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     LabelObject* label = (LabelObject*)object;
     WidgetObject* widget = (WidgetObject*)label;
 
-fprintf(stderr, "In drawRect\n"); fflush(stderr);
-
     CFStringRef keys[] = { kCTFontAttributeName,
                            kCTForegroundColorFromContextAttributeName };
     CFTypeRef values[] = { label->font->font,
@@ -496,6 +494,7 @@ fprintf(stderr, "In drawRect\n"); fflush(stderr);
             break;
     }
 
+fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue, alpha); fflush(stderr);
     CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
@@ -513,8 +512,8 @@ fprintf(stderr, "In drawRect\n"); fflush(stderr);
             rect.size.height = self.frame.size.height - widget->margin_top - widget->margin_bottom;
             break;
         case 't':
-            rect.size.height = text_height + 2 * label->pady;
-            rect.origin.y = widget->margin_top;
+            rect.size.height = self.frame.size.height;
+            rect.origin.y = self.bounds.origin.y;
             break;
         case 'b':
             rect.size.height = text_height + 2 * label->pady;
@@ -554,7 +553,6 @@ fprintf(stderr, "In drawRect\n"); fflush(stderr);
     Tk_Fill3DRectangle(tkwin, pixmap, border, 0, 0, Tk_Width(tkwin),
             Tk_Height(tkwin), 0, TK_RELIEF_FLAT);
 */
-fprintf(stderr, "rect.size.width = %f, rect.origin.x = %f\n", rect.size.width, rect.origin.x);
     CGContextFillRect(cr, rect);
     /*
      * Display image or bitmap or text for button.
@@ -638,12 +636,6 @@ fprintf(stderr, "rect.size.width = %f, rect.origin.x = %f\n", rect.size.width, r
         height = ascent + descent;
         size.width = width;
         size.height = height;
-fprintf(stderr, "rect.origin.x = %f, rect.size.width = %f, size.width = %f\r\n", rect.origin.x, rect.size.width, size.width);
-
-        x = rect.origin.x + 0.5 * rect.size.width - 0.5 * width;
-        y = rect.origin.y + 0.5 * rect.size.height - 0.5 * height;
-        _compute_anchor(label, rect.size, size, &x, &y);
-fprintf(stderr, "after _compute_anchor: x = %f, y = %f\r\n", x, y);
 
         switch (label->state) {
             case NORMAL:
@@ -671,10 +663,13 @@ fprintf(stderr, "after _compute_anchor: x = %f, y = %f\r\n", x, y);
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextSaveGState(cr);
         CGContextClipToRect(cr, self.bounds);
-        CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
-  //  CGContextTranslateCTM(cr, x + rect.origin.x, self.bounds.size.height);
-        CGContextScaleCTM(cr, 1.0, -1.0);
-        // CTFrameDraw(frame, cr);
+        x = rect.origin.x + 0.5 * rect.size.width - 0.5 * width;
+        y = rect.origin.y + 0.5 * rect.size.height - 0.5 * height;
+        // _compute_anchor(label, rect.size, size, &x, &y);
+        // CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
+        // CGContextScaleCTM(cr, 1.0, -1.0);
+        fprintf(stderr, "Frame has origin (%f, %f), width = %f, height = %f; Drawing offset by %f, %f\n", self.frame.origin.x, self.frame.origin.y, self.frame.size.width, self.frame.size.height, rect.origin.x, rect.size.height + y + rect.origin.y);
+        CTFrameDraw(frame, cr);
         CTLineDraw(line, cr);
         CGContextRestoreGState(cr);
         // CFRelease(frame);

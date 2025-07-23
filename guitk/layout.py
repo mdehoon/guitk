@@ -57,9 +57,7 @@ class Grid(gui.Layout):
             widget = super().__getitem__(k)
             if widget is None:
                 continue
-            x, y, w, h = widget.place(xs[j], ys[i], widths[j], heights[i])
-            widget.origin = (x, y)
-            widget.size = (w, h)
+            widget.place(xs[j], ys[i], widths[j], heights[i])
             if isinstance(widget, gui.Layout):
                 widget.layout()
     def calculate_minimum_size(self):
