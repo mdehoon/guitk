@@ -506,24 +506,7 @@ fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue,
     CGFloat text_width = widget->minimum_size.width
                        - 2 * (label->padx + label->highlight_thickness + label->border_width)
                        - (widget->margin_left + widget->margin_right);
-    switch (widget->valign) {
-        case 'f':
-            rect.origin.y = widget->margin_top;
-            rect.size.height = self.frame.size.height - widget->margin_top - widget->margin_bottom;
-            break;
-        case 't':
-            rect.size.height = widget->minimum_size.height - widget->margin_top - widget->margin_bottom;
-            rect.origin.y = widget->margin_top;
-            break;
-        case 'b':
-            rect.size.height = widget->minimum_size.height - widget->margin_top - widget->margin_bottom;
-            rect.origin.y = self.frame.size.height - widget->margin_bottom - rect.size.height;
-            break;
-        case 'c':
-            rect.size.height = widget->minimum_size.height - widget->margin_top - widget->margin_bottom;
-            rect.origin.y = 0.5 * (self.frame.size.height - rect.size.height + widget->margin_top - widget->margin_bottom);
-            break;
-    }
+
     switch (widget->halign) {
         case 'f':
             rect.size.width = self.frame.size.width - widget->margin_left - widget->margin_right;
@@ -540,6 +523,24 @@ fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue,
         case 'c':
             rect.size.width = widget->minimum_size.width - widget->margin_left - widget->margin_right;
             rect.origin.x = 0.5 * (self.frame.size.width - rect.size.width + widget->margin_left - widget->margin_right);
+            break;
+    }
+    switch (widget->valign) {
+        case 'f':
+            rect.origin.y = widget->margin_top;
+            rect.size.height = self.frame.size.height - widget->margin_top - widget->margin_bottom;
+            break;
+        case 't':
+            rect.size.height = widget->minimum_size.height - widget->margin_top - widget->margin_bottom;
+            rect.origin.y = widget->margin_top;
+            break;
+        case 'b':
+            rect.size.height = widget->minimum_size.height - widget->margin_top - widget->margin_bottom;
+            rect.origin.y = self.frame.size.height - widget->margin_bottom - rect.size.height;
+            break;
+        case 'c':
+            rect.size.height = widget->minimum_size.height - widget->margin_top - widget->margin_bottom;
+            rect.origin.y = 0.5 * (self.frame.size.height - rect.size.height + widget->margin_top - widget->margin_bottom);
             break;
     }
 
@@ -627,6 +628,7 @@ fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue,
         CGFloat descent;
         CGFloat leading;
         width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+        fprintf(stderr, "colored box height = %f, ascent = %f, descent = %f\n", height, ascent, descent);
         height = ascent + descent;
         size.width = width;
         size.height = height;
@@ -657,13 +659,17 @@ fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue,
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextSaveGState(cr);
         CGContextClipToRect(cr, self.bounds);
-        x = rect.origin.x + 0.5 * rect.size.width - 0.5 * width;
-        y = rect.origin.y + 0.5 * rect.size.height - 0.5 * height;
-        // _compute_anchor(label, rect.size, size, &x, &y);
-        // CGContextTranslateCTM(cr, x + rect.origin.x, rect.size.height + y + rect.origin.y);
-        // CGContextScaleCTM(cr, 1.0, -1.0);
-        fprintf(stderr, "Frame has origin (%f, %f), width = %f, height = %f; Drawing offset by %f, %f\n", self.frame.origin.x, self.frame.origin.y, self.frame.size.width, self.frame.size.height, rect.origin.x, rect.size.height + y + rect.origin.y);
-        CTFrameDraw(frame, cr);
+        double xalign = label->xalign;
+        double yalign = label->yalign;
+        x = rect.origin.x + label->padx;
+	x += xalign * (rect.size.width - size.width - 2 * label->padx);
+fprintf(stderr, "In drawRect, preparing to draw text; x = %f, rect.size.height = %f, size.height = %f\n", x, rect.size.height, size.height);
+        y = descent + self.bounds.size.height - rect.origin.y - rect.size.height + label->pady;   // <-- yalign = 1
+        y += (1 - yalign) * (rect.size.height - ascent - descent - 2 * label->pady);
+        CGContextTranslateCTM(cr, 0, self.bounds.size.height);
+        CGContextScaleCTM(cr, 1.0, -1.0);
+        // CTFrameDraw(frame, cr);
+        CGContextSetTextPosition(cr, x, y);
         CTLineDraw(line, cr);
         CGContextRestoreGState(cr);
         // CFRelease(frame);
