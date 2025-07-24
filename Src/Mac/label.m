@@ -1135,7 +1135,6 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
                                                             NULL,
                                                             constraints,
                                                             &fitRange);
-        fprintf(stderr, "HIER: height = %f, size.height = %f\n", height, size.height);
         // height = size.height;
     }
 
