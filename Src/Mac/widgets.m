@@ -106,15 +106,12 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
         case 'f':
             break;
         case 'l':
-            width = minimum_width;
             break;
         case 'c':
             x += 0.5 * (width - minimum_width);
             width = minimum_width;
             break;
         case 'r':
-            x += width - minimum_width;
-            width = minimum_width;
             break;
         default:
             PyErr_Format(PyExc_RuntimeError,

@@ -533,7 +533,7 @@ fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue,
             rect.size.width = self.frame.size.width - widget->margin_left - widget->margin_right;
             break;
         case 'l':
-            rect.size.width = text_width + 2 * label->padx;
+            rect.size.width = text_width + 2 * (label->padx + label->border_width + label->highlight_thickness);
             rect.origin.x = widget->margin_left;
             break;
         case 'r':
