@@ -390,7 +390,6 @@ static PyObject* Widget_get_margin_left(WidgetObject* self, void* closure)
 static int
 Widget_set_margin_left(WidgetObject* self, PyObject* value, void* closure)
 {
-    WidgetObject* widget = (WidgetObject*) self;
     WidgetView* view;
     const CGFloat margin_left = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
@@ -416,7 +415,6 @@ static PyObject* Widget_get_margin_right(WidgetObject* self, void* closure)
 static int
 Widget_set_margin_right(WidgetObject* self, PyObject* value, void* closure)
 {
-    WidgetObject* widget = (WidgetObject*) self;
     WidgetView* view;
     const CGFloat margin_right = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
@@ -442,7 +440,6 @@ static PyObject* Widget_get_margin_top(WidgetObject* self, void* closure)
 static int
 Widget_set_margin_top(WidgetObject* self, PyObject* value, void* closure)
 {
-    WidgetObject* widget = (WidgetObject*) self;
     WidgetView* view;
     const CGFloat margin_top = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
@@ -468,7 +465,6 @@ static PyObject* Widget_get_margin_bottom(WidgetObject* self, void* closure)
 static int
 Widget_set_margin_bottom(WidgetObject* self, PyObject* value, void* closure)
 {
-    WidgetObject* widget = (WidgetObject*) self;
     WidgetView* view;
     const CGFloat margin_bottom = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
