@@ -512,19 +512,16 @@ fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue,
             rect.size.height = self.frame.size.height - widget->margin_top - widget->margin_bottom;
             break;
         case 't':
-            rect.size.height = self.frame.size.height;
-            rect.origin.y = self.bounds.origin.y;
+            rect.size.height = widget->minimum_size.height - widget->margin_top - widget->margin_bottom;
+            rect.origin.y = widget->margin_top;
             break;
         case 'b':
-            rect.size.height = text_height + 2 * label->pady;
+            rect.size.height = widget->minimum_size.height - widget->margin_top - widget->margin_bottom;
             rect.origin.y = self.frame.size.height - widget->margin_bottom - rect.size.height;
             break;
         case 'c':
-            rect.size.height = text_height + 2 * label->pady;
-            rect.origin.y = widget->margin_top
-                          + 0.5 * self.frame.size.height
-                          - 0.5 * widget->minimum_size.height
-                          + label->highlight_thickness + label->border_width;
+            rect.size.height = widget->minimum_size.height - widget->margin_top - widget->margin_bottom;
+            rect.origin.y = 0.5 * (self.frame.size.height - rect.size.height + widget->margin_top - widget->margin_bottom);
             break;
     }
     switch (widget->halign) {

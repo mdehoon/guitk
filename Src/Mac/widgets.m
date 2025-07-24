@@ -62,10 +62,6 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
     double y;
     double width;
     double height;
-    CGFloat minimum_width, minimum_height;
-    PyObject* item;
-    PyObject* object = (PyObject*)self;
-    PyObject* minimum_size;
     CGRect frame;
 
     static char* kwlist[] = {"x", "y", "width", "height", NULL};
@@ -73,48 +69,6 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "dddd", kwlist,
                                      &x, &y, &width, &height))
         return NULL;
-
-    minimum_size = PyObject_GetAttrString(object, "minimum_size");
-    if (minimum_size == NULL) return NULL;
-    if (!PyTuple_Check(minimum_size)) {
-        PyErr_SetString(PyExc_ValueError,
-            "minimum_size should return a tuple.");
-        return NULL;
-    }
-    if (PyTuple_GET_SIZE(minimum_size) != 2) {
-        PyErr_SetString(PyExc_ValueError,
-            "minimum_size should return a tuple of size 2.");
-        return NULL;
-    }
-    item = PyTuple_GET_ITEM(minimum_size, 1);
-    minimum_height = PyFloat_AsDouble(item);
-    if (PyErr_Occurred()) {
-        PyErr_SetString(PyExc_ValueError,
-            "height returned by minimum_size should be numeric.");
-        return NULL;
-    }
-    Py_DECREF(minimum_size);
-
-    switch (self->valign) {
-        case 'f':
-            break;
-        case 't':
-            height = minimum_height;
-            break;
-        case 'c':
-            y += 0.5 * (height - minimum_height);
-            height = minimum_height;
-            break;
-        case 'b':
-            y += height - minimum_height;
-            height = minimum_height;
-            break;
-        default:
-            PyErr_Format(PyExc_RuntimeError,
-                         "valign should be 'f', 't', 'c', or 'b' "
-                         "(got '%d')", self->valign);
-            return NULL;
-    }
 
     frame.origin.x = x;
     frame.origin.y = y;
