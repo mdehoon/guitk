@@ -663,7 +663,7 @@ fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue,
         double yalign = label->yalign;
         x = rect.origin.x + label->padx;
 	x += xalign * (rect.size.width - size.width - 2 * label->padx);
-        y = descent + self.bounds.size.height - rect.origin.y - rect.size.height + label->pady + rect.size.height - ascent - descent - 2 * label->pady;
+        y = self.bounds.size.height - rect.origin.y - label->pady - ascent;
         y += ( - yalign) * (rect.size.height - ascent - descent - 2 * label->pady);
         CGContextTranslateCTM(cr, 0, self.bounds.size.height);
         CGContextScaleCTM(cr, 1.0, -1.0);
