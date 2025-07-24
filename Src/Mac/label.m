@@ -494,7 +494,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
             break;
     }
 
-fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue, alpha); fflush(stderr);
     CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
                                  ((CGFloat)green)/USHRT_MAX,
                                  ((CGFloat)blue)/USHRT_MAX,
