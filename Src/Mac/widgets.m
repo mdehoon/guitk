@@ -86,13 +86,6 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
             "minimum_size should return a tuple of size 2.");
         return NULL;
     }
-    item = PyTuple_GET_ITEM(minimum_size, 0);
-    minimum_width = PyFloat_AsDouble(item);
-    if (PyErr_Occurred()) {
-        PyErr_SetString(PyExc_ValueError,
-            "width returned by minimum_size should be numeric.");
-        return NULL;
-    }
     item = PyTuple_GET_ITEM(minimum_size, 1);
     minimum_height = PyFloat_AsDouble(item);
     if (PyErr_Occurred()) {
@@ -102,23 +95,6 @@ Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
     }
     Py_DECREF(minimum_size);
 
-    switch (self->halign) {
-        case 'f':
-            break;
-        case 'l':
-            break;
-        case 'c':
-            x += 0.5 * (width - minimum_width);
-            width = minimum_width;
-            break;
-        case 'r':
-            break;
-        default:
-            PyErr_Format(PyExc_RuntimeError,
-                         "halign should be 'f', 'l', 'c', or 'r' "
-                         "(got '%d')", self->halign);
-            return NULL;
-    }
     switch (self->valign) {
         case 'f':
             break;

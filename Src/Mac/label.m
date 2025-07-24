@@ -529,23 +529,20 @@ fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue,
     }
     switch (widget->halign) {
         case 'f':
-            rect.origin.x = widget->margin_left;
             rect.size.width = self.frame.size.width - widget->margin_left - widget->margin_right;
+            rect.origin.x = widget->margin_left;
             break;
         case 'l':
-            rect.size.width = text_width + 2 * (label->padx + label->border_width + label->highlight_thickness);
+            rect.size.width = widget->minimum_size.width - widget->margin_left - widget->margin_right;
             rect.origin.x = widget->margin_left;
             break;
         case 'r':
-            rect.size.width = text_width + 2 * label->padx;
+            rect.size.width = widget->minimum_size.width - widget->margin_left - widget->margin_right;
             rect.origin.x = self.frame.size.width - widget->margin_right - rect.size.width;
             break;
         case 'c':
-            rect.size.width = text_width + 2 * label->padx;
-            rect.origin.x = widget->margin_left
-                          + 0.5 * self.frame.size.width
-                          - 0.5 * widget->minimum_size.width
-                          + label->highlight_thickness + label->border_width;
+            rect.size.width = widget->minimum_size.width - widget->margin_left - widget->margin_right;
+            rect.origin.x = 0.5 * (self.frame.size.width - rect.size.width + widget->margin_left - widget->margin_right);
             break;
     }
 
