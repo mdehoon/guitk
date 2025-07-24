@@ -628,7 +628,6 @@ fprintf(stderr, "In drawRect; fill color is %d, %d, %d, %d\n", red, green, blue,
         CGFloat descent;
         CGFloat leading;
         width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
-        fprintf(stderr, "colored box height = %f, ascent = %f, descent = %f\n", height, ascent, descent);
         height = ascent + descent;
         size.width = width;
         size.height = height;
