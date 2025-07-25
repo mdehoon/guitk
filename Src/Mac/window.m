@@ -46,10 +46,15 @@
             [self setFrame: frame display: NO];
             if (PyObject_IsInstance((PyObject*)object, (PyObject*)&LayoutType)) {
                 double x, y, width, height;
-                x = frame.origin.x;
-                y = frame.origin.y;
-                width = frame.size.width;
-                height = frame.size.height;
+                x = rect.origin.x;
+                y = rect.origin.y;
+                width = rect.size.width;
+                height = rect.size.height;
+                result = PyObject_CallMethod((PyObject *)object, "place", "dddd", x, y, width, height, NULL);
+                if (result)
+                     Py_DECREF(result);
+                else
+                     PyErr_Print();
                 result = PyObject_CallMethod((PyObject *)object, "layout", "dddd", x, y, width, height, NULL);
                 if (result)
                      Py_DECREF(result);
