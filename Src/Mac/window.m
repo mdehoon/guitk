@@ -35,6 +35,7 @@
         PyObject* result;
         result = Widget_get_minimum_size(object, NULL);
         if (result) {
+            double x, y, width, height;
             NSRect rect = self.contentView.frame;
             CGSize minimum_size = object->minimum_size;
             if (rect.size.width < minimum_size.width) rect.size.width = minimum_size.width;
@@ -44,25 +45,21 @@
             frame.origin = self.frame.origin;
             frame.origin.y -= frame.size.height - self.frame.size.height;
             [self setFrame: frame display: NO];
+            x = rect.origin.x;
+            y = rect.origin.y;
+            width = rect.size.width;
+            height = rect.size.height;
+            result = PyObject_CallMethod((PyObject *)object, "place", "dddd", x, y, width, height, NULL);
+            if (result)
+                 Py_DECREF(result);
+            else
+                 PyErr_Print();
             if (PyObject_IsInstance((PyObject*)object, (PyObject*)&LayoutType)) {
-                double x, y, width, height;
-                x = rect.origin.x;
-                y = rect.origin.y;
-                width = rect.size.width;
-                height = rect.size.height;
-                result = PyObject_CallMethod((PyObject *)object, "place", "dddd", x, y, width, height, NULL);
-                if (result)
-                     Py_DECREF(result);
-                else
-                     PyErr_Print();
                 result = PyObject_CallMethod((PyObject *)object, "layout", "dddd", x, y, width, height, NULL);
                 if (result)
                      Py_DECREF(result);
                 else
                      PyErr_Print();
-            }
-            else {
-                // FIXME content is a widget; place it
             }
         }
         else
