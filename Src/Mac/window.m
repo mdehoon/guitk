@@ -27,39 +27,41 @@
 @implementation Window
 - (void) displayIfNeeded
 {
-    NSRect frame;
     NSView *view = [self contentView];
     if ([view isKindOfClass: [WidgetView class]]) {
-        WidgetObject* object = (WidgetObject*) ((WidgetView*)view)->object;
-        PyGILState_STATE gstate = PyGILState_Ensure();
         PyObject* result;
-        result = Widget_get_minimum_size(object, NULL);
-        if (result) {
-            double x, y, width, height;
-            NSRect rect = self.contentView.frame;
-            CGSize minimum_size = object->minimum_size;
-            if (rect.size.width < minimum_size.width) rect.size.width = minimum_size.width;
-            if (rect.size.height < minimum_size.height) rect.size.height = minimum_size.height;
-            Py_DECREF(result);
-            frame = [self frameRectForContentRect:rect];
-            frame.origin = self.frame.origin;
-            frame.origin.y -= frame.size.height - self.frame.size.height;
-            [self setFrame: frame display: NO];
-            x = rect.origin.x;
-            y = rect.origin.y;
-            width = rect.size.width;
-            height = rect.size.height;
-            result = PyObject_CallMethod((PyObject *)object, "place", "dddd", x, y, width, height, NULL);
-            if (result)
-                 Py_DECREF(result);
-            else
-                 PyErr_Print();
+        PyGILState_STATE gstate;
+        NSRect frame;
+        WidgetObject* object = (WidgetObject*) ((WidgetView*)view)->object;
+        CGSize minimum_size = object->minimum_size;
+        double x, y, width, height;
+        NSRect rect = view.frame;
+        if (CGSizeEqualToSize(object->minimum_size, CGSizeZero)) {
+            gstate = PyGILState_Ensure();
+            result = Widget_get_minimum_size(object, NULL);
+            if (result) Py_DECREF(result);
+            else PyErr_Print();
+            PyGILState_Release(gstate);
+            if (!result) return;
+            minimum_size = object->minimum_size;
         }
-        else
-            PyErr_Print();
+        if (rect.size.width < minimum_size.width) rect.size.width = minimum_size.width;
+        if (rect.size.height < minimum_size.height) rect.size.height = minimum_size.height;
+        frame = [self frameRectForContentRect:rect];
+        frame.origin = self.frame.origin;
+        frame.origin.y -= frame.size.height - self.frame.size.height;
+        [self setFrame: frame display: NO];
+        x = rect.origin.x;
+        y = rect.origin.y;
+        width = rect.size.width;
+        height = rect.size.height;
+        gstate = PyGILState_Ensure();
+        result = PyObject_CallMethod((PyObject *)object, "place", "dddd", x, y, width, height, NULL);
+        if (result) Py_DECREF(result);
+        else PyErr_Print();
         PyGILState_Release(gstate);
     }
-    // otherwise, this window was not yet loaded.
+    // otherwise, the contentView of this window was not yet loaded with a widget.
     [super displayIfNeeded];
 }
 @synthesize object = _object;
