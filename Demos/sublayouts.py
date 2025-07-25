@@ -9,7 +9,7 @@ label1 = Label(text="One")
 label1.background=Color('red')
 label1.font = Font("Helvetica", 64)
 label1.hexpand = True
-label1.sticky = 'WE'
+label1.halign = "FILL"
 
 label2 = Label(text="Two")
 label2.background=Color('pink')
@@ -30,9 +30,10 @@ label5.font = Font("Helvetica", 64)
 label6 = Label(text="Six")
 label6.background=Color('lightblue')
 label6.font = Font("Helvetica", 64)
-label6.sticky = 'NSWE'
 label6.hexpand = True
 label6.vexpand = True
+label6.halign = "FILL"
+label6.valign = "FILL"
 
 
 # label1.focus_set()

@@ -279,32 +279,17 @@ static PyMappingMethods Layout_mapping = {
     (objobjargproc)Layout_ass_subscript,     /* mp_ass_subscript */
 };
 
-static PyObject* Layout_layout(LayoutObject* self)
+static PyObject* Layout_layout(PyObject* unused, PyObject* args, PyObject* keywords)
 {
-    WidgetView* parent = self->widget.view;
-    NSView* subview;
-    WidgetView* child;
-    PyObject* object;
-    for (subview in parent.subviews) {
-        child = (WidgetView*)subview;
-        object = (PyObject*)child->object;
-        if (PyObject_IsInstance(object, (PyObject*)&LayoutType)) {
-            PyObject* result;
-            result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
-            if (result)
-                 Py_DECREF(result);
-            else
-                 PyErr_Print();
-        }
-    }
-    Py_INCREF(Py_None);
-    return Py_None;
+    PyErr_SetString(PyExc_NotImplementedError,
+        ".layout must be implemented in the subclass.");
+    return NULL;
 }
 
 static PyMethodDef Layout_methods[] = {
     {"layout",
      (PyCFunction)Layout_layout,
-     METH_NOARGS,
+     METH_KEYWORDS | METH_VARARGS,
      "Calculate the origin and size of each subwidget, based on the requested minimum size of each widget, their relative positions, and the size allocated to the Layout. Default method: no-op."
     },
     {NULL}  /* Sentinel */

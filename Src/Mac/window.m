@@ -27,6 +27,7 @@
 @implementation Window
 - (void) displayIfNeeded
 {
+    NSRect frame;
     NSView *view = [self contentView];
     if ([view isKindOfClass: [WidgetView class]]) {
         WidgetObject* object = (WidgetObject*) ((WidgetView*)view)->object;
@@ -39,24 +40,28 @@
             if (rect.size.width < minimum_size.width) rect.size.width = minimum_size.width;
             if (rect.size.height < minimum_size.height) rect.size.height = minimum_size.height;
             Py_DECREF(result);
-            NSRect frame = [self frameRectForContentRect:rect];
+            frame = [self frameRectForContentRect:rect];
             frame.origin = self.frame.origin;
             frame.origin.y -= frame.size.height - self.frame.size.height;
             [self setFrame: frame display: NO];
+            if (PyObject_IsInstance((PyObject*)object, (PyObject*)&LayoutType)) {
+                double x, y, width, height;
+                x = frame.origin.x;
+                y = frame.origin.y;
+                width = frame.size.width;
+                height = frame.size.height;
+                result = PyObject_CallMethod((PyObject *)object, "layout", "dddd", x, y, width, height, NULL);
+                if (result)
+                     Py_DECREF(result);
+                else
+                     PyErr_Print();
+            }
+            else {
+                // FIXME content is a widget; place it
+            }
         }
         else
             PyErr_Print();
-        if (PyObject_IsInstance((PyObject*)object, (PyObject*)&LayoutType)) {
-            PyObject* result;
-            result = PyObject_CallMethod((PyObject *)object, "layout", NULL);
-            if (result)
-                 Py_DECREF(result);
-            else
-                 PyErr_Print();
-        }
-        else {
-            // FIXME content is a widget; place it
-        }
         PyGILState_Release(gstate);
     }
     // otherwise, this window was not yet loaded.
