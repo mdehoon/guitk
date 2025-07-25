@@ -279,18 +279,18 @@ static PyMappingMethods Layout_mapping = {
     (objobjargproc)Layout_ass_subscript,     /* mp_ass_subscript */
 };
 
-static PyObject* Layout_layout(PyObject* unused, PyObject* args, PyObject* keywords)
+static PyObject* Layout_place(PyObject* unused, PyObject* args, PyObject* keywords)
 {
     PyErr_SetString(PyExc_NotImplementedError,
-        ".layout must be implemented in the subclass.");
+        ".place must be implemented in the subclass.");
     return NULL;
 }
 
 static PyMethodDef Layout_methods[] = {
-    {"layout",
-     (PyCFunction)Layout_layout,
+    {"place",
+     (PyCFunction)Layout_place,
      METH_KEYWORDS | METH_VARARGS,
-     "Calculate the origin and size of each subwidget, based on the requested minimum size of each widget, their relative positions, and the size allocated to the Layout. Default method: no-op."
+     "Places the layout in its assigned space, calculates the position and size of its subviews in the assigned space, and calls place on each subview. This method must be implemented in the derived class."
     },
     {NULL}  /* Sentinel */
 };

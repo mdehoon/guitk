@@ -17,7 +17,8 @@ class Grid(gui.Layout):
         i, j = key
         k = i * self.ncols + j
         super().__setitem__(k, value)
-    def layout(self, x, y, width, height):
+    def place(self, x, y, width, height):
+        super(gui.Layout, self).place(x, y, width, height)
         heights = array.array('f', [0]*self.nrows)
         widths = array.array('f', [0]*self.ncols)
         hexpand = array.array('b', [0]*self.ncols)
@@ -58,8 +59,6 @@ class Grid(gui.Layout):
             if widget is None:
                 continue
             widget.place(xs[j], ys[i], widths[j], heights[i])
-            if isinstance(widget, gui.Layout):
-                widget.layout(xs[j], ys[i], widths[j], heights[i])
     def calculate_minimum_size(self):
         heights = array.array('f', [0]*self.nrows)
         widths = array.array('f', [0]*self.ncols)

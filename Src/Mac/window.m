@@ -54,13 +54,6 @@
                  Py_DECREF(result);
             else
                  PyErr_Print();
-            if (PyObject_IsInstance((PyObject*)object, (PyObject*)&LayoutType)) {
-                result = PyObject_CallMethod((PyObject *)object, "layout", "dddd", x, y, width, height, NULL);
-                if (result)
-                     Py_DECREF(result);
-                else
-                     PyErr_Print();
-            }
         }
         else
             PyErr_Print();
