@@ -36,7 +36,7 @@
         CGSize minimum_size = object->minimum_size;
         double x, y, width, height;
         NSRect rect = view.frame;
-        if (CGSizeEqualToSize(object->minimum_size, CGSizeZero)) {
+        if (minimum_size.width == 0 || minimum_size.height == 0) {
             gstate = PyGILState_Ensure();
             result = Widget_get_minimum_size(object, NULL);
             if (result) Py_DECREF(result);

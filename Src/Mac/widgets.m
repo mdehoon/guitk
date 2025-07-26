@@ -176,7 +176,7 @@ static char Widget_size__doc__[] = "Widget size";
 PyObject* Widget_get_minimum_size(WidgetObject* self, void* closure)
 {
     CGSize size = self->minimum_size;
-    if (CGSizeEqualToSize(size, CGSizeZero)) {
+    if (size.width == 0 && size.height == 0) {
         PyObject* object = (PyObject*)self;
         PyObject* tuple;
         PyObject* item;
@@ -223,7 +223,8 @@ void Widget_unset_minimum_size(WidgetObject* widget)
     WidgetView* view = widget->view;
     WidgetView* top = (WidgetView*) view.window.contentView;
     while (true) {
-        if (CGSizeEqualToSize(widget->minimum_size, CGSizeZero)) break;
+        if (widget->minimum_size.width == 0
+         && widget->minimum_size.height == 0) break;
         widget->minimum_size = CGSizeZero;
         if (view == top) break;
         view = (WidgetView *)view.superview;
