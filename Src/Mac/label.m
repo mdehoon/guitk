@@ -516,9 +516,10 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
             y -= ascent;
         }
         if (label->frame) {
+            CGRect r;
             CGPathRef path = CTFrameGetPath(label->frame);
-            CGPathIsRect(path, &rect);
-            size = rect.size;
+            CGPathIsRect(path, &r);
+            size = r.size;
             y -= size.height;
         }
 	x += xalign * (rect.size.width - size.width - 2 * label->padx);
@@ -955,6 +956,10 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
     if (self->line) {
         CFRelease(self->line);
         self->line = NULL;
+    }
+    if (self->frame) {
+        CFRelease(self->frame);
+        self->frame = NULL;
     }
 
     if (text) {
