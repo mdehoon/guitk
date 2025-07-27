@@ -59,6 +59,7 @@ typedef struct {
     State state;
     CFStringRef text;
     FontObject* font;
+    CTLineRef line;
     Py_ssize_t underline;
     size_t wraplength;
     bool take_focus;
@@ -693,6 +694,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->height = 0.0;
     self->text = NULL;
     self->font = NULL;
+    self->line = NULL;
     self->image = NULL;
     self->compound = PY_COMPOUND_NONE;
     self->wraplength = 0;
@@ -1013,6 +1015,11 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         return Py_BuildValue("ff", width, height);
     }
 
+    if (self->line) {
+        CFRelease(self->line);
+        self->line = NULL;
+    }
+
     if (text) {
         CFAttributedStringRef string;
         CFDictionaryRef attributes;
@@ -1066,10 +1073,13 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
             CGFloat ascent;
             CGFloat descent;
             CGFloat leading;
-            CTLineRef line = CTLineCreateWithAttributedString(string);
+            self->line = CTLineCreateWithAttributedString(string);
+            if (!self->line) {
+                PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
+                return NULL;
+            }
             CFRelease(string);
-            width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
-            CFRelease(line);
+            width = CTLineGetTypographicBounds(self->line, &ascent, &descent, &leading);
             height = ascent + descent;
         }
     }
