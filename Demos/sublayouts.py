@@ -5,7 +5,8 @@ from guitk.layout import Grid
 root = Window()
 root.size = (700, 500)
 
-label1 = Label(text="One")
+label1 = Label(text="One One One")
+label1.wraplength = 1000
 label1.background=Color('red')
 label1.font = Font("Helvetica", 64)
 label1.hexpand = True

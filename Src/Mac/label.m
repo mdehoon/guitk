@@ -60,6 +60,7 @@ typedef struct {
     CFStringRef text;
     FontObject* font;
     CTLineRef line;
+    CTFrameRef frame;
     Py_ssize_t underline;
     size_t wraplength;
     bool take_focus;
@@ -380,30 +381,19 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
 /* TkpDisplayButton */
 - (void)drawRect:(NSRect)dirtyRect
 {
-    CFMutableAttributedStringRef string = NULL;
-    CFDictionaryRef attributes = NULL;
     CGContextRef cr;
     NSGraphicsContext* gc;
     CGFloat x;
     CGFloat y;
     CGSize size;
     CGRect rect;
-    // CGPathRef path;
     CGFloat width = 0;
     CGFloat height = 0;
     CGFloat imageWidth;
     CGFloat imageHeight;
-    // CTFrameRef frame = NULL;
-    // CTFramesetterRef framesetter = NULL;
-    // CFRange fitRange;
     unsigned short red, green, blue, alpha;
     LabelObject* label = (LabelObject*)object;
     WidgetObject* widget = (WidgetObject*)label;
-
-    CFStringRef keys[] = { kCTFontAttributeName,
-                           kCTForegroundColorFromContextAttributeName };
-    CFTypeRef values[] = { label->font->font,
-                           kCFBooleanTrue };
     const Relief relief = label->relief;
     CGImageRef image = NULL;
 
@@ -488,78 +478,8 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     imageHeight = height;
 
     if (label->text) {
-        CFRange range = CFRangeMake(0, CFStringGetLength(label->text));
-        string = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
-        if (!string) return;
-        CFAttributedStringReplaceString(string, CFRangeMake(0, 0), label->text);
-        attributes = CFDictionaryCreate(kCFAllocatorDefault,
-                                        (const void**)&keys,
-                                        (const void**)&values,
-                                        2,
-                                        &kCFTypeDictionaryKeyCallBacks,
-                                        &kCFTypeDictionaryValueCallBacks);
-        if (attributes) {
-            Py_ssize_t underline = label->underline;
-            CFAttributedStringSetAttributes(string, range, attributes, false);
-            CFRelease(attributes);
-            if (underline >= 0) {
-                CTUnderlineStyle value = kCTUnderlineStyleSingle;
-                CFNumberRef number = CFNumberCreate(kCFAllocatorDefault,
-                                                    kCFNumberNSIntegerType,
-                                                    &value);
-                if (number) {
-                    CFAttributedStringSetAttribute(string,
-                                                   CFRangeMake(underline, 1),
-                                                   kCTUnderlineStyleAttributeName,
-                                                   number);
-                    CFRelease(number);
-                }
-            }
-            // framesetter = CTFramesetterCreateWithAttributedString(string);
-        }
-        // use this to ensure that the string is not wrapped, and is written completely
-        // (and then clipped manually).
-        CFRelease(string);
-        // if (!framesetter) return;
-        // size = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, range, NULL, self.bounds.size, &fitRange);
-
-        // width = self.frame.size.width;
-        // height = self.frame.size.height;
-        width = rect.size.width;
-        height = rect.size.height;
-        if (label->wraplength > 0) width = label->wraplength;
-        // path = CGPathCreateWithRect(CGRectMake(0, 0, width, height), NULL);
-        // if (path) {
-            // frame = CTFramesetterCreateFrame(framesetter, range, path, NULL);
-            // CFRelease(framesetter);
-        // }
-        // CFRelease(path);
-        // if (!frame) return;
-
-/*
-        if (label->compound != PY_COMPOUND_NONE && label->image && label->text)
-        {
-            switch (label->compound) {
-                case PY_COMPOUND_TOP:
-                case PY_COMPOUND_BOTTOM:
-  // FIXME calculate position if there is both text and image
-            }
-        }
-*/
-/*
-            TkComputeAnchor(butPtr->anchor, tkwin, butPtr->padX, butPtr->padY,
-                    butPtr->indicatorSpace + butPtr->textWidth,
-                    butPtr->textHeight, &x, &y);
-*/
-
-        CGFloat ascent;
-        CGFloat descent;
-        CGFloat leading;
-        width = CTLineGetTypographicBounds(label->line, &ascent, &descent, &leading);
-        height = ascent + descent;
-        size.width = width;
-        size.height = height;
-
+        double xalign = label->xalign;
+        double yalign = label->yalign;
         switch (label->state) {
             case NORMAL:
                 red = label->foreground->rgba[0];
@@ -584,21 +504,36 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
                                      ((CGFloat)green)/USHRT_MAX,
                                      ((CGFloat)blue)/USHRT_MAX,
                                      ((CGFloat)alpha)/USHRT_MAX);
+
+        x = rect.origin.x + label->padx;
+        y = self.bounds.size.height - rect.origin.y - label->pady;
+        if (label->line) {
+            CGFloat ascent;
+            CGFloat descent;
+            CGFloat leading;
+            size.width = CTLineGetTypographicBounds(label->line, &ascent, &descent, &leading);
+            size.height = ascent + descent;
+            y -= ascent;
+        }
+        if (label->frame) {
+            CGPathRef path = CTFrameGetPath(label->frame);
+            CGPathIsRect(path, &rect);
+            size = rect.size;
+            y -= size.height;
+        }
+	x += xalign * (rect.size.width - size.width - 2 * label->padx);
+        y -= yalign * (rect.size.height - size.height - 2 * label->pady);
+
         CGContextSaveGState(cr);
         CGContextClipToRect(cr, self.bounds);
-        double xalign = label->xalign;
-        double yalign = label->yalign;
-        x = rect.origin.x + label->padx;
-	x += xalign * (rect.size.width - size.width - 2 * label->padx);
-        y = self.bounds.size.height - rect.origin.y - label->pady - ascent;
-        y += ( - yalign) * (rect.size.height - ascent - descent - 2 * label->pady);
         CGContextTranslateCTM(cr, 0, self.bounds.size.height);
         CGContextScaleCTM(cr, 1.0, -1.0);
-        // CTFrameDraw(frame, cr);
-        CGContextSetTextPosition(cr, x, y);
-        CTLineDraw(label->line, cr);
+        CGContextTranslateCTM(cr, x, y);
+
+        if (label->line) CTLineDraw(label->line, cr);
+        else if (label->frame) CTFrameDraw(label->frame, cr);
+
         CGContextRestoreGState(cr);
-        // CFRelease(frame);
     }
 
     if (relief != PY_RELIEF_FLAT) {
@@ -965,9 +900,11 @@ Label_dealloc(LabelObject* self)
     LabelView* label = (LabelView*) (widget->view);
     CFStringRef text = self->text;
     CTLineRef line = self->line;
+    CTFrameRef frame = self->frame;
     if (label) [label release];
     if (text) CFRelease(text);
     if (line) CFRelease(line);
+    if (frame) CFRelease(frame);
     Py_XDECREF(self->font);
     Py_XDECREF(self->foreground);
     Py_XDECREF(self->background);
@@ -1021,8 +958,9 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
     }
 
     if (text) {
-        CFAttributedStringRef string;
+        CFMutableAttributedStringRef string;
         CFDictionaryRef attributes;
+        CFRange range = CFRangeMake(0, CFStringGetLength(self->text));
         CFStringRef keys[] = { kCTFontAttributeName };
         CFTypeRef values[] = { self->font->font } ;
         Py_ssize_t underline = self->underline;
@@ -1037,15 +975,15 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
                             "failed to create attributes dictionary");
             return NULL;
         }
-        string = CFAttributedStringCreate(kCFAllocatorDefault,
-                                          text,
-                                          attributes);
-        CFRelease(attributes);
+        string = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
         if (!string) {
             PyErr_SetString(PyExc_MemoryError,
                             "failed to create attributed string");
             return NULL;
         }
+        CFAttributedStringReplaceString(string, CFRangeMake(0, 0), self->text);
+        CFAttributedStringSetAttributes(string, range, attributes, false);
+        CFRelease(attributes);
         if (underline >= 0) {
             CTUnderlineStyle value = kCTUnderlineStyleSingle;
             CFNumberRef number = CFNumberCreate(kCFAllocatorDefault,
@@ -1070,11 +1008,12 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
          || CFStringFind(text, CFSTR("\n"), 0).location != kCFNotFound) {
             // multiple lines
             CGSize size;
-            CTFramesetterRef framesetter;
+            CTFramesetterRef framesetter = CTFramesetterCreateWithAttributedString(string);
             CGSize constraints = CGSizeMake(self->wraplength, CGFLOAT_MAX);
             CFRange fitRange;
             CFRange range = CFRangeMake(0, 0);
-            framesetter = CTFramesetterCreateWithAttributedString(string);
+            CGPathRef path;
+            CTFrameRef frame;
             CFRelease(string);
             if (!framesetter) {
                 PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
@@ -1085,9 +1024,20 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
                                                                 NULL,
                                                                 constraints,
                                                                 &fitRange);
-            CFRelease(framesetter);
             width = size.width;
             height = size.height;
+            path = CGPathCreateWithRect(CGRectMake(0, 0, width, height), NULL);
+            if (path) {
+                frame = CTFramesetterCreateFrame(framesetter, range, path, NULL);
+                CFRelease(path);
+            }
+            else frame = NULL;
+            CFRelease(framesetter);
+            if (!frame) {
+                PyErr_SetString(PyExc_MemoryError, "failed to create framer");
+                return NULL;
+            }
+            self->frame = frame;
         }
         else {
             // single line
