@@ -517,7 +517,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
             }
             // framesetter = CTFramesetterCreateWithAttributedString(string);
         }
-        CTLineRef line = CTLineCreateWithAttributedString(string);
         // use this to ensure that the string is not wrapped, and is written completely
         // (and then clipped manually).
         CFRelease(string);
@@ -556,7 +555,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
         CGFloat ascent;
         CGFloat descent;
         CGFloat leading;
-        width = CTLineGetTypographicBounds(line, &ascent, &descent, &leading);
+        width = CTLineGetTypographicBounds(label->line, &ascent, &descent, &leading);
         height = ascent + descent;
         size.width = width;
         size.height = height;
@@ -597,10 +596,9 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
         CGContextScaleCTM(cr, 1.0, -1.0);
         // CTFrameDraw(frame, cr);
         CGContextSetTextPosition(cr, x, y);
-        CTLineDraw(line, cr);
+        CTLineDraw(label->line, cr);
         CGContextRestoreGState(cr);
         // CFRelease(frame);
-        CFRelease(line);
     }
 
     if (relief != PY_RELIEF_FLAT) {
@@ -966,8 +964,10 @@ Label_dealloc(LabelObject* self)
     WidgetObject* widget = (WidgetObject*)self;
     LabelView* label = (LabelView*) (widget->view);
     CFStringRef text = self->text;
+    CTLineRef line = self->line;
     if (label) [label release];
     if (text) CFRelease(text);
+    if (line) CFRelease(line);
     Py_XDECREF(self->font);
     Py_XDECREF(self->foreground);
     Py_XDECREF(self->background);
@@ -1025,6 +1025,7 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         CFDictionaryRef attributes;
         CFStringRef keys[] = { kCTFontAttributeName };
         CFTypeRef values[] = { self->font->font } ;
+        Py_ssize_t underline = self->underline;
         attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                         (const void**)&keys,
                                         (const void**)&values,
@@ -1044,6 +1045,26 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
             PyErr_SetString(PyExc_MemoryError,
                             "failed to create attributed string");
             return NULL;
+        }
+        if (underline >= 0) {
+            CTUnderlineStyle value = kCTUnderlineStyleSingle;
+            CFNumberRef number = CFNumberCreate(kCFAllocatorDefault,
+                                                kCFNumberNSIntegerType,
+                                                &value);
+            if (number) {
+                CFAttributedStringSetAttribute(string,
+                                               CFRangeMake(underline, 1),
+                                               kCTUnderlineStyleAttributeName,
+                                               number);
+                CFRelease(number);
+            }
+            else {
+                CFRelease(string);
+                PyErr_SetString(PyExc_MemoryError,
+                                "failed to create number with the index "
+                                "for the character to underline");
+                return NULL;
+            }
         }
         if (self->wraplength
          || CFStringFind(text, CFSTR("\n"), 0).location != kCFNotFound) {

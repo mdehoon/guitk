@@ -10,22 +10,27 @@ label1.background=Color('red')
 label1.font = Font("Helvetica", 64)
 label1.hexpand = True
 label1.halign = "FILL"
+label1.underline = 0
 
 label2 = Label(text="Two")
 label2.background=Color('pink')
 label2.font = Font("Helvetica", 64)
+label2.underline = 0
 
 label3 = Label(text="Three")
 label3.background=Color('Orange')
 label3.font = Font("Helvetica", 64)
+label3.underline = 2
 
 label4 = Label(text="Four")
 label4.background=Color('green')
 label4.font = Font("Helvetica", 64)
+label4.underline = 0
 
 label5 = Label(text="Five")
 label5.background=Color('blue')
 label5.font = Font("Helvetica", 64)
+label5.underline = 1
 
 label6 = Label(text="Six")
 label6.background=Color('lightblue')
@@ -34,6 +39,7 @@ label6.hexpand = True
 label6.vexpand = True
 label6.halign = "FILL"
 label6.valign = "FILL"
+label6.underline = 0
 
 
 # label1.focus_set()
