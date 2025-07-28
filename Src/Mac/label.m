@@ -1067,17 +1067,39 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
                 return NULL;
             }
         }
-        if (self->wraplength
-         || CFStringFind(text, CFSTR("\n"), 0).location != kCFNotFound) {
+        if (CFStringFind(text, CFSTR("\n"), 0).location == kCFNotFound) {
+            // try if the string fits on a single line
+            CGFloat ascent;
+            CGFloat descent;
+            CGFloat leading;
+            self->line = CTLineCreateWithAttributedString(string);
+            if (!self->line) {
+                CFRelease(string);
+                PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
+                return NULL;
+            }
+            width = CTLineGetTypographicBounds(self->line, &ascent, &descent, &leading);
+            if (self->wraplength != 0 && width > self->wraplength) {
+                CFRelease(self->line);
+                self->line = NULL;
+            }
+            else {
+                CFRelease(string);
+                height = ascent + descent;
+            }
+        }
+        if (self->line == NULL) {
             // multiple lines
             CGSize size;
             CTFramesetterRef framesetter = CTFramesetterCreateWithAttributedString(string);
-            CGSize constraints = CGSizeMake(self->wraplength, CGFLOAT_MAX);
+            CFRelease(string);
+            CGSize constraints;
+            if (self->wraplength == 0) constraints = CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX);
+            else constraints = CGSizeMake(self->wraplength, CGFLOAT_MAX);
             CFRange fitRange;
             CFRange range = CFRangeMake(0, 0);
             CGPathRef path;
             CTFrameRef frame;
-            CFRelease(string);
             if (!framesetter) {
                 PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
                 return NULL;
@@ -1101,20 +1123,6 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
                 return NULL;
             }
             self->frame = frame;
-        }
-        else {
-            // single line
-            CGFloat ascent;
-            CGFloat descent;
-            CGFloat leading;
-            self->line = CTLineCreateWithAttributedString(string);
-            if (!self->line) {
-                PyErr_SetString(PyExc_MemoryError, "failed to create framesetter");
-                return NULL;
-            }
-            CFRelease(string);
-            width = CTLineGetTypographicBounds(self->line, &ascent, &descent, &leading);
-            height = ascent + descent;
         }
     }
 
