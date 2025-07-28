@@ -18,28 +18,29 @@
 #define kCTTextAlignmentJustified kCTJistifiedTextAlignment
 #endif
 
-typedef enum {LEFT, CENTER, RIGHT} Alignment;
 
-typedef enum {PY_COMPOUND_NONE,
-              PY_COMPOUND_BOTTOM,
-              PY_COMPOUND_TOP,
-              PY_COMPOUND_LEFT,
-              PY_COMPOUND_RIGHT,
-              PY_COMPOUND_CENTER} Compound;
+typedef enum {COREGUI_COMPOUND_NONE,
+              COREGUI_COMPOUND_BOTTOM,
+              COREGUI_COMPOUND_TOP,
+              COREGUI_COMPOUND_LEFT,
+              COREGUI_COMPOUND_RIGHT,
+              COREGUI_COMPOUND_CENTER} Compound;
 
-typedef enum {PY_RELIEF_RAISED,
-              PY_RELIEF_SUNKEN,
-              PY_RELIEF_FLAT,
-              PY_RELIEF_RIDGE,
-              PY_RELIEF_SOLID,
-              PY_RELIEF_GROOVE} Relief;
+typedef enum {COREGUI_RELIEF_RAISED,
+              COREGUI_RELIEF_SUNKEN,
+              COREGUI_RELIEF_FLAT,
+              COREGUI_RELIEF_RIDGE,
+              COREGUI_RELIEF_SOLID,
+              COREGUI_RELIEF_GROOVE} Relief;
 
-typedef enum {PY_JUSTIFY_LEFT,
-              PY_JUSTIFY_CENTER,
-              PY_JUSTIFY_RIGHT,
-              PY_JUSTIFY_FILL} Justify;
+typedef enum {COREGUI_JUSTIFY_LEFT,
+              COREGUI_JUSTIFY_CENTER,
+              COREGUI_JUSTIFY_RIGHT,
+              COREGUI_JUSTIFY_FILL} Justify;
 
-typedef enum {NORMAL, ACTIVE, DISABLED} State;
+typedef enum {COREGUI_STATE_NORMAL,
+              COREGUI_STATE_ACTIVE,
+              COREGUI_STATE_DISABLED} State;
 
 
 @interface LabelView : WidgetView
@@ -60,7 +61,6 @@ typedef struct {
     double height;
     double width;
     double highlight_thickness;
-    Alignment alignment;
     Justify justify;
     Relief relief;
     double xalign;
@@ -144,7 +144,7 @@ _draw_3d_vertical_bevel(CGContextRef cr,
     unsigned short blue = color->rgba[2];
     unsigned short alpha = color->rgba[3];
 
-    if (relief == PY_RELIEF_RAISED) {
+    if (relief == COREGUI_RELIEF_RAISED) {
         CGRect rect = CGRectMake(x, y, width, height);
         if (left_bevel) {
             _get_light_shadow(&red, &green, &blue);
@@ -156,7 +156,7 @@ _draw_3d_vertical_bevel(CGContextRef cr,
                                      ((CGFloat)blue)/USHRT_MAX,
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextFillRect(cr, rect);
-    } else if (relief == PY_RELIEF_SUNKEN) {
+    } else if (relief == COREGUI_RELIEF_SUNKEN) {
         CGRect rect = CGRectMake(x, y, width, height);
         if (left_bevel) {
             _get_dark_shadow(&red, &green, &blue);
@@ -168,7 +168,7 @@ _draw_3d_vertical_bevel(CGContextRef cr,
                                      ((CGFloat)blue)/USHRT_MAX,
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextFillRect(cr, rect);
-    } else if (relief == PY_RELIEF_RIDGE) {
+    } else if (relief == COREGUI_RELIEF_RIDGE) {
         unsigned short red_shadow;
         unsigned short green_shadow;
         unsigned short blue_shadow;
@@ -199,7 +199,7 @@ _draw_3d_vertical_bevel(CGContextRef cr,
                                      ((CGFloat)blue_shadow)/USHRT_MAX,
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextFillRect(cr, rect);
-    } else if (relief == PY_RELIEF_GROOVE) {
+    } else if (relief == COREGUI_RELIEF_GROOVE) {
         unsigned short red_shadow;
         unsigned short green_shadow;
         unsigned short blue_shadow;
@@ -230,14 +230,14 @@ _draw_3d_vertical_bevel(CGContextRef cr,
                                      ((CGFloat)blue_shadow)/USHRT_MAX,
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextFillRect(cr, rect);
-    } else if (relief == PY_RELIEF_FLAT) {
+    } else if (relief == COREGUI_RELIEF_FLAT) {
         CGRect rect = CGRectMake(x, y, width, height);
         CGContextSetRGBFillColor(cr, ((CGFloat)red)/USHRT_MAX,
                                      ((CGFloat)green)/USHRT_MAX,
                                      ((CGFloat)blue)/USHRT_MAX,
                                      ((CGFloat)alpha)/USHRT_MAX);
         CGContextFillRect(cr, rect);
-    } else if (relief == PY_RELIEF_SOLID) {
+    } else if (relief == COREGUI_RELIEF_SOLID) {
         CGRect rect = CGRectMake(x, y, width, height);
         CGContextSetRGBFillColor(cr, 0.0, 0.0, 0.0, 1.0);
         CGContextFillRect(cr, rect);
@@ -269,13 +269,13 @@ _draw_3d_horizontal_bevel(CGContextRef cr,
     unsigned short blue_bottom = blue;
 
     switch (relief) {
-    case PY_RELIEF_FLAT:
+    case COREGUI_RELIEF_FLAT:
         break;
-    case PY_RELIEF_GROOVE:
+    case COREGUI_RELIEF_GROOVE:
         _get_dark_shadow(&red_top, &green_top, &blue_top);
         _get_light_shadow(&red_bottom, &green_bottom, &blue_bottom);
         break;
-    case PY_RELIEF_RAISED:
+    case COREGUI_RELIEF_RAISED:
         if (top_bevel) {
             _get_light_shadow(&red_top, &green_top, &blue_top);
             _get_light_shadow(&red_bottom, &green_bottom, &blue_bottom);
@@ -284,17 +284,17 @@ _draw_3d_horizontal_bevel(CGContextRef cr,
             _get_dark_shadow(&red_bottom, &green_bottom, &blue_bottom);
         }
         break;
-    case PY_RELIEF_RIDGE:
+    case COREGUI_RELIEF_RIDGE:
         _get_light_shadow(&red_top, &green_top, &blue_top);
         _get_dark_shadow(&red_bottom, &green_bottom, &blue_bottom);
         break;
-    case PY_RELIEF_SOLID: {
+    case COREGUI_RELIEF_SOLID: {
         CGRect rect = CGRectMake(x, y, width, height);
         CGContextSetRGBFillColor(cr, 0.0, 0.0, 0.0, 1.0);
         CGContextFillRect(cr, rect);
         return;
     }
-    case PY_RELIEF_SUNKEN:
+    case COREGUI_RELIEF_SUNKEN:
         if (top_bevel) {
             _get_dark_shadow(&red_top, &green_top, &blue_top);
             _get_dark_shadow(&red_bottom, &green_bottom, &blue_bottom);
@@ -417,14 +417,14 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     cr = (CGContextRef) [gc graphicsPort];
 #endif
     switch (label->state) {
-        case ACTIVE:
+        case COREGUI_STATE_ACTIVE:
             red = label->active_background->rgba[0];
             green = label->active_background->rgba[1];
             blue = label->active_background->rgba[2];
             alpha = label->active_background->rgba[3];
             break;
-        case NORMAL:
-        case DISABLED:
+        case COREGUI_STATE_NORMAL:
+        case COREGUI_STATE_DISABLED:
             red = label->background->rgba[0];
             green = label->background->rgba[1];
             blue = label->background->rgba[2];
@@ -494,19 +494,19 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
         double xalign = label->xalign;
         double yalign = label->yalign;
         switch (label->state) {
-            case NORMAL:
+            case COREGUI_STATE_NORMAL:
                 red = label->foreground->rgba[0];
                 green = label->foreground->rgba[1];
                 blue = label->foreground->rgba[2];
                 alpha = label->foreground->rgba[3];
                 break;
-            case ACTIVE:
+            case COREGUI_STATE_ACTIVE:
                 red = label->active_foreground->rgba[0];
                 green = label->active_foreground->rgba[1];
                 blue = label->active_foreground->rgba[2];
                 alpha = label->active_foreground->rgba[3];
                 break;
-            case DISABLED:
+            case COREGUI_STATE_DISABLED:
                 red = label->disabled_foreground->rgba[0];
                 green = label->disabled_foreground->rgba[1];
                 blue = label->disabled_foreground->rgba[2];
@@ -550,7 +550,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
         CGContextRestoreGState(cr);
     }
 
-    if (relief != PY_RELIEF_FLAT) {
+    if (relief != COREGUI_RELIEF_FLAT) {
         ColorObject* color;
         CGFloat inset = label->highlight_thickness;
         CGFloat border_width = label->border_width;
@@ -559,11 +559,11 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
         width = rect.size.width - 2 * inset;
         height = rect.size.height - 2 * inset;
         switch (label->state) {
-            case ACTIVE:
+            case COREGUI_STATE_ACTIVE:
                 color = label->active_background;
                 break;
-            case NORMAL:
-            case DISABLED:
+            case COREGUI_STATE_NORMAL:
+            case COREGUI_STATE_DISABLED:
                 color = label->background;
                 break;
         }
@@ -627,13 +627,12 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->highlight_color = NULL;
     self->border_width = 0.0;
     self->highlight_thickness = 0.0;
-    self->alignment = CENTER;
     self->padx = 0.0;
     self->pady = 0.0;
     self->xalign = 0.5;
     self->yalign = 0.5;
-    self->relief = PY_RELIEF_FLAT;
-    self->state = NORMAL;
+    self->relief = COREGUI_RELIEF_FLAT;
+    self->state = COREGUI_STATE_NORMAL;
     self->take_focus = false;
     self->is_first_responder = false;
     self->underline = -1;
@@ -643,7 +642,7 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->font = NULL;
     self->line = NULL;
     self->image = NULL;
-    self->compound = PY_COMPOUND_NONE;
+    self->compound = COREGUI_COMPOUND_NONE;
     self->wraplength = 0;
     return (PyObject*)self;
 }
@@ -660,20 +659,24 @@ compound_converter(PyObject* argument, void* pointer)
     }
     value = PyUnicode_AsUTF8(argument);
     if (!value) return 0;
-    if (PyOS_stricmp(value, "N")==0
-     || PyOS_stricmp(value, "NONE")==0) *compound = PY_COMPOUND_NONE;
-    else if (PyOS_stricmp(value, "B")==0
-          || PyOS_stricmp(value, "BOTTOM")==0) *compound = PY_COMPOUND_BOTTOM;
-    else if (PyOS_stricmp(value, "T")==0
-          || PyOS_stricmp(value, "TOP")==0) *compound = PY_COMPOUND_TOP;
-    else if (PyOS_stricmp(value, "B")==0
-          || PyOS_stricmp(value, "BOTTOM")==0) *compound = PY_COMPOUND_BOTTOM;
-    else if (PyOS_stricmp(value, "L")==0
-          || PyOS_stricmp(value, "LEFT")==0) *compound = PY_COMPOUND_LEFT;
-    else if (PyOS_stricmp(value, "R")==0
-          || PyOS_stricmp(value, "RIGHT")==0) *compound = PY_COMPOUND_RIGHT;
-    else if (PyOS_stricmp(value, "C")==0
-          || PyOS_stricmp(value, "CENTER")==0) *compound = PY_COMPOUND_CENTER;
+    if (PyOS_stricmp(value, "N") == 0
+     || PyOS_stricmp(value, "NONE") == 0)
+        *compound = COREGUI_COMPOUND_NONE;
+    else if (PyOS_stricmp(value, "B") == 0
+          || PyOS_stricmp(value, "BOTTOM") == 0)
+        *compound = COREGUI_COMPOUND_BOTTOM;
+    else if (PyOS_stricmp(value, "T") == 0
+          || PyOS_stricmp(value, "TOP") == 0)
+        *compound = COREGUI_COMPOUND_TOP;
+    else if (PyOS_stricmp(value, "L") == 0
+          || PyOS_stricmp(value, "LEFT") == 0)
+        *compound = COREGUI_COMPOUND_LEFT;
+    else if (PyOS_stricmp(value, "R") == 0
+          || PyOS_stricmp(value, "RIGHT") == 0)
+        *compound = COREGUI_COMPOUND_RIGHT;
+    else if (PyOS_stricmp(value, "C") == 0
+          || PyOS_stricmp(value, "CENTER") == 0)
+        *compound = COREGUI_COMPOUND_CENTER;
     else {
         PyErr_Format(PyExc_ValueError,
             "expected 'NONE', 'N', 'BOTTOM', 'B', 'TOP', 'T', "
@@ -694,7 +697,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
     NSRect rect;
     FontObject* font = default_font_object;
     ImageObject* image = NULL;
-    Compound compound = PY_COMPOUND_NONE;
+    Compound compound = COREGUI_COMPOUND_NONE;
 
     static char* kwlist[] = {"text", "font", "image", "compound", NULL};
     if (!PyArg_ParseTupleAndKeywords(args, keywords, "|O&O!O!O&", kwlist,
@@ -981,17 +984,25 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         CFRange range = CFRangeMake(0, CFStringGetLength(self->text));
         CTTextAlignment alignment;
         switch (self->justify) {
-            case PY_JUSTIFY_LEFT: alignment = kCTTextAlignmentLeft; break;
-            case PY_JUSTIFY_CENTER: alignment = kCTTextAlignmentCenter; break;
-            case PY_JUSTIFY_RIGHT: alignment = kCTTextAlignmentRight; break;
-            case PY_JUSTIFY_FILL: alignment = kCTTextAlignmentJustified; break;
+            case COREGUI_JUSTIFY_LEFT:
+                alignment = kCTTextAlignmentLeft;
+                break;
+            case COREGUI_JUSTIFY_CENTER:
+                alignment = kCTTextAlignmentCenter;
+                break;
+            case COREGUI_JUSTIFY_RIGHT: 
+               alignment = kCTTextAlignmentRight;
+                break;
+            case COREGUI_JUSTIFY_FILL:
+                alignment = kCTTextAlignmentJustified;
+                break;
             default:
                 PyErr_Format(PyExc_RuntimeError,
                     "expected LEFT (%d), RIGHT (%d), CENTER (%d), or "
                     "FILL (%d); got %d",
-                    PY_JUSTIFY_LEFT, PY_JUSTIFY_RIGHT, PY_JUSTIFY_CENTER,
-                    PY_JUSTIFY_FILL, self->justify);
-                return NULL
+                    COREGUI_JUSTIFY_LEFT, COREGUI_JUSTIFY_RIGHT, COREGUI_JUSTIFY_CENTER,
+                    COREGUI_JUSTIFY_FILL, self->justify);
+                return NULL;
         }
         CTParagraphStyleSetting setting[] = {
             { kCTParagraphStyleSpecifierAlignment,
@@ -1113,17 +1124,17 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         size_t image_height = CGImageGetHeight(image);
 
         switch (self->compound) {
-            case PY_COMPOUND_TOP:
-            case PY_COMPOUND_BOTTOM:
+            case COREGUI_COMPOUND_TOP:
+            case COREGUI_COMPOUND_BOTTOM:
                 height += self->pady + image_height;
                 width = (width > image_width ? width : image_width);
                 break;
-            case PY_COMPOUND_LEFT:
-            case PY_COMPOUND_RIGHT:
+            case COREGUI_COMPOUND_LEFT:
+            case COREGUI_COMPOUND_RIGHT:
                 height = (height > image_height ? height : image_height);
                 width += self->padx + image_width;
                 break;
-            case PY_COMPOUND_CENTER:
+            case COREGUI_COMPOUND_CENTER:
                 height = (height > image_height ? height : image_height);
                 width = (width > image_width ? width : image_width);
                 break;
@@ -1219,16 +1230,16 @@ static char Label_font__doc__[] = "font for label";
 static PyObject* Label_get_justify(LabelObject* self, void* closure)
 {
     switch (self->justify) {
-        case PY_JUSTIFY_LEFT: return PyUnicode_FromString("LEFT");
-        case PY_JUSTIFY_RIGHT: return PyUnicode_FromString("RIGHT");
-        case PY_JUSTIFY_CENTER: return PyUnicode_FromString("CENTER");
-        case PY_JUSTIFY_FILL: return PyUnicode_FromString("FILL");
+        case COREGUI_JUSTIFY_LEFT: return PyUnicode_FromString("LEFT");
+        case COREGUI_JUSTIFY_RIGHT: return PyUnicode_FromString("RIGHT");
+        case COREGUI_JUSTIFY_CENTER: return PyUnicode_FromString("CENTER");
+        case COREGUI_JUSTIFY_FILL: return PyUnicode_FromString("FILL");
         default:
             PyErr_Format(PyExc_RuntimeError,
                 "expected LEFT (%d), RIGHT (%d), CENTER (%d), or "
                 "FILL (%d); got %d",
-                PY_JUSTIFY_LEFT, PY_JUSTIFY_RIGHT, PY_JUSTIFY_CENTER,
-                PY_JUSTIFY_FILL, self->justify);
+                COREGUI_JUSTIFY_LEFT, COREGUI_JUSTIFY_RIGHT,
+                COREGUI_JUSTIFY_CENTER, COREGUI_JUSTIFY_FILL, self->justify);
             return NULL;
     }
 }
@@ -1247,16 +1258,16 @@ Label_set_justify(LabelObject* self, PyObject* value, void* closure)
     if (!justify) return -1;
     if (PyOS_stricmp(justify, "LEFT") == 0
      || PyOS_stricmp(justify, "L") == 0)
-        self->justify = PY_JUSTIFY_LEFT;
+        self->justify = COREGUI_JUSTIFY_LEFT;
     else if (PyOS_stricmp(justify, "RIGHT") == 0
           || PyOS_stricmp(justify, "R") == 0)
-        self->justify = PY_JUSTIFY_RIGHT;
+        self->justify = COREGUI_JUSTIFY_RIGHT;
     else if (PyOS_stricmp(justify, "CENTER") == 0
           || PyOS_stricmp(justify, "C") == 0)
-        self->justify = PY_JUSTIFY_CENTER;
+        self->justify = COREGUI_JUSTIFY_CENTER;
     else if (PyOS_stricmp(justify, "FILL") == 0
           || PyOS_stricmp(justify, "F") == 0)
-        self->justify = PY_JUSTIFY_FILL;
+        self->justify = COREGUI_JUSTIFY_FILL;
     else {
         PyErr_Format(PyExc_ValueError,
             "expected 'LEFT', 'L', 'RIGHT', 'R', 'CENTER', 'C', "
@@ -1543,13 +1554,14 @@ static char Label_disabled_foreground__doc__[] = "foreground color when disabled
 static PyObject* Label_get_state(LabelObject* self, void* closure)
 {
     switch (self->state) {
-        case NORMAL: return PyUnicode_FromString("NORMAL");
-        case ACTIVE: return PyUnicode_FromString("ACTIVE");
-        case DISABLED: return PyUnicode_FromString("DISABLED");
+        case COREGUI_STATE_NORMAL: return PyUnicode_FromString("NORMAL");
+        case COREGUI_STATE_ACTIVE: return PyUnicode_FromString("ACTIVE");
+        case COREGUI_STATE_DISABLED: return PyUnicode_FromString("DISABLED");
         default:
             PyErr_Format(PyExc_RuntimeError,
                 "expected NORMAL (%d), ACTIVE (%d), or DISABLED (%d); got %d",
-                NORMAL, ACTIVE, DISABLED, self->state);
+                COREGUI_STATE_NORMAL, COREGUI_STATE_ACTIVE,
+                COREGUI_STATE_DISABLED, self->state);
             return NULL;
     }
 }
@@ -1566,9 +1578,15 @@ Label_set_state(LabelObject* self, PyObject* value, void* closure)
     }
     state = PyUnicode_AsUTF8(value);
     if (!state) return -1;
-    if (PyOS_stricmp(state, "NORMAL")==0) self->state = NORMAL;
-    else if (PyOS_stricmp(state, "ACTIVE")==0) self->state = ACTIVE;
-    else if (PyOS_stricmp(state, "DISABLED")==0) self->state = DISABLED;
+    if (PyOS_stricmp(state, "N") == 0
+     || PyOS_stricmp(state, "NORMAL") == 0)
+        self->state = COREGUI_STATE_NORMAL;
+    else if (PyOS_stricmp(state, "A") == 0
+          || PyOS_stricmp(state, "ACTIVE") == 0)
+        self->state = COREGUI_STATE_ACTIVE;
+    else if (PyOS_stricmp(state, "D") == 0
+          || PyOS_stricmp(state, "DISABLED") == 0)
+        self->state = COREGUI_STATE_DISABLED;
     else {
         PyErr_Format(PyExc_ValueError,
             "expected 'NORMAL', 'ACTIVE', 'DISABLED (case-insensitive)' "
@@ -1607,18 +1625,18 @@ static char Label_take_focus__doc__[] = "True if the label accepts the focus dur
 static PyObject* Label_get_relief(LabelObject* self, void* closure)
 {
     switch (self->relief) {
-        case PY_RELIEF_RAISED: return PyUnicode_FromString("RAISED");
-        case PY_RELIEF_SUNKEN: return PyUnicode_FromString("SUNKEN");
-        case PY_RELIEF_FLAT: return PyUnicode_FromString("FLAT");
-        case PY_RELIEF_RIDGE: return PyUnicode_FromString("RIDGE");
-        case PY_RELIEF_SOLID: return PyUnicode_FromString("SOLID");
-        case PY_RELIEF_GROOVE: return PyUnicode_FromString("GROOVE");
+        case COREGUI_RELIEF_RAISED: return PyUnicode_FromString("RAISED");
+        case COREGUI_RELIEF_SUNKEN: return PyUnicode_FromString("SUNKEN");
+        case COREGUI_RELIEF_FLAT: return PyUnicode_FromString("FLAT");
+        case COREGUI_RELIEF_RIDGE: return PyUnicode_FromString("RIDGE");
+        case COREGUI_RELIEF_SOLID: return PyUnicode_FromString("SOLID");
+        case COREGUI_RELIEF_GROOVE: return PyUnicode_FromString("GROOVE");
         default:
             PyErr_Format(PyExc_RuntimeError,
                 "expected RAISED (%d), SUNKEN (%d), FLAT (%d), "
                 "RIDGE (%d), SOLID (%d), or GROOVE (%d); got %d",
-                PY_RELIEF_RAISED, PY_RELIEF_SUNKEN, PY_RELIEF_FLAT,
-                PY_RELIEF_RIDGE, PY_RELIEF_SOLID, PY_RELIEF_GROOVE,
+                COREGUI_RELIEF_RAISED, COREGUI_RELIEF_SUNKEN, COREGUI_RELIEF_FLAT,
+                COREGUI_RELIEF_RIDGE, COREGUI_RELIEF_SOLID, COREGUI_RELIEF_GROOVE,
                 self->relief);
             return NULL;
     }
@@ -1636,12 +1654,18 @@ Label_set_relief(LabelObject* self, PyObject* value, void* closure)
     }
     relief = PyUnicode_AsUTF8(value);
     if (!relief) return -1;
-    if (PyOS_stricmp(relief, "RAISED")==0) self->relief = PY_RELIEF_RAISED;
-    else if (PyOS_stricmp(relief, "SUNKEN")==0) self->relief = PY_RELIEF_SUNKEN;
-    else if (PyOS_stricmp(relief, "FLAT")==0) self->relief = PY_RELIEF_FLAT;
-    else if (PyOS_stricmp(relief, "RIDGE")==0) self->relief = PY_RELIEF_RIDGE;
-    else if (PyOS_stricmp(relief, "SOLID")==0) self->relief = PY_RELIEF_SOLID;
-    else if (PyOS_stricmp(relief, "GROOVE")==0) self->relief = PY_RELIEF_GROOVE;
+    if (PyOS_stricmp(relief, "RAISED") == 0)
+        self->relief = COREGUI_RELIEF_RAISED;
+    else if (PyOS_stricmp(relief, "SUNKEN") == 0)
+        self->relief = COREGUI_RELIEF_SUNKEN;
+    else if (PyOS_stricmp(relief, "FLAT") == 0)
+        self->relief = COREGUI_RELIEF_FLAT;
+    else if (PyOS_stricmp(relief, "RIDGE") == 0)
+        self->relief = COREGUI_RELIEF_RIDGE;
+    else if (PyOS_stricmp(relief, "SOLID") == 0)
+        self->relief = COREGUI_RELIEF_SOLID;
+    else if (PyOS_stricmp(relief, "GROOVE") == 0)
+        self->relief = COREGUI_RELIEF_GROOVE;
     else {
         PyErr_Format(PyExc_ValueError,
             "expected 'RAISED', 'SUNKEN', 'FLAT', 'RIDGE', 'SOLID', 'GROOVE' "
@@ -1652,7 +1676,7 @@ Label_set_relief(LabelObject* self, PyObject* value, void* closure)
     return 0;
 }
 
-static char Label_relief__doc__[] = "desired 3D effect of the label ('NORMAL', 'ACTIVE', or 'DISABLED').";
+static char Label_relief__doc__[] = "desired 3D effect of the label ('RAISED', 'SUNKEN', 'FLAT', 'RIDGE', 'SOLID', or 'GROOVE').";
 
 static PyObject* Label_get_border_width(LabelObject* self, void* closure)
 {
@@ -1823,18 +1847,20 @@ static char Label_height__doc__[] = "preferred label height as the number of tex
 static PyObject* Label_get_compound(LabelObject* self, void* closure)
 {
     switch (self->compound) {
-        case PY_COMPOUND_NONE: return PyUnicode_FromString("NONE");
-        case PY_COMPOUND_BOTTOM: return PyUnicode_FromString("BOTTOM");
-        case PY_COMPOUND_TOP: return PyUnicode_FromString("TOP");
-        case PY_COMPOUND_LEFT: return PyUnicode_FromString("LEFT");
-        case PY_COMPOUND_RIGHT: return PyUnicode_FromString("RIGHT");
-        case PY_COMPOUND_CENTER: return PyUnicode_FromString("CENTER");
+        case COREGUI_COMPOUND_NONE: return PyUnicode_FromString("NONE");
+        case COREGUI_COMPOUND_BOTTOM: return PyUnicode_FromString("BOTTOM");
+        case COREGUI_COMPOUND_TOP: return PyUnicode_FromString("TOP");
+        case COREGUI_COMPOUND_LEFT: return PyUnicode_FromString("LEFT");
+        case COREGUI_COMPOUND_RIGHT: return PyUnicode_FromString("RIGHT");
+        case COREGUI_COMPOUND_CENTER: return PyUnicode_FromString("CENTER");
         default:
             PyErr_Format(PyExc_RuntimeError,
                 "expected NONE (%d), BOTTOM (%d), TOP (%d), "
                 "LEFT (%d), RIGHT (%d), or CENTER (%d)",
-                PY_COMPOUND_NONE, PY_COMPOUND_BOTTOM, PY_COMPOUND_TOP,
-                PY_COMPOUND_LEFT, PY_COMPOUND_RIGHT, PY_COMPOUND_CENTER,
+                COREGUI_COMPOUND_NONE,
+                COREGUI_COMPOUND_BOTTOM, COREGUI_COMPOUND_TOP,
+                COREGUI_COMPOUND_LEFT, COREGUI_COMPOUND_RIGHT,
+                COREGUI_COMPOUND_CENTER,
                 self->compound);
             return NULL;
     }
