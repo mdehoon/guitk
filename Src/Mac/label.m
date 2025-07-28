@@ -7,8 +7,15 @@
 #include "font.h"
 
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 10100
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 #define COMPILING_FOR_10_10
+#endif
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED < 100800
+#define kCTTextAlignmentLeft kCTLeftTextAlignment
+#define kCTTextAlignmentRight kCTRightTextAlignment
+#define kCTTextAlignmentCenter kCTCenterTextAlignment
+#define kCTTextAlignmentJustified kCTJistifiedTextAlignment
 #endif
 
 typedef enum {LEFT, CENTER, RIGHT} Alignment;
@@ -26,6 +33,11 @@ typedef enum {PY_RELIEF_RAISED,
               PY_RELIEF_RIDGE,
               PY_RELIEF_SOLID,
               PY_RELIEF_GROOVE} Relief;
+
+typedef enum {PY_JUSTIFY_LEFT,
+              PY_JUSTIFY_CENTER,
+              PY_JUSTIFY_RIGHT,
+              PY_JUSTIFY_FILL} Justify;
 
 typedef enum {NORMAL, ACTIVE, DISABLED} State;
 
@@ -49,6 +61,7 @@ typedef struct {
     double width;
     double highlight_thickness;
     Alignment alignment;
+    Justify justify;
     Relief relief;
     double xalign;
     double yalign;
@@ -665,7 +678,7 @@ compound_converter(PyObject* argument, void* pointer)
         PyErr_Format(PyExc_ValueError,
             "expected 'NONE', 'N', 'BOTTOM', 'B', 'TOP', 'T', "
             "'LEFT', 'L', 'RIGHT', 'R', 'CENTER', or 'C' "
-            "(case-insensitive), got '%s'", value);
+            "(case-insensitive); got '%s'", value);
         return 0;
     }
     return Py_CLEANUP_SUPPORTED;
@@ -966,15 +979,48 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         CFMutableAttributedStringRef string;
         CFDictionaryRef attributes;
         CFRange range = CFRangeMake(0, CFStringGetLength(self->text));
-        CFStringRef keys[] = { kCTFontAttributeName };
-        CFTypeRef values[] = { self->font->font } ;
+        CTTextAlignment alignment;
+        switch (self->justify) {
+            case PY_JUSTIFY_LEFT: alignment = kCTTextAlignmentLeft; break;
+            case PY_JUSTIFY_CENTER: alignment = kCTTextAlignmentCenter; break;
+            case PY_JUSTIFY_RIGHT: alignment = kCTTextAlignmentRight; break;
+            case PY_JUSTIFY_FILL: alignment = kCTTextAlignmentJustified; break;
+            default:
+                PyErr_Format(PyExc_RuntimeError,
+                    "expected LEFT (%d), RIGHT (%d), CENTER (%d), or "
+                    "FILL (%d); got %d",
+                    PY_JUSTIFY_LEFT, PY_JUSTIFY_RIGHT, PY_JUSTIFY_CENTER,
+                    PY_JUSTIFY_FILL, self->justify);
+                return NULL
+        }
+        CTParagraphStyleSetting setting[] = {
+            { kCTParagraphStyleSpecifierAlignment,
+              sizeof(CTTextAlignment),
+              &alignment,
+            },
+        };
         Py_ssize_t underline = self->underline;
+        CTParagraphStyleRef paragraphStyle = CTParagraphStyleCreate(setting, 1);
+        if (!paragraphStyle) {
+            PyErr_SetString(PyExc_MemoryError,
+                            "failed to create paragraph style");
+            return NULL;
+        }
+        CFStringRef keys[] = { kCTFontAttributeName,
+                               kCTForegroundColorFromContextAttributeName,
+                               kCTParagraphStyleAttributeName
+                             };
+        CFTypeRef values[] = { self->font->font,
+                               kCFBooleanTrue,
+                               paragraphStyle,
+                             };
         attributes = CFDictionaryCreate(kCFAllocatorDefault,
                                         (const void**)&keys,
                                         (const void**)&values,
-                                        1,
+                                        3,
                                         &kCFTypeDictionaryKeyCallBacks,
                                         &kCFTypeDictionaryValueCallBacks);
+        CFRelease(paragraphStyle);
         if (!attributes) {
             PyErr_SetString(PyExc_MemoryError,
                             "failed to create attributes dictionary");
@@ -982,6 +1028,7 @@ static PyObject* Label_calculate_minimum_size(LabelObject* self, void* closure)
         }
         string = CFAttributedStringCreateMutable(kCFAllocatorDefault, 0);
         if (!string) {
+            CFRelease(attributes);
             PyErr_SetString(PyExc_MemoryError,
                             "failed to create attributed string");
             return NULL;
@@ -1168,6 +1215,60 @@ Label_set_font(LabelObject* self, PyObject* value, void* closure)
 }
 
 static char Label_font__doc__[] = "font for label";
+
+static PyObject* Label_get_justify(LabelObject* self, void* closure)
+{
+    switch (self->justify) {
+        case PY_JUSTIFY_LEFT: return PyUnicode_FromString("LEFT");
+        case PY_JUSTIFY_RIGHT: return PyUnicode_FromString("RIGHT");
+        case PY_JUSTIFY_CENTER: return PyUnicode_FromString("CENTER");
+        case PY_JUSTIFY_FILL: return PyUnicode_FromString("FILL");
+        default:
+            PyErr_Format(PyExc_RuntimeError,
+                "expected LEFT (%d), RIGHT (%d), CENTER (%d), or "
+                "FILL (%d); got %d",
+                PY_JUSTIFY_LEFT, PY_JUSTIFY_RIGHT, PY_JUSTIFY_CENTER,
+                PY_JUSTIFY_FILL, self->justify);
+            return NULL;
+    }
+}
+
+static int
+Label_set_justify(LabelObject* self, PyObject* value, void* closure)
+{
+    const char* justify;
+    WidgetObject* widget = (WidgetObject*) self;
+    LabelView* label = (LabelView*) (widget->view);
+    if (!PyUnicode_Check(value)) {
+        PyErr_SetString(PyExc_ValueError, "expected a string");
+        return -1;
+    }
+    justify = PyUnicode_AsUTF8(value);
+    if (!justify) return -1;
+    if (PyOS_stricmp(justify, "LEFT") == 0
+     || PyOS_stricmp(justify, "L") == 0)
+        self->justify = PY_JUSTIFY_LEFT;
+    else if (PyOS_stricmp(justify, "RIGHT") == 0
+          || PyOS_stricmp(justify, "R") == 0)
+        self->justify = PY_JUSTIFY_RIGHT;
+    else if (PyOS_stricmp(justify, "CENTER") == 0
+          || PyOS_stricmp(justify, "C") == 0)
+        self->justify = PY_JUSTIFY_CENTER;
+    else if (PyOS_stricmp(justify, "FILL") == 0
+          || PyOS_stricmp(justify, "F") == 0)
+        self->justify = PY_JUSTIFY_FILL;
+    else {
+        PyErr_Format(PyExc_ValueError,
+            "expected 'LEFT', 'L', 'RIGHT', 'R', 'CENTER', 'C', "
+            "'FILL', or 'F' (case-insensitive); got %s.", justify);
+        return -1;
+    }
+    Widget_unset_minimum_size(widget);
+    label.needsDisplay = YES;
+    return 0;
+}
+
+static char Label_justify__doc__[] = "if the label has multiple lines, this property specifies how the lines are aligned to each other.";
 
 static PyObject* Label_get_underline(LabelObject* self, void* closure)
 {
@@ -1447,7 +1548,7 @@ static PyObject* Label_get_state(LabelObject* self, void* closure)
         case DISABLED: return PyUnicode_FromString("DISABLED");
         default:
             PyErr_Format(PyExc_RuntimeError,
-                "expected NORMAL (%d), ACTIVE (%d), or DISABLED (%d), got %d",
+                "expected NORMAL (%d), ACTIVE (%d), or DISABLED (%d); got %d",
                 NORMAL, ACTIVE, DISABLED, self->state);
             return NULL;
     }
@@ -1515,7 +1616,7 @@ static PyObject* Label_get_relief(LabelObject* self, void* closure)
         default:
             PyErr_Format(PyExc_RuntimeError,
                 "expected RAISED (%d), SUNKEN (%d), FLAT (%d), "
-                "RIDGE (%d), SOLID (%d), or GROOVE (%d), got %d",
+                "RIDGE (%d), SOLID (%d), or GROOVE (%d); got %d",
                 PY_RELIEF_RAISED, PY_RELIEF_SUNKEN, PY_RELIEF_FLAT,
                 PY_RELIEF_RIDGE, PY_RELIEF_SOLID, PY_RELIEF_GROOVE,
                 self->relief);
@@ -1544,7 +1645,7 @@ Label_set_relief(LabelObject* self, PyObject* value, void* closure)
     else {
         PyErr_Format(PyExc_ValueError,
             "expected 'RAISED', 'SUNKEN', 'FLAT', 'RIDGE', 'SOLID', 'GROOVE' "
-            "(case-insensitive), got %s.", relief);
+            "(case-insensitive); got %s.", relief);
         return -1;
     }
     label.needsDisplay = YES;
@@ -1760,6 +1861,7 @@ static PyGetSetDef Label_getseters[] = {
     {"image", (getter)Label_get_image, (setter)Label_set_image, Label_image__doc__, NULL},
     {"underline", (getter)Label_get_underline, (setter)Label_set_underline, Label_underline__doc__, NULL},
     {"wraplength", (getter)Label_get_wraplength, (setter)Label_set_wraplength, Label_wraplength__doc__, NULL},
+    {"justify", (getter)Label_get_justify, (setter)Label_set_justify, Label_justify__doc__, NULL},
     {"foreground", (getter)Label_get_foreground, (setter)Label_set_foreground, Label_foreground__doc__, NULL},
     {"background", (getter)Label_get_background, (setter)Label_set_background, Label_background__doc__, NULL},
     {"active_foreground", (getter)Label_get_active_foreground, (setter)Label_set_active_foreground, Label_active_foreground__doc__, NULL},
