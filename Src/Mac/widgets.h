@@ -22,6 +22,7 @@ typedef struct WidgetObject {
 @public
     WidgetObject* object;
 }
+- (BOOL)isFlipped;
 @end
 
 extern PyTypeObject WidgetType;

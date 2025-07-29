@@ -5,6 +5,5 @@
 @interface LabelView : WidgetView
 {
 }
-- (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
 @end

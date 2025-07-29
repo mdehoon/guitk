@@ -11,11 +11,6 @@
 
 
 @implementation LayoutView
-- (BOOL)isFlipped
-{
-    return YES;
-}
-
 - (void)didAddSubview:(NSView *)subview
 {
     WidgetView* view = (WidgetView*) subview;

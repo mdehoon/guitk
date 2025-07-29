@@ -44,7 +44,6 @@ typedef enum {COREGUI_STATE_NORMAL,
 
 
 @interface LabelView : WidgetView
-- (BOOL)isFlipped;
 - (void)drawRect:(NSRect)rect;
 @end
 
@@ -601,11 +600,6 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
         rect.size.height = imageHeight;
         CGContextDrawImage(cr, rect, image);
     }
-}
-
-- (BOOL)isFlipped
-{
-    return YES;
 }
 @end
 

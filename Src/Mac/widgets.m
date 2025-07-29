@@ -19,6 +19,10 @@
 
 
 @implementation WidgetView
+- (BOOL)isFlipped
+{
+    return YES;
+}
 @end
 
 
