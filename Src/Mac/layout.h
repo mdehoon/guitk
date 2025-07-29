@@ -6,7 +6,6 @@ typedef struct {
 } LayoutObject;
 
 @interface LayoutView : WidgetView
-@property BOOL layout_requested;
 - (LayoutView*)initWithFrame:(NSRect)rect;
 - (BOOL)isFlipped;
 - (void)didAddSubview:(NSView *)subview;

@@ -11,16 +11,6 @@
 
 
 @implementation LayoutView
-
-@synthesize layout_requested;
-
-- (LayoutView*)initWithFrame:(NSRect)rect
-{
-    self = [super initWithFrame: rect];
-    self.autoresizesSubviews = NO;
-    return self;
-}
-
 - (BOOL)isFlipped
 {
     return YES;
@@ -42,14 +32,6 @@
     if (view.isHidden) widget = Py_None;
     else widget = (PyObject*) view->object;
     Py_DECREF(widget);
-}
-
-- (void)setFrameSize:(NSSize)newSize
-{
-    if (!NSEqualSizes(self.frame.size, newSize)) {
-        layout_requested = YES;
-        [super setFrameSize: newSize];
-    }
 }
 
 - (void)drawRect:(NSRect)dirtyRect
@@ -90,6 +72,7 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     LayoutObject *self = (LayoutObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
     view = [[LayoutView alloc] initWithFrame:rect];
+    view.autoresizesSubviews = NO;
     widget = (WidgetObject*)self;
     widget->view = view;
     view->object = widget;
@@ -269,7 +252,6 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
                      Py_TYPE(key));
         return -1;
     }
-    view.layout_requested = YES;
     return 0;
 }
 
