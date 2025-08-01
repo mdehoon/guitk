@@ -53,8 +53,8 @@ fprintf(stderr, "In displayIfNeeded, recalculating minimum size\n");
             frame.origin.y -= frame.size.height - self.frame.size.height;
             [self setFrame: frame display: NO];
         }
-fprintf(stderr, "In displayIfNeeded, calling Layout_perform_layout_in_subtree on widget %p with view %p\n", object, view);
-        Layout_perform_layout_in_subtree(object);
+fprintf(stderr, "In displayIfNeeded, calling Layout_update on widget %p with view %p\n", object, view);
+        Layout_update(object);
     }
     // otherwise, the contentView of this window was not yet loaded with a widget.
     [super displayIfNeeded];
@@ -96,15 +96,15 @@ fprintf(stderr, "In displayIfNeeded, calling Layout_perform_layout_in_subtree on
 - (void)windowDidResize:(NSNotification *)notification {
     Window* window = (Window*) notification.object;
     WidgetView* view = window.contentView;
-fprintf(stderr, "IN windowDidResize, contentView = %p\n", view); fflush(stderr);
+fprintf(stderr, "In windowDidResize, contentView = %p\n", view); fflush(stderr);
     if ([view isKindOfClass: [WidgetView class]]) {
         WidgetObject* widget = view.object;
-fprintf(stderr, "IN windowDidResize, widget = %p\n", widget); fflush(stderr);
+fprintf(stderr, "In windowDidResize, widget = %p\n", widget); fflush(stderr);
         PyGILState_STATE gstate = PyGILState_Ensure();
         int is_layout = PyObject_IsInstance(widget, (PyObject*) &LayoutType);
         PyGILState_Release(gstate);
         if (is_layout) {
-fprintf(stderr, "IN windowDidResize, widget is a layout\n"); fflush(stderr);
+fprintf(stderr, "In windowDidResize, widget is a layout\n"); fflush(stderr);
             LayoutObject* layout = (LayoutObject*)widget;
             layout->status = 1;
         }

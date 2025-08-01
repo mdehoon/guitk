@@ -13,5 +13,5 @@ typedef struct {
 - (void)drawRect:(NSRect)rect;
 @end
 
-Py_LOCAL_SYMBOL void Layout_perform_layout_in_subtree(WidgetObject* object);
-Py_LOCAL_SYMBOL void Layout_invalidate_layout(WidgetObject* object);
+Py_LOCAL_SYMBOL void Layout_update(WidgetObject* object);
+Py_LOCAL_SYMBOL void Layout_request(WidgetObject* object);

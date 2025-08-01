@@ -382,7 +382,7 @@ static int Widget_set_vexpand(WidgetObject* self, PyObject* value, void* closure
     }
     view = self->view;
     view.needsDisplay = YES;
-    Layout_invalidate_layout(self);
+    Layout_request(self);
     return 0;
 }
 

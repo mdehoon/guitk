@@ -71,7 +71,7 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     LayoutObject *self = (LayoutObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
-    self->status = COREGUI_LAYOUT_INVALID;
+    self->status = COREGUI_LAYOUT_VALID;
     view = [[LayoutView alloc] initWithFrame:rect];
     view.autoresizesSubviews = NO;
     widget = (WidgetObject*)self;
@@ -262,24 +262,32 @@ static PyMappingMethods Layout_mapping = {
     (objobjargproc)Layout_ass_subscript,     /* mp_ass_subscript */
 };
 
-Py_LOCAL_SYMBOL void Layout_invalidate_layout(WidgetObject* object)
+Py_LOCAL_SYMBOL void Layout_request(WidgetObject* object)
 {
     LayoutObject* layout;
     WidgetView* view = object->view;
     NSView* contentView = view.window.contentView;
-fprintf(stderr, "In Layout_invalidate_layout, view = %p, contentView = %p, superview = %p\n", view, contentView, view.superview);
+fprintf(stderr, "In Layout_request, view = %p, contentView = %p, superview = %p\n", view, contentView, view.superview);
     if (view == contentView) return;
     view = (WidgetView*) view.superview;
     if (!view) return;
     layout = (LayoutObject*) view.object;
-    layout->status |= COREGUI_LAYOUT_INVALID;
-fprintf(stderr, "In Layout_invalidate_layout, setting COREGUI_LAYOUT_INVALID for layout %p with view = %p\n", layout, view);
+    if (layout->status == COREGUI_LAYOUT_INVALID) {
+        fprintf(stderr, "Layout_request, in begin, found layout %p already marked\n", layout);
+        return;
+    }
+    layout->status = COREGUI_LAYOUT_INVALID;
+fprintf(stderr, "In Layout_request, setting COREGUI_LAYOUT_INVALID for layout %p with view = %p\n", layout, view);
     while (view != contentView) {
         view = (WidgetView*) view.superview;
         if (!view) break;
         layout = (LayoutObject*) view.object;
-fprintf(stderr, "In Layout_invalidate_layout, setting COREGUI_LAYOUT_SUBTREE_INVALID for layout %p with view = %p\n", layout, view);
-        layout->status |= COREGUI_LAYOUT_SUBTREE_INVALID;
+        if (layout->status == COREGUI_LAYOUT_SUBTREE_INVALID) {
+            fprintf(stderr, "Layout_request, in loop, found layout %p already marked\n", layout);
+            break;
+        }
+fprintf(stderr, "In Layout_request, setting COREGUI_LAYOUT_SUBTREE_INVALID for layout %p with view = %p\n", layout, view);
+        layout->status = COREGUI_LAYOUT_SUBTREE_INVALID;
     }
 }
 
@@ -293,6 +301,7 @@ fprintf(stderr, "In walk for layout %p with view %p; status = %d\n", self, ((Wid
         CGFloat y = view.frame.origin.y;
         CGFloat width = view.frame.size.width;
         CGFloat height = view.frame.size.height;
+fprintf(stderr, "In walk for layout %p with view %p; setting status from %d to COREGUI_LAYOUT_VALID\n", self, ((WidgetObject*)self)->view, self->status);
         self->status = COREGUI_LAYOUT_VALID;
         PyGILState_STATE gstate = PyGILState_Ensure();
         PyObject* result = PyObject_CallMethod((PyObject *)self, "place", "dddd",
@@ -304,6 +313,7 @@ fprintf(stderr, "In walk for layout %p with view %p; status = %d\n", self, ((Wid
     else if (self->status == COREGUI_LAYOUT_SUBTREE_INVALID) {
         NSView* view;
         WidgetObject* widget = (WidgetObject*)self;
+fprintf(stderr, "In walk for layout %p with view %p; setting status from %d to COREGUI_LAYOUT_VALID\n", self, ((WidgetObject*)self)->view, self->status);
         self->status = COREGUI_LAYOUT_VALID;
         for (view in widget->view.subviews) {
             WidgetObject* object = ((WidgetView*)view).object;
@@ -312,7 +322,7 @@ fprintf(stderr, "In walk for layout %p with view %p; status = %d\n", self, ((Wid
     }
 }
 
-Py_LOCAL_SYMBOL void Layout_perform_layout_in_subtree(WidgetObject* object)
+Py_LOCAL_SYMBOL void Layout_update(WidgetObject* object)
 {
     int is_layout;
     PyGILState_STATE gstate = PyGILState_Ensure();
