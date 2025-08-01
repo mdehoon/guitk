@@ -15,7 +15,7 @@
 #define kCTTextAlignmentLeft kCTLeftTextAlignment
 #define kCTTextAlignmentRight kCTRightTextAlignment
 #define kCTTextAlignmentCenter kCTCenterTextAlignment
-#define kCTTextAlignmentJustified kCTJistifiedTextAlignment
+#define kCTTextAlignmentJustified kCTJustifiedTextAlignment
 #endif
 
 
@@ -373,19 +373,19 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
 
 @implementation LabelView
 - (BOOL)becomeFirstResponder {
-    ((LabelObject*)object)->is_first_responder = true;
+    ((LabelObject*)self.object)->is_first_responder = true;
     [self setNeedsDisplay:YES];
     return YES;
 }
 
 - (BOOL)resignFirstResponder {
-    ((LabelObject*)object)->is_first_responder = false;
+    ((LabelObject*)self.object)->is_first_responder = false;
     [self setNeedsDisplay:YES];
     return YES;
 }
 
 - (BOOL)acceptsFirstResponder {
-    LabelObject* label = (LabelObject*)object;
+    LabelObject* label = (LabelObject*)self.object;
     if (label->take_focus) return YES;
     else return NO;
 }
@@ -404,7 +404,7 @@ _draw_focus_highlight(CGContextRef cr, ColorObject* color, CGRect rect, CGFloat 
     CGFloat imageWidth;
     CGFloat imageHeight;
     unsigned short red, green, blue, alpha;
-    LabelObject* label = (LabelObject*)object;
+    LabelObject* label = (LabelObject*)self.object;
     WidgetObject* widget = (WidgetObject*)label;
     const Relief relief = label->relief;
     CGImageRef image = NULL;
@@ -869,7 +869,7 @@ Label_init(LabelObject *self, PyObject *args, PyObject *keywords)
 
     label = [[LabelView alloc] initWithFrame: rect];
     widget->view = label;
-    label->object = widget;
+    label.object = widget;
 
     Py_INCREF(systemTextColor);
     Py_INCREF(systemTextColor);

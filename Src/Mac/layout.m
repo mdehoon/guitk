@@ -1,6 +1,5 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
-#include "widgets.h"
 #include "layout.h"
 #include "window.h"
 
@@ -10,22 +9,28 @@
 #endif
 
 
+#define COREGUI_LAYOUT_VALID 0x0
+#define COREGUI_LAYOUT_INVALID 0x1
+#define COREGUI_LAYOUT_SUBTREE_INVALID 0x2
+
+
+
 @implementation LayoutView
 - (void)didAddSubview:(NSView *)subview
 {
     WidgetView* view = (WidgetView*) subview;
     PyObject* widget;
     if (view.isHidden) widget = Py_None;
-    else widget = (PyObject*) view->object;
+    else widget = (PyObject*) view.object;
     Py_INCREF(widget);
 }
 
-- (void)willRemoveSubview:(NSView *)subview;
+- (void)willRemoveSubview:(NSView *)subview
 {
     WidgetView* view = (WidgetView*) subview;
     PyObject* widget;
     if (view.isHidden) widget = Py_None;
-    else widget = (PyObject*) view->object;
+    else widget = (PyObject*) view.object;
     Py_DECREF(widget);
 }
 
@@ -35,7 +40,7 @@
     NSGraphicsContext* gc;
     short red, green, blue, alpha;
     CGRect rect;
-    LayoutObject* layout = (LayoutObject*)object;
+    LayoutObject* layout = (LayoutObject*)self.object;
     gc = [NSGraphicsContext currentContext];
 #ifdef COMPILING_FOR_10_10
     cr = gc.CGContext;
@@ -66,11 +71,12 @@ Layout_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     LayoutObject *self = (LayoutObject*) WidgetType.tp_new(type, args, kwds);
     if (!self) return NULL;
+    self->status = COREGUI_LAYOUT_INVALID;
     view = [[LayoutView alloc] initWithFrame:rect];
     view.autoresizesSubviews = NO;
     widget = (WidgetObject*)self;
     widget->view = view;
-    view->object = widget;
+    view.object = widget;
     Py_INCREF(systemWindowBackgroundColor);
     self->background = systemWindowBackgroundColor;
     for (index = 0; index < length; index++) {
@@ -136,7 +142,7 @@ Layout_subscript(LayoutObject* self, PyObject* key)
         }
         view = (WidgetView*) [view.subviews objectAtIndex: index];
         if (view.isHidden) widget = (WidgetObject *)Py_None;
-        else widget = view->object;
+        else widget = view.object;
         Py_INCREF((PyObject*)widget);
         return (PyObject*) widget;
     }
@@ -152,7 +158,7 @@ Layout_subscript(LayoutObject* self, PyObject* key)
             for (i = 0, index = start; i < slicelength; i++, index += step) {
                 view = (WidgetView*) [view.subviews objectAtIndex: index];
                 if (view.isHidden) widget = (WidgetObject *)Py_None;
-                else widget = view->object;
+                else widget = view.object;
                 Py_INCREF((PyObject*) widget);
                 PyList_SET_ITEM(result, i, (PyObject*)widget);
             }
@@ -256,11 +262,70 @@ static PyMappingMethods Layout_mapping = {
     (objobjargproc)Layout_ass_subscript,     /* mp_ass_subscript */
 };
 
-static PyObject* Layout_place(PyObject* unused, PyObject* args, PyObject* keywords)
+Py_LOCAL_SYMBOL void Layout_invalidate_layout(WidgetObject* object)
 {
-    PyErr_SetString(PyExc_NotImplementedError,
-        ".place must be implemented in the subclass.");
-    return NULL;
+    LayoutObject* layout;
+    WidgetView* view = object->view;
+    NSView* contentView = view.window.contentView;
+fprintf(stderr, "In Layout_invalidate_layout, view = %p, contentView = %p, superview = %p\n", view, contentView, view.superview);
+    if (view == contentView) return;
+    view = (WidgetView*) view.superview;
+    if (!view) return;
+    layout = (LayoutObject*) view.object;
+    layout->status |= COREGUI_LAYOUT_INVALID;
+fprintf(stderr, "In Layout_invalidate_layout, setting COREGUI_LAYOUT_INVALID for layout %p with view = %p\n", layout, view);
+    while (view != contentView) {
+        view = (WidgetView*) view.superview;
+        if (!view) break;
+        layout = (LayoutObject*) view.object;
+fprintf(stderr, "In Layout_invalidate_layout, setting COREGUI_LAYOUT_SUBTREE_INVALID for layout %p with view = %p\n", layout, view);
+        layout->status |= COREGUI_LAYOUT_SUBTREE_INVALID;
+    }
+}
+
+static void walk(LayoutObject* self)
+{
+fprintf(stderr, "In walk for layout %p with view %p; status = %d\n", self, ((WidgetObject*)self)->view, self->status);
+    if (self->status == COREGUI_LAYOUT_VALID) return;
+    else if (self->status == COREGUI_LAYOUT_INVALID) {
+        WidgetView* view = ((WidgetObject*)self)->view;
+        CGFloat x = view.frame.origin.x;
+        CGFloat y = view.frame.origin.y;
+        CGFloat width = view.frame.size.width;
+        CGFloat height = view.frame.size.height;
+        self->status = COREGUI_LAYOUT_VALID;
+        PyGILState_STATE gstate = PyGILState_Ensure();
+        PyObject* result = PyObject_CallMethod((PyObject *)self, "place", "dddd",
+                                               x, y, width, height, NULL);
+        if (result) Py_DECREF(result);
+        else PyErr_Print();
+        PyGILState_Release(gstate);
+    }
+    else if (self->status == COREGUI_LAYOUT_SUBTREE_INVALID) {
+        NSView* view;
+        WidgetObject* widget = (WidgetObject*)self;
+        self->status = COREGUI_LAYOUT_VALID;
+        for (view in widget->view.subviews) {
+            WidgetObject* object = ((WidgetView*)view).object;
+            walk((LayoutObject*) object);
+        }
+    }
+}
+
+Py_LOCAL_SYMBOL void Layout_perform_layout_in_subtree(WidgetObject* object)
+{
+    int is_layout;
+    PyGILState_STATE gstate = PyGILState_Ensure();
+    is_layout = PyObject_IsInstance((PyObject*)object, (PyObject*) &LayoutType);
+    PyGILState_Release(gstate);
+    if (!is_layout) return;
+    walk(object);
+}
+
+static PyObject* Layout_place(LayoutObject* self, PyObject* args, PyObject* keywords)
+{
+    fprintf(stderr, "In Layout_place for layout object %p wrapping view %p; status is %d\n", self, ((WidgetObject*)self)->view, self->status);
+    return Widget_place(self, args, keywords);
 }
 
 static PyMethodDef Layout_methods[] = {

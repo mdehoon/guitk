@@ -59,7 +59,7 @@ Widget_dealloc(WidgetObject* self)
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
-static PyObject*
+Py_LOCAL_SYMBOL PyObject*
 Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords)
 {
     double x;
@@ -232,7 +232,7 @@ void Widget_unset_minimum_size(WidgetObject* widget)
         widget->minimum_size = CGSizeZero;
         if (view == top) break;
         view = (WidgetView *)view.superview;
-        widget = view->object;
+        widget = view.object;
     }
 }
 
@@ -382,6 +382,7 @@ static int Widget_set_vexpand(WidgetObject* self, PyObject* value, void* closure
     }
     view = self->view;
     view.needsDisplay = YES;
+    Layout_invalidate_layout(self);
     return 0;
 }
 

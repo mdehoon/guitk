@@ -1,6 +1,7 @@
 #include <Cocoa/Cocoa.h>
 #include "window.h"
 #include "widgets.h"
+#include "layout.h"
 
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
@@ -28,15 +29,16 @@
 - (void) displayIfNeeded
 {
     NSView *view = [self contentView];
+fprintf(stderr, "In displayIfNeeded\n");
     if ([view isKindOfClass: [WidgetView class]]) {
         PyObject* result;
         PyGILState_STATE gstate;
         NSRect frame;
-        WidgetObject* object = (WidgetObject*) ((WidgetView*)view)->object;
+        WidgetObject* object = ((WidgetView*)view).object;
         CGSize minimum_size = object->minimum_size;
-        double x, y, width, height;
         NSRect rect = view.frame;
         if (minimum_size.width == 0 || minimum_size.height == 0) {
+fprintf(stderr, "In displayIfNeeded, recalculating minimum size\n");
             gstate = PyGILState_Ensure();
             result = Widget_get_minimum_size(object, NULL);
             if (result) Py_DECREF(result);
@@ -44,22 +46,15 @@
             PyGILState_Release(gstate);
             if (!result) return;
             minimum_size = object->minimum_size;
+            if (rect.size.width < minimum_size.width) rect.size.width = minimum_size.width;
+            if (rect.size.height < minimum_size.height) rect.size.height = minimum_size.height;
+            frame = [self frameRectForContentRect:rect];
+            frame.origin = self.frame.origin;
+            frame.origin.y -= frame.size.height - self.frame.size.height;
+            [self setFrame: frame display: NO];
         }
-        if (rect.size.width < minimum_size.width) rect.size.width = minimum_size.width;
-        if (rect.size.height < minimum_size.height) rect.size.height = minimum_size.height;
-        frame = [self frameRectForContentRect:rect];
-        frame.origin = self.frame.origin;
-        frame.origin.y -= frame.size.height - self.frame.size.height;
-        [self setFrame: frame display: NO];
-        x = rect.origin.x;
-        y = rect.origin.y;
-        width = rect.size.width;
-        height = rect.size.height;
-        gstate = PyGILState_Ensure();
-        result = PyObject_CallMethod((PyObject *)object, "place", "dddd", x, y, width, height, NULL);
-        if (result) Py_DECREF(result);
-        else PyErr_Print();
-        PyGILState_Release(gstate);
+fprintf(stderr, "In displayIfNeeded, calling Layout_perform_layout_in_subtree on widget %p with view %p\n", object, view);
+        Layout_perform_layout_in_subtree(object);
     }
     // otherwise, the contentView of this window was not yet loaded with a widget.
     [super displayIfNeeded];
@@ -86,16 +81,34 @@
     Py_DECREF(_object);
 }
 
-- (void)windowDidBecomeKey:(NSNotification *)notification;
+- (void)windowDidBecomeKey:(NSNotification *)notification
 {
     _object->is_key = true;
     self.contentView.needsDisplay = YES;
 }
 
-- (void)windowDidResignKey:(NSNotification *)notification;
+- (void)windowDidResignKey:(NSNotification *)notification
 {
     _object->is_key = false;
     self.contentView.needsDisplay = YES;
+}
+
+- (void)windowDidResize:(NSNotification *)notification {
+    Window* window = (Window*) notification.object;
+    WidgetView* view = window.contentView;
+fprintf(stderr, "IN windowDidResize, contentView = %p\n", view); fflush(stderr);
+    if ([view isKindOfClass: [WidgetView class]]) {
+        WidgetObject* widget = view.object;
+fprintf(stderr, "IN windowDidResize, widget = %p\n", widget); fflush(stderr);
+        PyGILState_STATE gstate = PyGILState_Ensure();
+        int is_layout = PyObject_IsInstance(widget, (PyObject*) &LayoutType);
+        PyGILState_Release(gstate);
+        if (is_layout) {
+fprintf(stderr, "IN windowDidResize, widget is a layout\n"); fflush(stderr);
+            LayoutObject* layout = (LayoutObject*)widget;
+            layout->status = 1;
+        }
+    }
 }
 @end
 
@@ -398,7 +411,7 @@ static PyObject* Window_get_content(WindowObject* self, void* closure)
     }
     view = (WidgetView*) window.contentView;
     if (view) {
-        object = (PyObject*) (view->object);
+        object = (PyObject*) (view.object);
     }
     else {
         object = Py_None;

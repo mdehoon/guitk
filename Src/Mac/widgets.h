@@ -1,6 +1,9 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
 
+#ifndef WIDGETS_H
+#define WIDGETS_H
+
 @class WidgetView;
 
 typedef struct WidgetObject {
@@ -17,11 +20,11 @@ typedef struct WidgetObject {
     double margin_bottom;
 } WidgetObject;
 
+
 @interface WidgetView : NSView
 {
-@public
-    WidgetObject* object;
 }
+@property (nonatomic, assign) WidgetObject* object;
 - (BOOL)isFlipped;
 @end
 
@@ -37,5 +40,9 @@ extern PyTypeObject CheckboxType;
 extern PyTypeObject TextboxType;
 extern PyTypeObject ListboxType;
 
-void Widget_unset_minimum_size(WidgetObject* self);
-PyObject* Widget_get_minimum_size(WidgetObject* self, void* closure);
+Py_LOCAL_SYMBOL void Widget_unset_minimum_size(WidgetObject* self);
+Py_LOCAL_SYMBOL PyObject* Widget_get_minimum_size(WidgetObject* self, void* closure);
+
+Py_LOCAL_SYMBOL PyObject*
+Widget_place(WidgetObject* self, PyObject *args, PyObject *keywords);
+#endif
