@@ -15,3 +15,4 @@ typedef struct {
 
 Py_LOCAL_SYMBOL void Layout_update(WidgetObject* object);
 Py_LOCAL_SYMBOL void Layout_request(WidgetObject* object);
+Py_LOCAL_SYMBOL void Layout_notify_window_resized(WidgetObject* object);

@@ -291,6 +291,25 @@ fprintf(stderr, "In Layout_request, setting COREGUI_LAYOUT_SUBTREE_INVALID for l
     }
 }
 
+Py_LOCAL_SYMBOL void Layout_notify_window_resized(WidgetObject* object)
+{
+fprintf(stderr, "In Layout_notify_window_resized, widget = %p\n", object); fflush(stderr);
+    PyGILState_STATE gstate = PyGILState_Ensure();
+    int is_layout = PyObject_IsInstance((PyObject*)object,
+                                        (PyObject*) &LayoutType);
+    PyGILState_Release(gstate);
+    if (is_layout) {
+fprintf(stderr, "In Layout_notify_window_resized, widget is a layout\n"); fflush(stderr);
+        LayoutObject* layout = (LayoutObject*)object;
+        layout->status = COREGUI_LAYOUT_INVALID;
+    }
+    else
+fprintf(stderr, "In Layout_notify_window_resized, widget is not a layout\n"); fflush(stderr);
+}
+
+
+
+
 static void walk(LayoutObject* self)
 {
 fprintf(stderr, "In walk for layout %p with view %p; status = %d\n", self, ((WidgetObject*)self)->view, self->status);
@@ -329,13 +348,13 @@ Py_LOCAL_SYMBOL void Layout_update(WidgetObject* object)
     is_layout = PyObject_IsInstance((PyObject*)object, (PyObject*) &LayoutType);
     PyGILState_Release(gstate);
     if (!is_layout) return;
-    walk(object);
+    walk((LayoutObject*)object);
 }
 
 static PyObject* Layout_place(LayoutObject* self, PyObject* args, PyObject* keywords)
 {
     fprintf(stderr, "In Layout_place for layout object %p wrapping view %p; status is %d\n", self, ((WidgetObject*)self)->view, self->status);
-    return Widget_place(self, args, keywords);
+    return Widget_place((WidgetObject*)self, args, keywords);
 }
 
 static PyMethodDef Layout_methods[] = {

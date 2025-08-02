@@ -97,18 +97,8 @@ fprintf(stderr, "In displayIfNeeded, calling Layout_update on widget %p with vie
     Window* window = (Window*) notification.object;
     WidgetView* view = window.contentView;
 fprintf(stderr, "In windowDidResize, contentView = %p\n", view); fflush(stderr);
-    if ([view isKindOfClass: [WidgetView class]]) {
-        WidgetObject* widget = view.object;
-fprintf(stderr, "In windowDidResize, widget = %p\n", widget); fflush(stderr);
-        PyGILState_STATE gstate = PyGILState_Ensure();
-        int is_layout = PyObject_IsInstance(widget, (PyObject*) &LayoutType);
-        PyGILState_Release(gstate);
-        if (is_layout) {
-fprintf(stderr, "In windowDidResize, widget is a layout\n"); fflush(stderr);
-            LayoutObject* layout = (LayoutObject*)widget;
-            layout->status = 1;
-        }
-    }
+    if ([view isKindOfClass: [WidgetView class]])
+        Layout_notify_window_resized(view.object);
 }
 @end
 
