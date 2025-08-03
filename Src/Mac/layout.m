@@ -80,6 +80,8 @@ Layout_dealloc(LayoutObject* self)
 {
     WidgetObject* widget = (WidgetObject*)self;
     NSView* view = widget->view;
+fprintf(stderr, "Deallocating layout %p with view %p\n", widget, view);
+    /* FIXME deallocate subviews */
     if (view) [view release];
     Py_DECREF(self->background);
     Py_TYPE(self)->tp_free((PyObject*)self);
@@ -152,65 +154,70 @@ Layout_subscript(LayoutObject* self, PyObject* key)
     }
 }
 
+
+static int _set_widget(NSView* view, Py_ssize_t index, PyObject* value)
+{
+    WidgetObject* widget = NULL;
+    NSView *old_view, *new_view;
+    if (PyObject_IsInstance(value, (PyObject*) &WidgetType)) {
+        widget = (WidgetObject *)value;
+        new_view = (NSView*) widget->view;
+        if (new_view.superview) {
+            PyErr_SetString(PyExc_ValueError,
+                "widget is already used in a layout; "
+                "remove it before using it in a different layout");
+            return -1;
+        }
+    }
+    else if (value == Py_None) {
+        new_view = [[NSView alloc] initWithFrame: NSZeroRect];
+        new_view.hidden = YES;
+    }
+    else {
+        PyErr_SetString(PyExc_ValueError,
+                        "value must be a widget or None");
+        return -1;
+    }
+    old_view = [view.subviews objectAtIndex: index];
+    if (old_view.isHidden) {
+        Py_DECREF(Py_None);
+        [view replaceSubview: old_view with: new_view];
+        if (widget) Layout_request(widget);
+    }
+    else {
+        widget = ((WidgetView*)old_view).object;
+        Layout_request(widget);
+        [view replaceSubview: old_view with: new_view];
+        Py_DECREF(widget);
+    }
+    new_view.needsDisplay = YES;
+    Py_INCREF(value);
+    return 0;
+}
+
 static int
 Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
 {
-    Py_ssize_t length;
-    WidgetObject* widget;
+    Py_ssize_t index, length;
     LayoutView* view = (LayoutView*) self->widget.view;
-    WidgetView *oldView, *newView;
     if (!view) {
         PyErr_SetString(PyExc_RuntimeError, "layout has not been initialized");
         return -1;
     }
     length = view.subviews.count;
     if (PyIndex_Check(key)) {
-        WidgetObject* widget = NULL;
         Py_ssize_t index = PyNumber_AsSsize_t(key, PyExc_IndexError);
         if (index == -1 && PyErr_Occurred())
             return -1;
-        if (PyObject_IsInstance(value, (PyObject*) &WidgetType)) {
-            widget = (WidgetObject *)value;
-            newView = (NSView*) widget->view;
-            if (newView.superview) {
-                PyErr_SetString(PyExc_ValueError,
-                    "widget is already used in a layout; "
-                    "remove it before using it in a different layout");
-                return -1;
-            }
-        }
-        else if (value == Py_None) {
-            newView = [[NSView alloc] initWithFrame: NSZeroRect];
-            newView.hidden = YES;
-        }
-        else {
-            PyErr_SetString(PyExc_ValueError,
-                            "value must be a widget or None");
-            return -1;
-        }
         if (index < 0)
             index += length;
         if (index < 0 || index >= length) {
             PyErr_SetString(PyExc_IndexError, "index out of range");
             return -1;
         }
-        oldView = (WidgetView*) [view.subviews objectAtIndex: index];
-        if (oldView.isHidden) {
-            Py_DECREF(Py_None);
-            [view replaceSubview: oldView with: newView];
-            if (widget) Layout_request(widget);
-        }
-        else {
-            widget = (PyObject*) oldView.object;
-            Layout_request(widget);
-            [view replaceSubview: oldView with: newView];
-            Py_DECREF(widget);
-        }
-        newView.needsDisplay = YES;
-        Py_INCREF(value);
+        if (_set_widget(view, index, value) == -1) return -1;
     }
     else if (PySlice_Check(key)) {
-        Py_ssize_t index;
         Py_ssize_t start, stop, step, slicelength;
         PyObject *iterator;
         if (PySlice_GetIndicesEx(key, length, &start, &stop, &step,
@@ -222,37 +229,16 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
         }
         for (index = start; index < slicelength; index += step) {
             PyObject* object = PyIter_Next(iterator);
-            WidgetObject* widget = NULL;
             if (object == NULL) {
                 if (!PyErr_Occurred())
                     PyErr_SetString(PyExc_ValueError, "insufficient widgets");
+                Py_DECREF(iterator);
                 return -1;
             }
-            if (PyObject_IsInstance((PyObject *)object,
-                                    (PyObject *)&WidgetType)) {
-                newView = (NSView*) widget->view;
-                widget = (WidgetObject*)object;
-                if (newView.superview) {
-                    PyErr_SetString(PyExc_ValueError,
-                        "widget is already used in a layout; "
-                        "remove it before using it in a different layout");
-                    return -1;
-                }
-            }
-            else if (value == Py_None) {
-                newView = [[NSView alloc] initWithFrame: NSZeroRect];
-                newView.hidden = YES;
-            }
-            else {
-                PyErr_SetString(PyExc_ValueError,
-                                "value must be a widget or None");
+            if (_set_widget(view, index, object) == -1) {
+                Py_DECREF(iterator);
                 return -1;
             }
-            NSView *oldView = [view.subviews objectAtIndex: index];
-            [view replaceSubview: oldView with: newView];
-            newView.needsDisplay = YES;
-            Py_INCREF(object);
-            if (widget) Layout_request(widget);
         }
     }
     else {
@@ -291,7 +277,7 @@ fprintf(stderr, "In Layout_request, setting COREGUI_LAYOUT_INVALID for layout %p
         if (!view) break;
         layout = (LayoutObject*) view.object;
         if (layout->status == COREGUI_LAYOUT_SUBTREE_INVALID) {
-            fprintf(stderr, "Layout_request, in loop, found layout %p already marked\n", layout);
+            fprintf(stderr, "Layout_request, in loop, found layout %p already marked COREGUI_LAYOUT_SUBTREE_INVALID\n", layout);
             break;
         }
 fprintf(stderr, "In Layout_request, setting COREGUI_LAYOUT_SUBTREE_INVALID for layout %p with view = %p\n", layout, view);
