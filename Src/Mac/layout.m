@@ -9,31 +9,10 @@
 #endif
 
 
-#define COREGUI_LAYOUT_VALID 0x0
-#define COREGUI_LAYOUT_INVALID 0x1
-#define COREGUI_LAYOUT_SUBTREE_INVALID 0x2
-
-
+@interface LayoutView : WidgetView
+@end
 
 @implementation LayoutView
-- (void)didAddSubview:(NSView *)subview
-{
-    WidgetView* view = (WidgetView*) subview;
-    PyObject* widget;
-    if (view.isHidden) widget = Py_None;
-    else widget = (PyObject*) view.object;
-    Py_INCREF(widget);
-}
-
-- (void)willRemoveSubview:(NSView *)subview
-{
-    WidgetView* view = (WidgetView*) subview;
-    PyObject* widget;
-    if (view.isHidden) widget = Py_None;
-    else widget = (PyObject*) view.object;
-    Py_DECREF(widget);
-}
-
 - (void)drawRect:(NSRect)dirtyRect
 {
     CGContextRef cr;
@@ -179,18 +158,26 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
     Py_ssize_t length;
     WidgetObject* widget;
     LayoutView* view = (LayoutView*) self->widget.view;
-    NSView *oldView, *newView;
+    WidgetView *oldView, *newView;
     if (!view) {
         PyErr_SetString(PyExc_RuntimeError, "layout has not been initialized");
         return -1;
     }
     length = view.subviews.count;
     if (PyIndex_Check(key)) {
+        WidgetObject* widget = NULL;
         Py_ssize_t index = PyNumber_AsSsize_t(key, PyExc_IndexError);
         if (index == -1 && PyErr_Occurred())
             return -1;
         if (PyObject_IsInstance(value, (PyObject*) &WidgetType)) {
-            newView = (NSView*) ((WidgetObject *)value)->view;
+            widget = (WidgetObject *)value;
+            newView = (NSView*) widget->view;
+            if (newView.superview) {
+                PyErr_SetString(PyExc_ValueError,
+                    "widget is already used in a layout; "
+                    "remove it before using it in a different layout");
+                return -1;
+            }
         }
         else if (value == Py_None) {
             newView = [[NSView alloc] initWithFrame: NSZeroRect];
@@ -208,8 +195,19 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
             return -1;
         }
         oldView = (WidgetView*) [view.subviews objectAtIndex: index];
-        [view replaceSubview: oldView with: newView];
+        if (oldView.isHidden) {
+            Py_DECREF(Py_None);
+            [view replaceSubview: oldView with: newView];
+            if (widget) Layout_request(widget);
+        }
+        else {
+            widget = (PyObject*) oldView.object;
+            Layout_request(widget);
+            [view replaceSubview: oldView with: newView];
+            Py_DECREF(widget);
+        }
         newView.needsDisplay = YES;
+        Py_INCREF(value);
     }
     else if (PySlice_Check(key)) {
         Py_ssize_t index;
@@ -223,15 +221,23 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
             return -1;
         }
         for (index = start; index < slicelength; index += step) {
-            widget = (WidgetObject*) PyIter_Next(iterator);
-            if (widget == NULL) {
+            PyObject* object = PyIter_Next(iterator);
+            WidgetObject* widget = NULL;
+            if (object == NULL) {
                 if (!PyErr_Occurred())
                     PyErr_SetString(PyExc_ValueError, "insufficient widgets");
                 return -1;
             }
-            if (PyObject_IsInstance((PyObject *)widget,
+            if (PyObject_IsInstance((PyObject *)object,
                                     (PyObject *)&WidgetType)) {
                 newView = (NSView*) widget->view;
+                widget = (WidgetObject*)object;
+                if (newView.superview) {
+                    PyErr_SetString(PyExc_ValueError,
+                        "widget is already used in a layout; "
+                        "remove it before using it in a different layout");
+                    return -1;
+                }
             }
             else if (value == Py_None) {
                 newView = [[NSView alloc] initWithFrame: NSZeroRect];
@@ -245,6 +251,8 @@ Layout_ass_subscript(LayoutObject* self, PyObject* key, PyObject* value)
             NSView *oldView = [view.subviews objectAtIndex: index];
             [view replaceSubview: oldView with: newView];
             newView.needsDisplay = YES;
+            Py_INCREF(object);
+            if (widget) Layout_request(widget);
         }
     }
     else {
@@ -273,7 +281,7 @@ fprintf(stderr, "In Layout_request, view = %p, contentView = %p, superview = %p\
     if (!view) return;
     layout = (LayoutObject*) view.object;
     if (layout->status == COREGUI_LAYOUT_INVALID) {
-        fprintf(stderr, "Layout_request, in begin, found layout %p already marked\n", layout);
+        fprintf(stderr, "Layout_request, in begin, found layout %p with view %p already marked\n", layout, view);
         return;
     }
     layout->status = COREGUI_LAYOUT_INVALID;
@@ -354,6 +362,7 @@ Py_LOCAL_SYMBOL void Layout_update(WidgetObject* object)
 static PyObject* Layout_place(LayoutObject* self, PyObject* args, PyObject* keywords)
 {
     fprintf(stderr, "In Layout_place for layout object %p wrapping view %p; status is %d\n", self, ((WidgetObject*)self)->view, self->status);
+    self->status = COREGUI_LAYOUT_VALID;
     return Widget_place((WidgetObject*)self, args, keywords);
 }
 
@@ -365,6 +374,14 @@ static PyMethodDef Layout_methods[] = {
     },
     {NULL}  /* Sentinel */
 };
+
+static PyObject* Layout_get_status(LayoutObject* self, void* closure)
+{
+    if (self->status == COREGUI_LAYOUT_VALID) return PyUnicode_FromString("COREGUI_LAYOUT_VALID");
+    if (self->status == COREGUI_LAYOUT_INVALID) return PyUnicode_FromString("COREGUI_LAYOUT_INVALID");
+    if (self->status == COREGUI_LAYOUT_SUBTREE_INVALID) return PyUnicode_FromString("COREGUI_LAYOUT_SUBTREE_INVALID");
+    return NULL;
+}
 
 static PyObject* Layout_get_size(WidgetObject* self, void* closure)
 {
@@ -425,6 +442,7 @@ Layout_set_background(LayoutObject* self, PyObject* value, void* closure)
 static char Layout_background__doc__[] = "background color.";
 
 static PyGetSetDef Layout_getset[] = {
+    {"status", (getter)Layout_get_status, NULL, NULL, NULL},
     {"size", (getter)Layout_get_size, (setter)Layout_set_size, Layout_size__doc__, NULL},
     {"background", (getter)Layout_get_background, (setter)Layout_set_background, Layout_background__doc__, NULL},
     {NULL}  /* Sentinel */

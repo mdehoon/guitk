@@ -1,17 +1,17 @@
 #include "widgets.h"
 #include "colors.h"
 
+
+typedef enum {COREGUI_LAYOUT_VALID,
+              COREGUI_LAYOUT_INVALID,
+              COREGUI_LAYOUT_SUBTREE_INVALID} LayoutStatus;
+
+
 typedef struct {
     WidgetObject widget;
     ColorObject* background;
-    int status;
+    LayoutStatus status;
 } LayoutObject;
-
-@interface LayoutView : WidgetView
-- (void)didAddSubview:(NSView *)subview;
-- (void)willRemoveSubview:(NSView *)subview;
-- (void)drawRect:(NSRect)rect;
-@end
 
 Py_LOCAL_SYMBOL void Layout_update(WidgetObject* object);
 Py_LOCAL_SYMBOL void Layout_request(WidgetObject* object);
