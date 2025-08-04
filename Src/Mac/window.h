@@ -13,9 +13,8 @@ typedef struct {
 
 @interface Window : NSWindow <NSWindowDelegate>
 {
-    WindowObject* _object;
 }
-@property (readonly) WindowObject* object;
+@property (nonatomic, assign) WindowObject* object;
 - (Window*)initWithContentRect: (NSRect)rect
                      styleMask: (NSUInteger)windowStyle
                         object: (WindowObject*)object;

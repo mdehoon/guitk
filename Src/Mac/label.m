@@ -909,6 +909,7 @@ Label_dealloc(LabelObject* self)
 {
     WidgetObject* widget = (WidgetObject*)self;
     LabelView* label = (LabelView*) (widget->view);
+fprintf(stderr, "Deallocating label %p with NSView %p\n", self, label);
     CFStringRef text = self->text;
     CTLineRef line = self->line;
     CTFrameRef frame = self->frame;

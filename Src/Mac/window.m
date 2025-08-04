@@ -59,37 +59,42 @@ fprintf(stderr, "In displayIfNeeded, calling Layout_update on widget %p with vie
     // otherwise, the contentView of this window was not yet loaded with a widget.
     [super displayIfNeeded];
 }
-@synthesize object = _object;
 
 - (Window*)initWithContentRect: (NSRect)rect
                      styleMask: (NSUInteger)windowStyle
-                        object: (WindowObject*)object
+                        object: (WindowObject*)window
 {
     self = [self initWithContentRect: rect
                            styleMask: windowStyle
                              backing: NSBackingStoreBuffered
                                defer: YES];
-    _object = object;
     self.releasedWhenClosed = NO;
     self.acceptsMouseMovedEvents = YES;
     self.delegate = self;
+    self.object = window;
     return self;
 }
 
 - (void)windowWillClose:(NSNotification *)notification
 {
-    Py_DECREF(_object);
+fprintf(stderr, "In windowWillClose\n");
+    NSView* view = self.contentView;
+    if ([view isKindOfClass: [WidgetView class]]) {
+        WidgetObject* widget = ((WidgetView*)view).object;
+        Py_DECREF(widget);
+    }
+    Py_DECREF(self.object);
 }
 
 - (void)windowDidBecomeKey:(NSNotification *)notification
 {
-    _object->is_key = true;
+    self.object->is_key = true;
     self.contentView.needsDisplay = YES;
 }
 
 - (void)windowDidResignKey:(NSNotification *)notification
 {
-    _object->is_key = false;
+    self.object->is_key = false;
     self.contentView.needsDisplay = YES;
 }
 
@@ -393,15 +398,15 @@ static PyMethodDef Window_methods[] = {
 static PyObject* Window_get_content(WindowObject* self, void* closure)
 {
     PyObject* object;
-    WidgetView* view;
+    NSView* view;
     NSWindow* window = self->window;
     if (!window) {
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return NULL;
     }
-    view = (WidgetView*) window.contentView;
-    if (view) {
-        object = (PyObject*) (view.object);
+    view = window.contentView;
+    if ([view isKindOfClass: [WidgetView class]]) {
+        object = (PyObject*) ((WidgetView*)view).object;
     }
     else {
         object = Py_None;
