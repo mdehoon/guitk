@@ -159,7 +159,7 @@ static int _set_widget(NSView* view, Py_ssize_t index, PyObject* value)
 {
     WidgetObject* widget = NULL;
     NSView *old_view, *new_view;
-    if (PyObject_IsInstance(value, (PyObject*) &WidgetType)) {
+    if (PyType_IsSubtype(Py_TYPE(value), &WidgetType)) {
         widget = (WidgetObject *)value;
         new_view = (NSView*) widget->view;
         if (new_view.superview) {
@@ -289,8 +289,7 @@ Py_LOCAL_SYMBOL void Layout_notify_window_resized(WidgetObject* object)
 {
 fprintf(stderr, "In Layout_notify_window_resized, widget = %p\n", object); fflush(stderr);
     PyGILState_STATE gstate = PyGILState_Ensure();
-    int is_layout = PyObject_IsInstance((PyObject*)object,
-                                        (PyObject*) &LayoutType);
+    int is_layout = PyType_IsSubtype(Py_TYPE(object), &LayoutType);
     PyGILState_Release(gstate);
     if (is_layout) {
 fprintf(stderr, "In Layout_notify_window_resized, widget is a layout\n"); fflush(stderr);
@@ -339,7 +338,7 @@ Py_LOCAL_SYMBOL void Layout_update(WidgetObject* object)
 {
     int is_layout;
     PyGILState_STATE gstate = PyGILState_Ensure();
-    is_layout = PyObject_IsInstance((PyObject*)object, (PyObject*) &LayoutType);
+    is_layout = PyType_IsSubtype(Py_TYPE(object), &LayoutType);
     PyGILState_Release(gstate);
     if (!is_layout) return;
     walk((LayoutObject*)object);

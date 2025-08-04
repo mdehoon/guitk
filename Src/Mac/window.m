@@ -78,11 +78,6 @@ fprintf(stderr, "In displayIfNeeded, calling Layout_update on widget %p with vie
 - (void)windowWillClose:(NSNotification *)notification
 {
 fprintf(stderr, "In windowWillClose\n");
-    NSView* view = self.contentView;
-    if ([view isKindOfClass: [WidgetView class]]) {
-        WidgetObject* widget = ((WidgetView*)view).object;
-        Py_DECREF(widget);
-    }
     Py_DECREF(self.object);
 }
 
@@ -110,7 +105,7 @@ fprintf(stderr, "In windowDidResize, contentView = %p\n", view); fflush(stderr);
 static int converter(PyObject* object, void* address)
 {
     NSWindow** p;
-    if (!PyObject_IsInstance(object, (PyObject*) &WindowType)) {
+    if (!PyType_IsSubtype(Py_TYPE(object), &WindowType)) {
         PyErr_SetString(PyExc_RuntimeError, "expected a window");
         return 0;
     }
@@ -217,7 +212,15 @@ Window_dealloc(WindowObject* self)
      * still be NULL.
      */
     NSWindow* window = self->window;
-    if (window) [window release];
+fprintf(stderr, "In Window_dealloc for window %p with NSWindow %p\n", self, window);
+    if (window) {
+        NSView* view = window.contentView;
+        if ([view isKindOfClass: [WidgetView class]]) {
+            WidgetObject* widget = ((WidgetView*)view).object;
+            Py_DECREF(widget);
+        }
+        [window release];
+    }
     Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
@@ -420,7 +423,6 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
 {
     PyObject* size;
     PyGILState_STATE gstate;
-    PyTypeObject* type;
     WidgetObject* widget;
     NSView* view;
     Window* window = self->window;
@@ -428,30 +430,28 @@ Window_set_content(WindowObject* self, PyObject* value, void* closure)
         PyErr_SetString(PyExc_RuntimeError, "window has not been initialized");
         return -1;
     }
-    type = Py_TYPE(value);
-    if (!PyType_IsSubtype(type, &WidgetType)) {
-        PyErr_SetString(PyExc_ValueError, "expected a widget or None");
-        return -1;
-    }
-    widget = (WidgetObject*)value;
-    view = widget->view;
-    gstate = PyGILState_Ensure();
-    size = PyObject_GetAttrString(value, "minimum_size");
-    if (size) {
-        Py_DECREF(size);
-        PyGILState_Release(gstate);
+    if (value == Py_None) {
+        view = [[NSView alloc] initWithFrame:window.contentView.frame];
     }
     else {
-        PyErr_Print();
-        PyGILState_Release(gstate);
-        return -1;
+        PyTypeObject* type = Py_TYPE(value);
+        if (!PyType_IsSubtype(type, &WidgetType)) {
+            PyErr_SetString(PyExc_ValueError, "expected a widget or None");
+            return -1;
+        }
+        widget = (WidgetObject*)value;
+        view = widget->view;
+        size = PyObject_GetAttrString(value, "minimum_size");
+        if (!size) return -1;
+        Py_DECREF(size);
+        window.contentSize = widget->minimum_size;
+        [view setFrameSize: widget->minimum_size];
+        Py_INCREF(value);
     }
-    window.contentSize = widget->minimum_size;
-    [view setFrameSize: widget->minimum_size];
-    if (window.contentView) {
-        [window.contentView removeFromSuperview];
+    if ([window.contentView isKindOfClass: [WidgetView class]]) {
+        WidgetView* widget = (WidgetView*)window.contentView;
+        Py_DECREF(widget.object);
     }
-    Py_INCREF(value);
     window.contentView = view;
     return 0;
 }

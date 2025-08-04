@@ -1216,7 +1216,7 @@ Label_set_font(LabelObject* self, PyObject* value, void* closure)
 {
     WidgetObject* widget = (WidgetObject*) self;
     LabelView* label = (LabelView*) (widget->view);
-    if (!PyObject_IsInstance(value, (PyObject *)&FontType)) {
+    if (!PyType_IsSubtype(Py_TYPE(value), &FontType)) {
         PyErr_SetString(PyExc_ValueError, "expected a Font object");
         return -1;
     }
@@ -1370,7 +1370,7 @@ Label_set_image(LabelObject* self, PyObject* value, void* closure)
         Py_XDECREF(self->image);
         self->image = NULL;
     }
-    else if (PyObject_IsInstance(value, (PyObject *)&ImageType)) {
+    else if (!PyType_IsSubtype(Py_TYPE(value), &ImageType)) {
         Py_INCREF(value);
         Py_XDECREF(self->image);
         self->image = (ImageObject*) value;
