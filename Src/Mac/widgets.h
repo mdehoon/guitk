@@ -10,6 +10,8 @@ typedef struct WidgetObject {
     PyObject_HEAD
     WidgetView* view;
     CGSize minimum_size;
+    double preferred_height;
+    double preferred_width;
     char halign;
     char valign;
     BOOL hexpand;

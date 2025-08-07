@@ -57,8 +57,6 @@ typedef struct {
     ColorObject* highlight_background;
     ColorObject* highlight_color;
     double border_width;
-    double height;
-    double width;
     double highlight_thickness;
     Justify justify;
     Relief relief;
@@ -630,8 +628,6 @@ Label_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->take_focus = false;
     self->is_first_responder = false;
     self->underline = -1;
-    self->width = 0.0;
-    self->height = 0.0;
     self->text = NULL;
     self->font = NULL;
     self->line = NULL;
@@ -1807,46 +1803,6 @@ Label_set_highlight_thickness(LabelObject* self, PyObject* value, void* closure)
 
 static char Label_highlight_thickness__doc__[] = "width of the highlight rectangle to draw around the outside of the label when it has the input focus.";
 
-static PyObject* Label_get_width(LabelObject* self, void* closure)
-{
-    return PyFloat_FromDouble(self->width);
-}
-
-static int
-Label_set_width(LabelObject* self, PyObject* value, void* closure)
-{
-    WidgetObject* widget = (WidgetObject*) self;
-    LabelView* label = (LabelView*) (widget->view);
-    const CGFloat width = PyFloat_AsDouble(value);
-    if (PyErr_Occurred()) return -1;
-    self->width = width;
-    Widget_unset_minimum_size(widget);
-    label.needsDisplay = YES;
-    return 0;
-}
-
-static char Label_width__doc__[] = "preferred label width in characters (in case of text only) or pixels (if the label includes an image).";
-
-static PyObject* Label_get_height(LabelObject* self, void* closure)
-{
-    return PyFloat_FromDouble(self->height);
-}
-
-static int
-Label_set_height(LabelObject* self, PyObject* value, void* closure)
-{
-    WidgetObject* widget = (WidgetObject*) self;
-    LabelView* label = (LabelView*) (widget->view);
-    const CGFloat height = PyFloat_AsDouble(value);
-    if (PyErr_Occurred()) return -1;
-    self->height = height;
-    Widget_unset_minimum_size(widget);
-    label.needsDisplay = YES;
-    return 0;
-}
-
-static char Label_height__doc__[] = "preferred label height as the number of text lines (in case of text only) or pixels (if the label includes an image).";
-
 static PyObject* Label_get_compound(LabelObject* self, void* closure)
 {
     switch (self->compound) {
@@ -1908,8 +1864,6 @@ static PyGetSetDef Label_getseters[] = {
     {"xalign", (getter)Label_get_xalign, (setter)Label_set_xalign, Label_xalign__doc__, NULL},
     {"yalign", (getter)Label_get_yalign, (setter)Label_set_yalign, Label_yalign__doc__, NULL},
     {"highlight_thickness", (getter)Label_get_highlight_thickness, (setter)Label_set_highlight_thickness, Label_highlight_thickness__doc__, NULL},
-    {"width", (getter)Label_get_width, (setter)Label_set_width, Label_width__doc__, NULL},
-    {"height", (getter)Label_get_height, (setter)Label_set_height, Label_height__doc__, NULL},
     {NULL}  /* Sentinel */
 };
 

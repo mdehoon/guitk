@@ -6,7 +6,7 @@ from tkinter import *
 
 root = Tk()
 
-w = Label(root, text="Hello, world!", font='Times 40')
+w = Label(root, text="Hello, world!", font='Times 40', width=40)
 w.pack()
 
 root.mainloop()

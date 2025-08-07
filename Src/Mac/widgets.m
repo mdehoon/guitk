@@ -1,6 +1,7 @@
 #include <Python.h>
 #include <Cocoa/Cocoa.h>
 #include <string.h>
+#include <math.h>
 #include "widgets.h"
 #include "layout.h"
 #include "window.h"
@@ -32,6 +33,8 @@ Widget_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     WidgetObject *self = (WidgetObject*)type->tp_alloc(type, 0);
     if (!self) return NULL;
     self->view = NULL;
+    self->preferred_width = NAN;
+    self->preferred_height = NAN;
     self->halign = 'f';
     self->valign = 'f';
     self->hexpand = NO;
@@ -248,6 +251,48 @@ Widget_set_minimum_size(WidgetObject* self, PyObject* value, void* closure)
 }
 
 static char Widget_minimum_size__doc__[] = "Minimum size requested by widget. Setting the minimum size to None discards the cached minimum size on the widget and its ancestors, triggering a recalculation when the minimum size is requested.";
+
+static PyObject* Widget_get_preferred_width(WidgetObject* self, void* closure)
+{
+    if (Py_IS_NAN(self->preferred_width)) Py_RETURN_NONE;
+    return PyFloat_FromDouble(self->preferred_width);
+}
+
+static int
+Widget_set_preferred_width(WidgetObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    WidgetView* view = (WidgetView*) (widget->view);
+    const CGFloat width = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    self->preferred_width = width;
+    Widget_unset_minimum_size(widget);
+    view.needsDisplay = YES;
+    return 0;
+}
+
+static char Widget_preferred_width__doc__[] = "preferred widget width in pixels.";
+
+static PyObject* Widget_get_preferred_height(WidgetObject* self, void* closure)
+{
+    if (Py_IS_NAN(self->preferred_height)) Py_RETURN_NONE;
+    return PyFloat_FromDouble(self->preferred_height);
+}
+
+static int
+Widget_set_preferred_height(WidgetObject* self, PyObject* value, void* closure)
+{
+    WidgetObject* widget = (WidgetObject*) self;
+    WidgetView* view = (WidgetView*) (widget->view);
+    const CGFloat height = PyFloat_AsDouble(value);
+    if (PyErr_Occurred()) return -1;
+    self->preferred_height = height;
+    Widget_unset_minimum_size(widget);
+    view.needsDisplay = YES;
+    return 0;
+}
+
+static char Widget_preferred_height__doc__[] = "preferred widget height in pixels.";
 
 static PyObject* Widget_get_halign(WidgetObject* self, void* closure)
 {
@@ -493,6 +538,8 @@ static PyGetSetDef Widget_getset[] = {
     {"origin", (getter)Widget_get_origin, (setter)Widget_set_origin, Widget_origin__doc__, NULL},
     {"size", (getter)Widget_get_size, (setter)Widget_set_size, Widget_size__doc__, NULL},
     {"minimum_size", (getter)Widget_get_minimum_size, (setter)Widget_set_minimum_size, Widget_minimum_size__doc__, NULL},
+    {"preferred_width", (getter)Widget_get_preferred_width, (setter)Widget_set_preferred_width, Widget_preferred_width__doc__, NULL},
+    {"preferred_height", (getter)Widget_get_preferred_height, (setter)Widget_set_preferred_height, Widget_preferred_height__doc__, NULL},
     {"halign", (getter)Widget_get_halign, (setter)Widget_set_halign, Widget_halign__doc__, NULL},
     {"valign", (getter)Widget_get_valign, (setter)Widget_set_valign, Widget_valign__doc__, NULL},
     {"hexpand", (getter)Widget_get_hexpand, (setter)Widget_set_hexpand, Widget_hexpand__doc__, NULL},
