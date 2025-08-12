@@ -4,7 +4,7 @@
 
 typedef enum {COREGUI_LAYOUT_VALID,
               COREGUI_LAYOUT_INVALID,
-              COREGUI_LAYOUT_SUBTREE_INVALID} LayoutStatus;
+              COREGUI_LAYOUT_CHILDREN_INVALID} LayoutStatus;
 
 
 typedef struct {

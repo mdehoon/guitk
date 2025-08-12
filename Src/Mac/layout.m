@@ -276,12 +276,12 @@ fprintf(stderr, "In Layout_request, setting COREGUI_LAYOUT_INVALID for layout %p
         view = (WidgetView*) view.superview;
         if (!view) break;
         layout = (LayoutObject*) view.object;
-        if (layout->status == COREGUI_LAYOUT_SUBTREE_INVALID) {
-            fprintf(stderr, "Layout_request, in loop, found layout %p already marked COREGUI_LAYOUT_SUBTREE_INVALID\n", layout);
+        if (layout->status == COREGUI_LAYOUT_CHILDREN_INVALID) {
+            fprintf(stderr, "Layout_request, in loop, found layout %p already marked COREGUI_LAYOUT_CHILDREN_INVALID\n", layout);
             break;
         }
-fprintf(stderr, "In Layout_request, setting COREGUI_LAYOUT_SUBTREE_INVALID for layout %p with view = %p\n", layout, view);
-        layout->status = COREGUI_LAYOUT_SUBTREE_INVALID;
+fprintf(stderr, "In Layout_request, setting COREGUI_LAYOUT_CHILDREN_INVALID for layout %p with view = %p\n", layout, view);
+        layout->status = COREGUI_LAYOUT_CHILDREN_INVALID;
     }
 }
 
@@ -322,7 +322,7 @@ fprintf(stderr, "In walk for layout %p with view %p; setting status from %d to C
         else PyErr_Print();
         PyGILState_Release(gstate);
     }
-    else if (self->status == COREGUI_LAYOUT_SUBTREE_INVALID) {
+    else if (self->status == COREGUI_LAYOUT_CHILDREN_INVALID) {
         NSView* view;
         WidgetObject* widget = (WidgetObject*)self;
 fprintf(stderr, "In walk for layout %p with view %p; setting status from %d to COREGUI_LAYOUT_VALID\n", self, ((WidgetObject*)self)->view, self->status);
@@ -364,7 +364,7 @@ static PyObject* Layout_get_status(LayoutObject* self, void* closure)
 {
     if (self->status == COREGUI_LAYOUT_VALID) return PyUnicode_FromString("COREGUI_LAYOUT_VALID");
     if (self->status == COREGUI_LAYOUT_INVALID) return PyUnicode_FromString("COREGUI_LAYOUT_INVALID");
-    if (self->status == COREGUI_LAYOUT_SUBTREE_INVALID) return PyUnicode_FromString("COREGUI_LAYOUT_SUBTREE_INVALID");
+    if (self->status == COREGUI_LAYOUT_CHILDREN_INVALID) return PyUnicode_FromString("COREGUI_LAYOUT_CHILDREN_INVALID");
     return NULL;
 }
 
