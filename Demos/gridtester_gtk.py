@@ -62,16 +62,19 @@ class MyWindow(Gtk.ApplicationWindow):
         return label
 
 
-gtk_win = MyWindow()
-label1 = gtk_win.label1
-label2 = gtk_win.label2
-label3 = gtk_win.label3
-label4 = gtk_win.label4
-label5 = gtk_win.label5
-label6 = gtk_win.label6
+window = MyWindow()
+label1 = window.label1
+label2 = window.label2
+label3 = window.label3
+label4 = window.label4
+label5 = window.label5
+label6 = window.label6
 labels = (label1, label2, label3, label4, label5, label6)
-gtk_win.connect("destroy", Gtk.main_quit)
-gtk_win.show_all()
+grid = window.grid
+grid1 = window.grid1
+grid2 = window.grid2
+window.connect("destroy", Gtk.main_quit)
+window.show_all()
 
 def randomize():
     attributes = ("xalign", "yalign", "halign", "valign", "hexpand", "vexpand")

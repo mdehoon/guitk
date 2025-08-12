@@ -422,7 +422,6 @@ static int
 Window_set_content(WindowObject* self, PyObject* value, void* closure)
 {
     PyObject* size;
-    PyGILState_STATE gstate;
     WidgetObject* widget;
     NSView* view;
     Window* window = self->window;
