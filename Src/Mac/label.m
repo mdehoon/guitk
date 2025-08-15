@@ -1709,10 +1709,10 @@ Label_set_xalign(LabelObject* self, PyObject* value, void* closure)
     const CGFloat xalign = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     if (xalign < 0 || xalign > 1) {
-        PyErr_SetString(PyExc_ValueError,
-                        "xalign must be between 0 and 1");
+        PyErr_SetString(PyExc_ValueError, "xalign must be between 0 and 1");
         return -1;
     }
+    if (self->xalign == xalign) return 0;
     self->xalign = xalign;
     label.needsDisplay = YES;
     return 0;
@@ -1733,10 +1733,10 @@ Label_set_yalign(LabelObject* self, PyObject* value, void* closure)
     const CGFloat yalign = PyFloat_AsDouble(value);
     if (PyErr_Occurred()) return -1;
     if (yalign < 0 || yalign > 1) {
-        PyErr_SetString(PyExc_ValueError,
-                        "yalign must be between 0 and 1");
+        PyErr_SetString(PyExc_ValueError, "yalign must be between 0 and 1");
         return -1;
     }
+    if (self->yalign == yalign) return 0;
     self->yalign = yalign;
     label.needsDisplay = YES;
     return 0;

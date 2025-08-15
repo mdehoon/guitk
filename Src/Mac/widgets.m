@@ -449,6 +449,7 @@ Widget_set_margin_left(WidgetObject* self, PyObject* value, void* closure)
                         "margin_left must be non-negative");
         return -1;
     }
+    if (self->margin_left == margin_left) return 0;
     self->margin_left = margin_left;
     Widget_unset_minimum_size(self);
     view = self->view;
@@ -474,6 +475,7 @@ Widget_set_margin_right(WidgetObject* self, PyObject* value, void* closure)
                         "margin_right must be non-negative");
         return -1;
     }
+    if (self->margin_right == margin_right) return 0;
     self->margin_right = margin_right;
     Widget_unset_minimum_size(self);
     view = self->view;
@@ -499,6 +501,7 @@ Widget_set_margin_top(WidgetObject* self, PyObject* value, void* closure)
                         "margin_top must be non-negative");
         return -1;
     }
+    if (self->margin_top == margin_top) return 0;
     self->margin_top = margin_top;
     Widget_unset_minimum_size(self);
     view = self->view;
@@ -524,6 +527,7 @@ Widget_set_margin_bottom(WidgetObject* self, PyObject* value, void* closure)
                         "margin_bottom must be non-negative");
         return -1;
     }
+    if (self->margin_bottom == margin_bottom) return 0;
     self->margin_bottom = margin_bottom;
     Widget_unset_minimum_size(self);
     view = self->view;
