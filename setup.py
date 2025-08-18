@@ -39,6 +39,8 @@ if sys.platform == 'darwin':
 else:
     event_sources = ["Src/X11/events.c",
                     ]
+    event_tcltk_sources = ["Src/X11/events_tcltk.c",
+                    ]
     gui_sources = ["Src/X11/window.c",
                    "Src/X11/graphics.c",
                    "Src/X11/gui.c",
@@ -48,6 +50,14 @@ else:
 
 extension = Extension("guitk.events",
                       event_sources,
+                      include_dirs=include_dirs,
+                      extra_link_args=extra_link_args,
+                      )
+
+extensions.append(extension)
+
+extension = Extension("guitk.events_tcltk",
+                      event_tcltk_sources,
                       include_dirs=include_dirs,
                       extra_link_args=extra_link_args,
                       )

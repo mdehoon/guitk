@@ -21,26 +21,10 @@ static struct NotifierState {
 
 static PyTypeObject TimerType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "events.Timer",            /*tp_name*/
-    sizeof(TimerObject),       /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
-    0,                         /*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /*tp_compare*/
-    0,                         /*tp_repr*/
-    0,                         /*tp_as_number*/
-    0,                         /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
-    0,                         /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,        /*tp_flags*/
-    "Timer object",            /*tp_doc */
+    .tp_name = "events.Timer",
+    .tp_basicsize = sizeof(TimerObject),
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_doc = "Timer object",
 };
 
 static void add_timer(TimerObject* timer)
@@ -194,26 +178,10 @@ PyEvents_RemoveTimer(PyObject* unused, PyObject* argument)
 
 static PyTypeObject SocketType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "events.Socket",           /*tp_name*/
-    sizeof(SocketObject),      /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
-    0,                         /*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /*tp_compare*/
-    0,                         /*tp_repr*/
-    0,                         /*tp_as_number*/
-    0,                         /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
-    0,                         /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,        /*tp_flags*/
-    "Socket object",           /*tp_doc */
+    .tp_name = "events.Socket",
+    .tp_basicsize = sizeof(SocketObject),
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_doc = "Socket object",
 };
 
 static void add_socket(SocketObject* socket)
@@ -448,15 +416,12 @@ static void freeevents(void* module)
 }
 
 static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT,  /* m_base */
-    "events",               /* m_name */
-    "events module",        /* m_doc */
-    -1,                     /* m_size */
-    methods,                /* m_methods */
-    NULL,                   /* m_reload */
-    NULL,                   /* m_traverse */
-    NULL,                   /* m_clear */
-    freeevents              /* m_free */
+    PyModuleDef_HEAD_INIT,
+    .m_name = "events",
+    .m_doc = "events module",
+    .m_size = -1,
+    .m_methods = methods,
+    .m_free = freeevents,
 };
 
 PyObject* PyInit_events(void)
