@@ -4,7 +4,43 @@
 #include "tclInt.h"
 #include "tcl.h"
 #include "tkInt.h"
+#include <stdbool.h>
 
+
+static PyThread_type_lock tcl_lock = 0;
+
+static Tcl_ThreadDataKey state_key;
+typedef PyThreadState *ThreadSpecificData;
+#define tcl_tstate \
+    (*(PyThreadState**)Tcl_GetThreadData(&state_key, sizeof(PyThreadState*)))
+
+#define ENTER_TCL \
+    { PyThreadState *tstate = PyThreadState_Get(); \
+      Py_BEGIN_ALLOW_THREADS \
+      if(tcl_lock)PyThread_acquire_lock(tcl_lock, 1); \
+      tcl_tstate = tstate;
+
+#define LEAVE_TCL \
+    tcl_tstate = NULL; \
+    if(tcl_lock)PyThread_release_lock(tcl_lock); \
+    Py_END_ALLOW_THREADS}
+
+#define ENTER_PYTHON \
+    { PyThreadState *tstate = tcl_tstate; tcl_tstate = NULL; \
+      if(tcl_lock) \
+        PyThread_release_lock(tcl_lock); \
+      PyEval_RestoreThread((tstate)); }
+
+#define LEAVE_PYTHON \
+    { PyThreadState *tstate = PyEval_SaveThread(); \
+      if(tcl_lock)PyThread_acquire_lock(tcl_lock, 1); \
+      tcl_tstate = tstate; }
+
+
+
+
+static bool threaded = 0;
+static Tcl_ThreadId thread_id = NULL;
 
 static int* framePtr = NULL;
 
@@ -50,6 +86,7 @@ static void InitNotifier(void);
 
 static XtAppContext TclSetAppContext(XtAppContext appContext)
 {
+fprintf(stderr, "In TclSetAppContext\n"); fflush(stderr);
     if (!initialized) {
 	InitNotifier();
     }
@@ -118,6 +155,7 @@ TimerProc(
     TCL_UNUSED(XtPointer),
     XtIntervalId *id)
 {
+fprintf(stderr, "In TimerProc\n"); fflush(stderr);
     if (*id != notifier.currentTimeout) {
 	return;
     }
@@ -125,10 +163,12 @@ TimerProc(
 
     Tcl_ServiceAll();
 }
+
 static void
 SetTimer(const Tcl_Time *timePtr)
 {
     unsigned long timeout;
+fprintf(stderr, "In SetTimer\n"); fflush(stderr);
 
     if (!initialized) {
 	InitNotifier();
@@ -172,6 +212,8 @@ WaitForEvent(
     const Tcl_Time *timePtr)	/* Maximum block time, or NULL. */
 {
     int timeout;
+fprintf(stderr, "Starting WaitForEvent\n"); fflush(stderr);
+    PyThreadState *tstate = PyThreadState_Get();
 
     if (!initialized) {
 	InitNotifier();
@@ -185,6 +227,7 @@ WaitForEvent(
 	    if (XtAppPending(notifier.appContext)) {
 		goto process;
 	    } else {
+fprintf(stderr, "Leaving WaitForEvent 0\n"); fflush(stderr);
 		return 0;
 	    }
 	} else {
@@ -193,7 +236,10 @@ WaitForEvent(
     }
 
   process:
+ENTER_TCL
     XtAppProcessEvent(notifier.appContext, XtIMAll);
+LEAVE_TCL
+fprintf(stderr, "Leaving WaitForEvent\n"); fflush(stderr);
     return 1;
 }
 
@@ -228,8 +274,10 @@ FileHandlerEventProc(
     FileHandler *filePtr;
     FileHandlerEvent *fileEvPtr = (FileHandlerEvent *) evPtr;
     int mask;
+fprintf(stderr, "Starting FileHandlerEventProc\n"); fflush(stderr);
 
     if (!(flags & TCL_FILE_EVENTS)) {
+fprintf(stderr, "Leaving FileHandlerEventProc 0\n"); fflush(stderr);
 	return 0;
     }
 
@@ -261,10 +309,13 @@ FileHandlerEventProc(
 	mask = filePtr->readyMask & filePtr->mask;
 	filePtr->readyMask = 0;
 	if (mask != 0) {
+fprintf(stderr, "In FileHandlerEventProc, calling filePtr->proc\n"); fflush(stderr);
 	    filePtr->proc(filePtr->clientData, mask);
+fprintf(stderr, "In FileHandlerEventProc, after calling filePtr->proc\n"); fflush(stderr);
 	}
 	break;
     }
+fprintf(stderr, "Leaving FileHandlerEventProc\n"); fflush(stderr);
     return 1;
 }
 
@@ -290,6 +341,7 @@ DeleteFileHandler(
 				 * procedure. */
 {
     FileHandler *filePtr, *prevPtr;
+fprintf(stderr, "In DeleteFileHandler\n"); fflush(stderr);
 
     if (!initialized) {
 	InitNotifier();
@@ -376,6 +428,7 @@ FileProc(
     FileHandler *filePtr = (FileHandler *) clientData;
     FileHandlerEvent *fileEvPtr;
     int mask = 0;
+fprintf(stderr, "Starting FileProc\n"); fflush(stderr);
 
     /*
      * Determine which event happened.
@@ -411,7 +464,11 @@ FileProc(
      * Process events on the Tcl event queue before returning to Xt.
      */
 
+fprintf(stderr, "In FileProc, getting GIL\n"); fflush(stderr);
+    ENTER_TCL
     Tcl_ServiceAll();
+    LEAVE_TCL
+fprintf(stderr, "Leaving FileProc\n"); fflush(stderr);
 }
 
 /*
@@ -443,6 +500,7 @@ CreateFileHandler(
     void *clientData)		/* Arbitrary data to pass to proc. */
 {
     FileHandler *filePtr;
+fprintf(stderr, "In CreateFileHandler\n"); fflush(stderr);
 
     if (!initialized) {
 	InitNotifier();
@@ -527,16 +585,30 @@ static void InitNotifier(void)
 static PyObject*
 start(PyObject* unused, PyObject* args)
 {
+static int counter = 0;
     int *oldFramePtr;
     int done;
     int oldMode = Tcl_SetServiceMode(TCL_SERVICE_ALL);
+    PyThreadState* tstate = PyThreadState_Get();
+
+    if (threaded && thread_id != Tcl_GetCurrentThread()) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "Calling Tcl from different apartment");
+        return NULL;
+    }
 
     oldFramePtr = framePtr;
     framePtr = &done;
-
     done = 0;
-    while (!done) {
-        XtAppProcessEvent(TclSetAppContext(NULL), XtIMAll);
+
+    if (threaded) {
+        ENTER_TCL
+        while (!done) {
+fprintf(stderr, "Calling XtAppProcessEvent %d\n", counter); fflush(stderr);
+            XtAppProcessEvent(TclSetAppContext(NULL), XtIMAll);
+fprintf(stderr, "After calling XtAppProcessEvent %d\n", counter++); fflush(stderr);
+        }
+        LEAVE_TCL
     }
     (void) Tcl_SetServiceMode(oldMode);
     framePtr = oldFramePtr;
@@ -563,6 +635,17 @@ static struct PyModuleDef moduledef = {
 
 PyObject* PyInit_events_tcltk(void)
 {
+    Tcl_Interp* interpreter = Tcl_CreateInterp();
+    if (interpreter == NULL) {
+        PyErr_Format(PyExc_RuntimeError, "failed to create Tcl interpreter");   
+        return NULL;
+    }
+    threaded = Tcl_GetVar2Ex(interpreter,
+                             "tcl_platform",
+                             "threaded",
+                             TCL_GLOBAL_ONLY) != NULL;
+    Tcl_DeleteInterp(interpreter);
+    if (threaded) thread_id = Tcl_GetCurrentThread();
     XtToolkitInitialize();
     InitNotifier();
     return PyModule_Create(&moduledef);
