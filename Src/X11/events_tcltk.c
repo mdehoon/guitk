@@ -2,7 +2,11 @@
 
 #include <X11/Intrinsic.h>
 #include "tclInt.h"
+#include "tcl.h"
+#include "tkInt.h"
 
+
+static int* framePtr = NULL;
 
 typedef struct FileHandler {
     int fd;
@@ -42,25 +46,9 @@ static struct NotifierState {
 
 static int initialized = 0;
 
-/*
- * Static routines defined in this file.
- */
+static void InitNotifier(void);
 
-static int		FileHandlerEventProc(Tcl_Event *evPtr, int flags);
-static void		FileProc(XtPointer clientData, int *source,
-			    XtInputId *id);
-static void		NotifierExitHandler(void *clientData);
-static void		TimerProc(XtPointer clientData, XtIntervalId *id);
-static void		CreateFileHandler(int fd, int mask,
-			    Tcl_FileProc *proc, void *clientData);
-static void		DeleteFileHandler(int fd);
-static void		SetTimer(const Tcl_Time * timePtr);
-static int		WaitForEvent(const Tcl_Time * timePtr);
-
-
-XtAppContext
-TclSetAppContext(
-    XtAppContext appContext)
+static XtAppContext TclSetAppContext(XtAppContext appContext)
 {
     if (!initialized) {
 	InitNotifier();
@@ -109,47 +97,6 @@ TclSetAppContext(
     return notifier.appContext;
 }
 
-static void
-NotifierExitHandler(
-    TCL_UNUSED(void *))
-{
-    if (notifier.currentTimeout != 0) {
-	XtRemoveTimeOut(notifier.currentTimeout);
-    }
-    for (; notifier.firstFileHandlerPtr != NULL; ) {
-	Tcl_DeleteFileHandler(notifier.firstFileHandlerPtr->fd);
-    }
-    if (notifier.appContextCreated) {
-	XtDestroyApplicationContext(notifier.appContext);
-	notifier.appContextCreated = 0;
-	notifier.appContext = NULL;
-    }
-    initialized = 0;
-}
-
-static void
-SetTimer(
-    const Tcl_Time *timePtr)	/* Timeout value, may be NULL. */
-{
-    unsigned long timeout;
-
-    if (!initialized) {
-	InitNotifier();
-    }
-
-    TclSetAppContext(NULL);
-    if (notifier.currentTimeout != 0) {
-	XtRemoveTimeOut(notifier.currentTimeout);
-    }
-    if (timePtr) {
-	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
-	notifier.currentTimeout = XtAppAddTimeOut(notifier.appContext,
-		timeout, TimerProc, NULL);
-    } else {
-	notifier.currentTimeout = 0;
-    }
-}
-
 /*
  *----------------------------------------------------------------------
  *
@@ -178,7 +125,295 @@ TimerProc(
 
     Tcl_ServiceAll();
 }
-
+static void
+SetTimer(const Tcl_Time *timePtr)
+{
+    unsigned long timeout;
+
+    if (!initialized) {
+	InitNotifier();
+    }
+
+    TclSetAppContext(NULL);
+    if (notifier.currentTimeout != 0) {
+	XtRemoveTimeOut(notifier.currentTimeout);
+    }
+    if (timePtr) {
+	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
+	notifier.currentTimeout = XtAppAddTimeOut(notifier.appContext,
+		timeout, TimerProc, NULL);
+    } else {
+	notifier.currentTimeout = 0;
+    }
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * WaitForEvent --
+ *
+ *	This function is called by Tcl_DoOneEvent to wait for new events on
+ *	the message queue. If the block time is 0, then Tcl_WaitForEvent just
+ *	polls without blocking.
+ *
+ * Results:
+ *	Returns 1 if an event was found, else 0. This ensures that
+ *	Tcl_DoOneEvent will return 1, even if the event is handled by non-Tcl
+ *	code.
+ *
+ * Side effects:
+ *	Queues file events that are detected by the select.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+WaitForEvent(
+    const Tcl_Time *timePtr)	/* Maximum block time, or NULL. */
+{
+    int timeout;
+
+    if (!initialized) {
+	InitNotifier();
+    }
+
+    TclSetAppContext(NULL);
+
+    if (timePtr) {
+	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
+	if (timeout == 0) {
+	    if (XtAppPending(notifier.appContext)) {
+		goto process;
+	    } else {
+		return 0;
+	    }
+	} else {
+	    Tcl_SetTimer(timePtr);
+	}
+    }
+
+  process:
+    XtAppProcessEvent(notifier.appContext, XtIMAll);
+    return 1;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * FileHandlerEventProc --
+ *
+ *	This procedure is called by Tcl_ServiceEvent when a file event reaches
+ *	the front of the event queue. This procedure is responsible for
+ *	actually handling the event by invoking the callback for the file
+ *	handler.
+ *
+ * Results:
+ *	Returns 1 if the event was handled, meaning it should be removed from
+ *	the queue. Returns 0 if the event was not handled, meaning it should
+ *	stay on the queue. The only time the event isn't handled is if the
+ *	TCL_FILE_EVENTS flag bit isn't set.
+ *
+ * Side effects:
+ *	Whatever the file handler's callback procedure does.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static int
+FileHandlerEventProc(
+    Tcl_Event *evPtr,		/* Event to service. */
+    int flags)			/* Flags that indicate what events to handle,
+				 * such as TCL_FILE_EVENTS. */
+{
+    FileHandler *filePtr;
+    FileHandlerEvent *fileEvPtr = (FileHandlerEvent *) evPtr;
+    int mask;
+
+    if (!(flags & TCL_FILE_EVENTS)) {
+	return 0;
+    }
+
+    /*
+     * Search through the file handlers to find the one whose handle matches
+     * the event. We do this rather than keeping a pointer to the file handler
+     * directly in the event, so that the handler can be deleted while the
+     * event is queued without leaving a dangling pointer.
+     */
+
+    for (filePtr = notifier.firstFileHandlerPtr; filePtr != NULL;
+	    filePtr = filePtr->nextPtr) {
+	if (filePtr->fd != fileEvPtr->fd) {
+	    continue;
+	}
+
+	/*
+	 * The code is tricky for two reasons:
+	 * 1. The file handler's desired events could have changed since the
+	 *    time when the event was queued, so AND the ready mask with the
+	 *    desired mask.
+	 * 2. The file could have been closed and re-opened since the time
+	 *    when the event was queued. This is why the ready mask is stored
+	 *    in the file handler rather than the queued event: it will be
+	 *    zeroed when a new file handler is created for the newly opened
+	 *    file.
+	 */
+
+	mask = filePtr->readyMask & filePtr->mask;
+	filePtr->readyMask = 0;
+	if (mask != 0) {
+	    filePtr->proc(filePtr->clientData, mask);
+	}
+	break;
+    }
+    return 1;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * DeleteFileHandler --
+ *
+ *	Cancel a previously-arranged callback arrangement for a file.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	If a callback was previously registered on file, remove it.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+DeleteFileHandler(
+    int fd)			/* Stream id for which to remove callback
+				 * procedure. */
+{
+    FileHandler *filePtr, *prevPtr;
+
+    if (!initialized) {
+	InitNotifier();
+    }
+
+    TclSetAppContext(NULL);
+
+    /*
+     * Find the entry for the given file (and return if there isn't one).
+     */
+
+    for (prevPtr = NULL, filePtr = notifier.firstFileHandlerPtr; ;
+	    prevPtr = filePtr, filePtr = filePtr->nextPtr) {
+	if (filePtr == NULL) {
+	    return;
+	}
+	if (filePtr->fd == fd) {
+	    break;
+	}
+    }
+
+    /*
+     * Clean up information in the callback record.
+     */
+
+    if (prevPtr == NULL) {
+	notifier.firstFileHandlerPtr = filePtr->nextPtr;
+    } else {
+	prevPtr->nextPtr = filePtr->nextPtr;
+    }
+    if (filePtr->mask & TCL_READABLE) {
+	XtRemoveInput(filePtr->read);
+    }
+    if (filePtr->mask & TCL_WRITABLE) {
+	XtRemoveInput(filePtr->write);
+    }
+    if (filePtr->mask & TCL_EXCEPTION) {
+	XtRemoveInput(filePtr->except);
+    }
+    Tcl_Free((char*) filePtr);
+}
+
+static void
+NotifierExitHandler(TCL_UNUSED(void *))
+{
+fprintf(stderr, "in NotifierExitHandler\n"); fflush(stderr);
+    if (notifier.currentTimeout != 0) {
+	XtRemoveTimeOut(notifier.currentTimeout);
+    }
+    for (; notifier.firstFileHandlerPtr != NULL; ) {
+	Tcl_DeleteFileHandler(notifier.firstFileHandlerPtr->fd);
+    }
+    if (notifier.appContextCreated) {
+	XtDestroyApplicationContext(notifier.appContext);
+	notifier.appContextCreated = 0;
+	notifier.appContext = NULL;
+    }
+    initialized = 0;
+}
+
+/*
+ *----------------------------------------------------------------------
+ *
+ * FileProc --
+ *
+ *	These procedures are called by Xt when a file becomes readable,
+ *	writable, or has an exception.
+ *
+ * Results:
+ *	None.
+ *
+ * Side effects:
+ *	Makes an entry on the Tcl event queue if the event is interesting.
+ *
+ *----------------------------------------------------------------------
+ */
+
+static void
+FileProc(
+    XtPointer clientData,
+    int *fd,
+    XtInputId *id)
+{
+    FileHandler *filePtr = (FileHandler *) clientData;
+    FileHandlerEvent *fileEvPtr;
+    int mask = 0;
+
+    /*
+     * Determine which event happened.
+     */
+
+    if (*id == filePtr->read) {
+	mask = TCL_READABLE;
+    } else if (*id == filePtr->write) {
+	mask = TCL_WRITABLE;
+    } else if (*id == filePtr->except) {
+	mask = TCL_EXCEPTION;
+    }
+
+    /*
+     * Ignore unwanted or duplicate events.
+     */
+
+    if (!(filePtr->mask & mask) || (filePtr->readyMask & mask)) {
+	return;
+    }
+
+    /*
+     * This is an interesting event, so put it onto the event queue.
+     */
+
+    filePtr->readyMask |= mask;
+    fileEvPtr = (FileHandlerEvent *) Tcl_Alloc(sizeof(FileHandlerEvent));
+    fileEvPtr->header.proc = FileHandlerEventProc;
+    fileEvPtr->fd = filePtr->fd;
+    Tcl_QueueEvent((Tcl_Event *) fileEvPtr, TCL_QUEUE_TAIL);
+
+    /*
+     * Process events on the Tcl event queue before returning to Xt.
+     */
+
+    Tcl_ServiceAll();
+}
+
 /*
  *----------------------------------------------------------------------
  *
@@ -271,282 +506,11 @@ CreateFileHandler(
     }
     filePtr->mask = mask;
 }
-
-/*
- *----------------------------------------------------------------------
- *
- * DeleteFileHandler --
- *
- *	Cancel a previously-arranged callback arrangement for a file.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	If a callback was previously registered on file, remove it.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-DeleteFileHandler(
-    int fd)			/* Stream id for which to remove callback
-				 * procedure. */
-{
-    FileHandler *filePtr, *prevPtr;
-
-    if (!initialized) {
-	InitNotifier();
-    }
-
-    TclSetAppContext(NULL);
-
-    /*
-     * Find the entry for the given file (and return if there isn't one).
-     */
-
-    for (prevPtr = NULL, filePtr = notifier.firstFileHandlerPtr; ;
-	    prevPtr = filePtr, filePtr = filePtr->nextPtr) {
-	if (filePtr == NULL) {
-	    return;
-	}
-	if (filePtr->fd == fd) {
-	    break;
-	}
-    }
-
-    /*
-     * Clean up information in the callback record.
-     */
-
-    if (prevPtr == NULL) {
-	notifier.firstFileHandlerPtr = filePtr->nextPtr;
-    } else {
-	prevPtr->nextPtr = filePtr->nextPtr;
-    }
-    if (filePtr->mask & TCL_READABLE) {
-	XtRemoveInput(filePtr->read);
-    }
-    if (filePtr->mask & TCL_WRITABLE) {
-	XtRemoveInput(filePtr->write);
-    }
-    if (filePtr->mask & TCL_EXCEPTION) {
-	XtRemoveInput(filePtr->except);
-    }
-    Tcl_Free(filePtr);
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * FileProc --
- *
- *	These procedures are called by Xt when a file becomes readable,
- *	writable, or has an exception.
- *
- * Results:
- *	None.
- *
- * Side effects:
- *	Makes an entry on the Tcl event queue if the event is interesting.
- *
- *----------------------------------------------------------------------
- */
-
-static void
-FileProc(
-    XtPointer clientData,
-    int *fd,
-    XtInputId *id)
-{
-    FileHandler *filePtr = (FileHandler *) clientData;
-    FileHandlerEvent *fileEvPtr;
-    int mask = 0;
-
-    /*
-     * Determine which event happened.
-     */
-
-    if (*id == filePtr->read) {
-	mask = TCL_READABLE;
-    } else if (*id == filePtr->write) {
-	mask = TCL_WRITABLE;
-    } else if (*id == filePtr->except) {
-	mask = TCL_EXCEPTION;
-    }
-
-    /*
-     * Ignore unwanted or duplicate events.
-     */
-
-    if (!(filePtr->mask & mask) || (filePtr->readyMask & mask)) {
-	return;
-    }
-
-    /*
-     * This is an interesting event, so put it onto the event queue.
-     */
-
-    filePtr->readyMask |= mask;
-    fileEvPtr = (FileHandlerEvent *) Tcl_Alloc(sizeof(FileHandlerEvent));
-    fileEvPtr->header.proc = FileHandlerEventProc;
-    fileEvPtr->fd = filePtr->fd;
-    Tcl_QueueEvent((Tcl_Event *) fileEvPtr, TCL_QUEUE_TAIL);
-
-    /*
-     * Process events on the Tcl event queue before returning to Xt.
-     */
-
-    Tcl_ServiceAll();
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * FileHandlerEventProc --
- *
- *	This procedure is called by Tcl_ServiceEvent when a file event reaches
- *	the front of the event queue. This procedure is responsible for
- *	actually handling the event by invoking the callback for the file
- *	handler.
- *
- * Results:
- *	Returns 1 if the event was handled, meaning it should be removed from
- *	the queue. Returns 0 if the event was not handled, meaning it should
- *	stay on the queue. The only time the event isn't handled is if the
- *	TCL_FILE_EVENTS flag bit isn't set.
- *
- * Side effects:
- *	Whatever the file handler's callback procedure does.
- *
- *----------------------------------------------------------------------
- */
-
-static int
-FileHandlerEventProc(
-    Tcl_Event *evPtr,		/* Event to service. */
-    int flags)			/* Flags that indicate what events to handle,
-				 * such as TCL_FILE_EVENTS. */
-{
-    FileHandler *filePtr;
-    FileHandlerEvent *fileEvPtr = (FileHandlerEvent *) evPtr;
-    int mask;
-
-    if (!(flags & TCL_FILE_EVENTS)) {
-	return 0;
-    }
-
-    /*
-     * Search through the file handlers to find the one whose handle matches
-     * the event. We do this rather than keeping a pointer to the file handler
-     * directly in the event, so that the handler can be deleted while the
-     * event is queued without leaving a dangling pointer.
-     */
-
-    for (filePtr = notifier.firstFileHandlerPtr; filePtr != NULL;
-	    filePtr = filePtr->nextPtr) {
-	if (filePtr->fd != fileEvPtr->fd) {
-	    continue;
-	}
-
-	/*
-	 * The code is tricky for two reasons:
-	 * 1. The file handler's desired events could have changed since the
-	 *    time when the event was queued, so AND the ready mask with the
-	 *    desired mask.
-	 * 2. The file could have been closed and re-opened since the time
-	 *    when the event was queued. This is why the ready mask is stored
-	 *    in the file handler rather than the queued event: it will be
-	 *    zeroed when a new file handler is created for the newly opened
-	 *    file.
-	 */
-
-	mask = filePtr->readyMask & filePtr->mask;
-	filePtr->readyMask = 0;
-	if (mask != 0) {
-	    filePtr->proc(filePtr->clientData, mask);
-	}
-	break;
-    }
-    return 1;
-}
-
-/*
- *----------------------------------------------------------------------
- *
- * WaitForEvent --
- *
- *	This function is called by Tcl_DoOneEvent to wait for new events on
- *	the message queue. If the block time is 0, then Tcl_WaitForEvent just
- *	polls without blocking.
- *
- * Results:
- *	Returns 1 if an event was found, else 0. This ensures that
- *	Tcl_DoOneEvent will return 1, even if the event is handled by non-Tcl
- *	code.
- *
- * Side effects:
- *	Queues file events that are detected by the select.
- *
- *----------------------------------------------------------------------
- */
-
-static int
-WaitForEvent(
-    const Tcl_Time *timePtr)	/* Maximum block time, or NULL. */
-{
-    int timeout;
-
-    if (!initialized) {
-	InitNotifier();
-    }
-
-    TclSetAppContext(NULL);
-
-    if (timePtr) {
-	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
-	if (timeout == 0) {
-	    if (XtAppPending(notifier.appContext)) {
-		goto process;
-	    } else {
-		return 0;
-	    }
-	} else {
-	    Tcl_SetTimer(timePtr);
-	}
-    }
-
-  process:
-    XtAppProcessEvent(notifier.appContext, XtIMAll);
-    return 1;
-}
-
-static void
-SetTimer(const Tcl_Time *timePtr)	/* Timeout value, may be NULL. */
-{
-    unsigned long timeout;
-
-    if (!initialized) {
-	InitNotifier();
-    }
-
-    TclSetAppContext(NULL);
-    if (notifier.currentTimeout != 0) {
-	XtRemoveTimeOut(notifier.currentTimeout);
-    }
-    if (timePtr) {
-	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
-	notifier.currentTimeout = XtAppAddTimeOut(notifier.appContext,
-		timeout, TimerProc, NULL);
-    } else {
-	notifier.currentTimeout = 0;
-    }
-}
 
 static void InitNotifier(void)
 {
-    static const Tcl_NotifierProcs np =
-	SetTimer,
+    static Tcl_NotifierProcs np = {
+        SetTimer,
 	WaitForEvent,
 	CreateFileHandler,
 	DeleteFileHandler,
@@ -559,7 +523,6 @@ static void InitNotifier(void)
     initialized = 1;
     Tcl_CreateExitHandler(NotifierExitHandler, NULL);
 }
-
 
 static PyObject*
 start(PyObject* unused, PyObject* args)
