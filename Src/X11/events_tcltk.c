@@ -1,42 +1,28 @@
 #include <Python.h>
-
-#include <X11/Intrinsic.h>
-#include "tclInt.h"
-#include "tcl.h"
-#include "tkInt.h"
 #include <stdbool.h>
+#include <X11/Intrinsic.h>
+
+#define TCL_THREADS
+
+#include "tcl.h"
+#include "tk.h"
 
 
 static PyThread_type_lock tcl_lock = 0;
 
-static Tcl_ThreadDataKey state_key;
+extern Tcl_ThreadDataKey state_key;
 typedef PyThreadState *ThreadSpecificData;
-#define tcl_tstate \
-    (*(PyThreadState**)Tcl_GetThreadData(&state_key, sizeof(PyThreadState*)))
 
 #define ENTER_TCL \
     { PyThreadState *tstate = PyThreadState_Get(); \
       Py_BEGIN_ALLOW_THREADS \
       if(tcl_lock)PyThread_acquire_lock(tcl_lock, 1); \
-      tcl_tstate = tstate;
+      (*(PyThreadState**)Tcl_GetThreadData(&state_key, sizeof(PyThreadState*))) = tstate;
 
 #define LEAVE_TCL \
-    tcl_tstate = NULL; \
+    (*(PyThreadState**)Tcl_GetThreadData(&state_key, sizeof(PyThreadState*))) = NULL; \
     if(tcl_lock)PyThread_release_lock(tcl_lock); \
     Py_END_ALLOW_THREADS}
-
-#define ENTER_PYTHON \
-    { PyThreadState *tstate = tcl_tstate; tcl_tstate = NULL; \
-      if(tcl_lock) \
-        PyThread_release_lock(tcl_lock); \
-      PyEval_RestoreThread((tstate)); }
-
-#define LEAVE_PYTHON \
-    { PyThreadState *tstate = PyEval_SaveThread(); \
-      if(tcl_lock)PyThread_acquire_lock(tcl_lock, 1); \
-      tcl_tstate = tstate; }
-
-
 
 
 static bool threaded = 0;
@@ -72,67 +58,11 @@ typedef struct {
 } FileHandlerEvent;
 
 static struct NotifierState {
-    XtAppContext appContext;	/* The context used by the Xt notifier. Can be
-				 * set with TclSetAppContext. */
-    int appContextCreated;	/* Was it created by us? */
+    XtAppContext appContext;	/* The context used by the Xt notifier. */
     XtIntervalId currentTimeout;/* Handle of current timer. */
     FileHandler *firstFileHandlerPtr;
 				/* Pointer to head of file handler list. */
 } notifier;
-
-static int initialized = 0;
-
-static void InitNotifier(void);
-
-static XtAppContext TclSetAppContext(XtAppContext appContext)
-{
-fprintf(stderr, "In TclSetAppContext\n"); fflush(stderr);
-    if (!initialized) {
-	InitNotifier();
-    }
-
-    /*
-     * If we already have a context we check whether we were asked to set a
-     * new context. If so, we panic because we try to prevent switching
-     * contexts by mistake. Otherwise, we return the one we have.
-     */
-
-    if (notifier.appContext != NULL) {
-	if (appContext != NULL) {
-	    /*
-	     * We already have a context. We do not allow switching contexts
-	     * after initialization, so we panic.
-	     */
-
-	    Tcl_Panic("TclSetAppContext: multiple application contexts");
-	}
-    } else {
-	/*
-	 * If we get here we have not yet gotten a context, so either create
-	 * one or use the one supplied by our caller.
-	 */
-
-	if (appContext == NULL) {
-	    /*
-	     * We must create a new context and tell our caller what it is, so
-	     * she can use it too.
-	     */
-
-	    notifier.appContext = XtCreateApplicationContext();
-	    notifier.appContextCreated = 1;
-	} else {
-	    /*
-	     * Otherwise we remember the context that our caller gave us and
-	     * use it.
-	     */
-
-	    notifier.appContextCreated = 0;
-	    notifier.appContext = appContext;
-	}
-    }
-
-    return notifier.appContext;
-}
 
 /*
  *----------------------------------------------------------------------
@@ -151,9 +81,7 @@ fprintf(stderr, "In TclSetAppContext\n"); fflush(stderr);
  */
 
 static void
-TimerProc(
-    TCL_UNUSED(XtPointer),
-    XtIntervalId *id)
+TimerProc(XtPointer unused, XtIntervalId *id)
 {
 fprintf(stderr, "In TimerProc\n"); fflush(stderr);
     if (*id != notifier.currentTimeout) {
@@ -169,12 +97,7 @@ SetTimer(const Tcl_Time *timePtr)
 {
     unsigned long timeout;
 fprintf(stderr, "In SetTimer\n"); fflush(stderr);
-
-    if (!initialized) {
-	InitNotifier();
-    }
-
-    TclSetAppContext(NULL);
+    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
     if (notifier.currentTimeout != 0) {
 	XtRemoveTimeOut(notifier.currentTimeout);
     }
@@ -213,14 +136,7 @@ WaitForEvent(
 {
     int timeout;
 fprintf(stderr, "Starting WaitForEvent\n"); fflush(stderr);
-    PyThreadState *tstate = PyThreadState_Get();
-
-    if (!initialized) {
-	InitNotifier();
-    }
-
-    TclSetAppContext(NULL);
-
+    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
     if (timePtr) {
 	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
 	if (timeout == 0) {
@@ -236,9 +152,7 @@ fprintf(stderr, "Leaving WaitForEvent 0\n"); fflush(stderr);
     }
 
   process:
-ENTER_TCL
     XtAppProcessEvent(notifier.appContext, XtIMAll);
-LEAVE_TCL
 fprintf(stderr, "Leaving WaitForEvent\n"); fflush(stderr);
     return 1;
 }
@@ -342,13 +256,7 @@ DeleteFileHandler(
 {
     FileHandler *filePtr, *prevPtr;
 fprintf(stderr, "In DeleteFileHandler\n"); fflush(stderr);
-
-    if (!initialized) {
-	InitNotifier();
-    }
-
-    TclSetAppContext(NULL);
-
+    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
     /*
      * Find the entry for the given file (and return if there isn't one).
      */
@@ -385,7 +293,7 @@ fprintf(stderr, "In DeleteFileHandler\n"); fflush(stderr);
 }
 
 static void
-NotifierExitHandler(TCL_UNUSED(void *))
+NotifierExitHandler(void *unused)
 {
 fprintf(stderr, "in NotifierExitHandler\n"); fflush(stderr);
     if (notifier.currentTimeout != 0) {
@@ -394,12 +302,10 @@ fprintf(stderr, "in NotifierExitHandler\n"); fflush(stderr);
     for (; notifier.firstFileHandlerPtr != NULL; ) {
 	Tcl_DeleteFileHandler(notifier.firstFileHandlerPtr->fd);
     }
-    if (notifier.appContextCreated) {
+    if (notifier.appContext) {
 	XtDestroyApplicationContext(notifier.appContext);
-	notifier.appContextCreated = 0;
 	notifier.appContext = NULL;
     }
-    initialized = 0;
 }
 
 /*
@@ -464,11 +370,7 @@ fprintf(stderr, "Starting FileProc\n"); fflush(stderr);
      * Process events on the Tcl event queue before returning to Xt.
      */
 
-fprintf(stderr, "In FileProc, getting GIL\n"); fflush(stderr);
-    ENTER_TCL
     Tcl_ServiceAll();
-    LEAVE_TCL
-fprintf(stderr, "Leaving FileProc\n"); fflush(stderr);
 }
 
 /*
@@ -501,12 +403,7 @@ CreateFileHandler(
 {
     FileHandler *filePtr;
 fprintf(stderr, "In CreateFileHandler\n"); fflush(stderr);
-
-    if (!initialized) {
-	InitNotifier();
-    }
-
-    TclSetAppContext(NULL);
+    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
 
     for (filePtr = notifier.firstFileHandlerPtr; filePtr != NULL;
 	    filePtr = filePtr->nextPtr) {
@@ -535,7 +432,7 @@ fprintf(stderr, "In CreateFileHandler\n"); fflush(stderr);
     if (mask & TCL_READABLE) {
 	if (!(filePtr->mask & TCL_READABLE)) {
 	    filePtr->read = XtAppAddInput(notifier.appContext, fd,
-		    INT2PTR(XtInputReadMask), FileProc, filePtr);
+		    (void *)(intptr_t)XtInputReadMask, FileProc, filePtr);
 	}
     } else {
 	if (filePtr->mask & TCL_READABLE) {
@@ -545,7 +442,7 @@ fprintf(stderr, "In CreateFileHandler\n"); fflush(stderr);
     if (mask & TCL_WRITABLE) {
 	if (!(filePtr->mask & TCL_WRITABLE)) {
 	    filePtr->write = XtAppAddInput(notifier.appContext, fd,
-		    INT2PTR(XtInputWriteMask), FileProc, filePtr);
+		    (void *)(intptr_t)XtInputWriteMask, FileProc, filePtr);
 	}
     } else {
 	if (filePtr->mask & TCL_WRITABLE) {
@@ -555,7 +452,7 @@ fprintf(stderr, "In CreateFileHandler\n"); fflush(stderr);
     if (mask & TCL_EXCEPTION) {
 	if (!(filePtr->mask & TCL_EXCEPTION)) {
 	    filePtr->except = XtAppAddInput(notifier.appContext, fd,
-		    INT2PTR(XtInputExceptMask), FileProc, filePtr);
+		    (void *)(intptr_t)XtInputExceptMask, FileProc, filePtr);
 	}
     } else {
 	if (filePtr->mask & TCL_EXCEPTION) {
@@ -574,11 +471,7 @@ static void InitNotifier(void)
 	DeleteFileHandler,
 	NULL, NULL, NULL, NULL
     };
-    if (TclInExit()) {
-	return;
-    }
     Tcl_SetNotifier(&np);
-    initialized = 1;
     Tcl_CreateExitHandler(NotifierExitHandler, NULL);
 }
 
@@ -589,7 +482,6 @@ static int counter = 0;
     int *oldFramePtr;
     int done;
     int oldMode = Tcl_SetServiceMode(TCL_SERVICE_ALL);
-    PyThreadState* tstate = PyThreadState_Get();
 
     if (threaded && thread_id != Tcl_GetCurrentThread()) {
         PyErr_SetString(PyExc_RuntimeError,
@@ -601,11 +493,12 @@ static int counter = 0;
     framePtr = &done;
     done = 0;
 
+    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
     if (threaded) {
         ENTER_TCL
         while (!done) {
 fprintf(stderr, "Calling XtAppProcessEvent %d\n", counter); fflush(stderr);
-            XtAppProcessEvent(TclSetAppContext(NULL), XtIMAll);
+            XtAppProcessEvent(notifier.appContext, XtIMAll);
 fprintf(stderr, "After calling XtAppProcessEvent %d\n", counter++); fflush(stderr);
         }
         LEAVE_TCL

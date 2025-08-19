@@ -59,7 +59,7 @@ extensions.append(extension)
 extension = Extension("guitk.events_tcltk",
                       event_tcltk_sources,
                       include_dirs=include_dirs+["/usr/include/tcl8.6/tcl-private/generic/", "/usr/include/tcl8.6/tcl-private/unix/", "/usr/include/tcl8.6/tk-private/generic/", "/usr/include/tcl8.6/tk-private/unix/"],
-                      extra_link_args=extra_link_args + ["-lXt", "-ltcl8.6"],
+                      extra_link_args=extra_link_args + ["-lXt", "-ltcl8.6", "/usr/lib/python3.12/lib-dynload/_tkinter.cpython-312-x86_64-linux-gnu.so"],
                       )
 
 extensions.append(extension)
