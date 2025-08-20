@@ -99,7 +99,6 @@ SetTimer(const Tcl_Time *timePtr)
 {
     unsigned long timeout;
 fprintf(stderr, "In SetTimer\n"); fflush(stderr);
-    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
     if (notifier.currentTimeout != 0) {
 	XtRemoveTimeOut(notifier.currentTimeout);
     }
@@ -138,7 +137,6 @@ WaitForEvent(
 {
     int timeout;
 fprintf(stderr, "Starting WaitForEvent\n"); fflush(stderr);
-    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
     if (timePtr) {
 	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
 	if (timeout == 0) {
@@ -258,7 +256,6 @@ DeleteFileHandler(
 {
     FileHandler *filePtr, *prevPtr;
 fprintf(stderr, "In DeleteFileHandler\n"); fflush(stderr);
-    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
     /*
      * Find the entry for the given file (and return if there isn't one).
      */
@@ -405,8 +402,6 @@ CreateFileHandler(
 {
     FileHandler *filePtr;
 fprintf(stderr, "In CreateFileHandler\n"); fflush(stderr);
-    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
-
     for (filePtr = notifier.firstFileHandlerPtr; filePtr != NULL;
 	    filePtr = filePtr->nextPtr) {
 	if (filePtr->fd == fd) {
@@ -495,7 +490,6 @@ static int counter = 0;
     framePtr = &done;
     done = 0;
 
-    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
     if (threaded) {
         ENTER_TCL
         while (!done) {
@@ -557,7 +551,6 @@ static PyObject* simple(PyObject* unused, PyObject* args) {
     int argc = 0;
     Display *dpy = NULL;
 
-    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
     dpy = XOpenDisplay(NULL);
     XtDisplayInitialize(notifier.appContext, dpy, "hello", "Hello", NULL, 0, &argc, NULL);
     top = XtAppCreateShell("hello", "Hello", applicationShellWidgetClass, dpy, NULL, 0);
@@ -613,7 +606,7 @@ PyObject* PyInit_events_tcltk(void)
     Tcl_DeleteInterp(interpreter);
     if (threaded) thread_id = Tcl_GetCurrentThread();
     XtToolkitInitialize();
-    notifier.appContext = XtCreateApplicationContext();
     InitNotifier();
+    notifier.appContext = XtCreateApplicationContext();
     return PyModule_Create(&moduledef);
 }   
