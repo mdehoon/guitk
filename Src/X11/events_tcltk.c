@@ -1,6 +1,8 @@
 #include <Python.h>
 #include <stdbool.h>
 #include <X11/Intrinsic.h>
+#include <X11/StringDefs.h>
+#include <X11/Shell.h>
 
 #define TCL_THREADS
 
@@ -62,7 +64,7 @@ static struct NotifierState {
     XtIntervalId currentTimeout;/* Handle of current timer. */
     FileHandler *firstFileHandlerPtr;
 				/* Pointer to head of file handler list. */
-} notifier;
+} notifier = {NULL, 0, NULL};
 
 /*
  *----------------------------------------------------------------------
@@ -509,13 +511,84 @@ fprintf(stderr, "After calling XtAppProcessEvent %d\n", counter++); fflush(stder
     return Py_None;
 }
 
+/* Callback to handle mouse clicks */
+static void button_callback(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
+    if (event->type == ButtonPress) {
+        printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Xt Button clicked!\n");
+    }
+}
+
+/* Expose handler to draw the button rectangle + label */
+static void expose_callback(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
+    if (event->type == Expose) {
+        Display *dpy = XtDisplay(w);
+        Window win = XtWindow(w);
+        GC gc = XCreateGC(dpy, win, 0, NULL);
+
+        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-72-*-*-*-*-*-*-*");
+        if (font) {
+            XSetFont(dpy, gc, font->fid);
+        }
+
+
+        /* Draw rectangle */
+        XDrawRectangle(dpy, win, gc, 10, 10, 380, 80);
+
+        /* Draw centered text */
+        const char *msg = "Xt window";
+        int len = strlen(msg);
+        int dir, asc, desc;
+        XCharStruct overall;
+        XTextExtents(font, msg, len, &dir, &asc, &desc, &overall);
+
+        int x = (400 - overall.width) / 2;
+	int y = (100 + asc - desc) / 2;
+
+        XDrawString(dpy, win, gc, x, y, msg, len);
+
+        XFreeGC(dpy, gc);
+        if (font) XFreeFont(dpy, font);
+    }
+}
+
+
+static PyObject* simple(PyObject* unused, PyObject* args) {
+    Widget top, button;
+    int argc = 0;
+    Display *dpy = NULL;
+
+    if (notifier.appContext == NULL) notifier.appContext = XtCreateApplicationContext();
+    dpy = XOpenDisplay(NULL);
+    XtDisplayInitialize(notifier.appContext, dpy, "hello", "Hello", NULL, 0, &argc, NULL);
+    top = XtAppCreateShell("hello", "Hello", applicationShellWidgetClass, dpy, NULL, 0);
+    /* Create a simple widget (core) to act as our button */
+    button = XtVaCreateManagedWidget("button",
+                                     widgetClass, top,
+                                     XtNwidth, 400,
+                                     XtNheight, 100,
+                                     NULL);
+
+    /* Add event handlers for drawing and clicking */
+    XtAddEventHandler(button, ExposureMask, False, expose_callback, NULL);
+    XtAddEventHandler(button, ButtonPressMask, False, button_callback, NULL);
+
+    XtRealizeWidget(top);
+    Py_INCREF(Py_None);
+    return Py_None;
+}
+
 static struct PyMethodDef methods[] = {
     {"start",
      (PyCFunction)start,
      METH_NOARGS,
      "Starts the Tcl/Tk event loop."
     }, 
-   {NULL,          NULL, 0, NULL} /* sentinel */
+    {"simple",
+     (PyCFunction)simple,
+     METH_NOARGS,
+     "Creates a simple X11 window using X/Xt only."
+    },
+    {NULL, NULL, 0, NULL} /* sentinel */
 };
 
 static struct PyModuleDef moduledef = {
@@ -540,6 +613,7 @@ PyObject* PyInit_events_tcltk(void)
     Tcl_DeleteInterp(interpreter);
     if (threaded) thread_id = Tcl_GetCurrentThread();
     XtToolkitInitialize();
+    notifier.appContext = XtCreateApplicationContext();
     InitNotifier();
     return PyModule_Create(&moduledef);
 }   
