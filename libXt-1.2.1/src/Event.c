@@ -1504,6 +1504,86 @@ XtDispatchEvent(XEvent *event)
     return was_dispatched;
 }
 
+Boolean
+MyXtDispatchEvent(XEvent *event)
+{
+    Boolean was_dispatched, safe;
+    int dispatch_level;
+    int starting_count;
+    XtPerDisplay pd;
+    Time time = 0;
+    XtEventDispatchProc dispatch = _XtDefaultDispatcher;
+    XtAppContext app = XtDisplayToApplicationContext(event->xany.display);
+
+    LOCK_APP(app);
+    dispatch_level = ++app->dispatch_level;
+    starting_count = app->destroy_count;
+
+    switch (event->type) {
+    case KeyPress:
+    case KeyRelease:
+        time = event->xkey.time;
+        break;
+    case ButtonPress:
+    case ButtonRelease:
+        time = event->xbutton.time;
+        break;
+    case MotionNotify:
+        time = event->xmotion.time;
+        break;
+    case EnterNotify:
+    case LeaveNotify:
+        time = event->xcrossing.time;
+        break;
+    case PropertyNotify:
+        time = event->xproperty.time;
+        break;
+    case SelectionClear:
+        time = event->xselectionclear.time;
+        break;
+
+    case MappingNotify:
+        _XtRefreshMapping(event, True);
+        break;
+    }
+    pd = _XtGetPerDisplay(event->xany.display);
+
+    if (time)
+        pd->last_timestamp = time;
+    pd->last_event = *event;
+
+    if (pd->dispatcher_list) {
+        dispatch = pd->dispatcher_list[event->type];
+        if (dispatch == NULL)
+            dispatch = _XtDefaultDispatcher;
+    }
+    was_dispatched = (*dispatch) (event);
+
+    /*
+     * To make recursive XtDispatchEvent work, we need to do phase 2 destroys
+     * only on those widgets destroyed by this particular dispatch.
+     *
+     */
+
+    if (app->destroy_count > starting_count)
+        _XtDoPhase2Destroy(app, dispatch_level);
+
+    app->dispatch_level = dispatch_level - 1;
+
+    if ((safe = _XtSafeToDestroy(app))) {
+        if (app->dpy_destroy_count != 0)
+            _XtCloseDisplays(app);
+        if (app->free_bindings)
+            _XtDoFreeBindings(app);
+    }
+    UNLOCK_APP(app);
+    LOCK_PROCESS;
+    if (_XtAppDestroyCount != 0 && safe)
+        _XtDestroyAppContexts();
+    UNLOCK_PROCESS;
+    return was_dispatched;
+}
+
 static void
 GrabDestroyCallback(Widget widget,
                     XtPointer closure _X_UNUSED,
