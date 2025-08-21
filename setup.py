@@ -44,7 +44,6 @@ else:
                            "libXt-1.2.1/src/ArgList.c",
                            "libXt-1.2.1/src/Callback.c",
                            "libXt-1.2.1/src/Composite.c",
-                           "libXt-1.2.1/src/Constraint.c",
                            "libXt-1.2.1/src/Convert.c",
                            "libXt-1.2.1/src/Converters.c",
                            "libXt-1.2.1/src/Core.c",

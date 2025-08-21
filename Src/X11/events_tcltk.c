@@ -3,6 +3,8 @@
 #include <X11/Intrinsic.h>
 #include <X11/StringDefs.h>
 #include <X11/Shell.h>
+#include <X11/Xatom.h>
+
 
 #define TCL_THREADS
 
@@ -545,6 +547,26 @@ static void expose_callback(Widget w, XtPointer client_data, XEvent *event, Bool
     }
 }
 
+static Atom wm_delete;
+
+static void wm_protocol_handler(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
+    if (event->type == ClientMessage) {
+        if ((Atom) event->xclient.data.l[0] == wm_delete) {
+            printf("WM_DELETE_WINDOW received, destroying widget...\n");
+            XtDestroyWidget(w);
+        }
+    }
+}
+
+static void
+delete_window_handler(Widget w, XtPointer client_data, XtPointer call_data)
+{
+    /* Perform cleanup here */
+fprintf(stderr, "in delete_window_handler\n"); fflush(stderr);
+    XtDestroyApplicationContext(XtWidgetToApplicationContext(w));
+fprintf(stderr, "leaving delete_window_handler\n"); fflush(stderr);
+    exit(0);
+}
 
 static PyObject* simple(PyObject* unused, PyObject* args) {
     Widget top, button;
@@ -554,6 +576,7 @@ static PyObject* simple(PyObject* unused, PyObject* args) {
     dpy = XOpenDisplay(NULL);
     XtDisplayInitialize(notifier.appContext, dpy, "hello", "Hello", NULL, 0, &argc, NULL);
     top = XtAppCreateShell("hello", "Hello", applicationShellWidgetClass, dpy, NULL, 0);
+
     /* Create a simple widget (core) to act as our button */
     button = XtVaCreateManagedWidget("button",
                                      widgetClass, top,
@@ -566,6 +589,14 @@ static PyObject* simple(PyObject* unused, PyObject* args) {
     XtAddEventHandler(button, ButtonPressMask, False, button_callback, NULL);
 
     XtRealizeWidget(top);
+
+    /* Ask window manager to send WM_DELETE_WINDOW instead of killing us */
+    wm_delete = XInternAtom(XtDisplay(top), "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(XtDisplay(top), XtWindow(top), &wm_delete, 1);
+
+    XtAddEventHandler(top, NoEventMask, True, wm_protocol_handler, NULL);
+    XtAddCallback(top, XtNdestroyCallback, delete_window_handler, NULL);
+
     Py_INCREF(Py_None);
     return Py_None;
 }

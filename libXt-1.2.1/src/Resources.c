@@ -438,21 +438,6 @@ _XtResourceDependencies(WidgetClass wc)
 void
 _XtConstraintResDependencies(ConstraintWidgetClass wc)
 {
-    if (wc == (ConstraintWidgetClass) constraintWidgetClass) {
-        _XtDependencies(&(wc->constraint_class.resources),
-                        &(wc->constraint_class.num_resources),
-                        (XrmResourceList *) NULL, (unsigned) 0, (unsigned) 0);
-    }
-    else {
-        ConstraintWidgetClass sc;
-
-        sc = (ConstraintWidgetClass) wc->core_class.superclass;
-        _XtDependencies(&(wc->constraint_class.resources),
-                        &(wc->constraint_class.num_resources),
-                        (XrmResourceList *) sc->constraint_class.resources,
-                        sc->constraint_class.num_resources,
-                        sc->constraint_class.constraint_size);
-    }
 }                               /* _XtConstraintResDependencies */
 
 XrmResourceList *
