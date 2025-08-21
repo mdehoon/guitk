@@ -579,8 +579,7 @@ _XtWaitForSomething(XtAppContext app,
                     _XtBoolean ignoreInputs,
                     _XtBoolean ignoreSignals,
                     _XtBoolean block,
-                    _XtBoolean drop_lock, /* only needed with XTHREADS */
-                    unsigned long *howlong)
+                    _XtBoolean drop_lock /* only needed with XTHREADS */ )
 {
     wait_times_t wt;
     wait_fds_t wf;
@@ -604,7 +603,7 @@ _XtWaitForSomething(XtAppContext app,
     drop_lock = drop_lock;      /* avoid unsed warning */
 #endif
 
-    InitTimes((Boolean) block, howlong, &wt);
+    InitTimes((Boolean) block, NULL, &wt);
 
 #ifdef USE_POLL
     wf.fdlist = NULL;
@@ -616,7 +615,7 @@ _XtWaitForSomething(XtAppContext app,
     app->rebuild_fdlist = TRUE;
 
     while (1) {
-        AdjustTimes(app, (Boolean) block, howlong, (Boolean) ignoreTimers, &wt);
+        AdjustTimes(app, (Boolean) block, NULL, (Boolean) ignoreTimers, &wt);
 
         if (block && app->block_hook_list) {
             BlockHook hook;
@@ -664,8 +663,6 @@ _XtWaitForSomething(XtAppContext app,
 
                     while (se_ptr != NULL) {
                         if (se_ptr->se_notice) {
-                            if (block && howlong != NULL)
-                                AdjustHowLong(howlong, &wt.start_time);
 #ifdef USE_POLL
                             XtStackFree((XtPointer) wf.fdlist, fdlist);
 #endif
@@ -735,16 +732,11 @@ _XtWaitForSomething(XtAppContext app,
 
     if (nfds == 0) {
         /* Timed out */
-        if (howlong)
-            *howlong = (unsigned long) 0;
 #ifdef USE_POLL
         XtStackFree((XtPointer) wf.fdlist, fdlist);
 #endif
         return -1;
     }
-
-    if (block && howlong != NULL)
-        AdjustHowLong(howlong, &wt.start_time);
 
     if (ignoreInputs && ignoreEvents) {
 #ifdef USE_POLL
@@ -1191,8 +1183,7 @@ DoOtherSources(XtAppContext app)
     if (app->input_count > 0) {
         /* Call _XtWaitForSomething to get input queued up */
         (void) _XtWaitForSomething(app,
-                                   TRUE, TRUE, FALSE, TRUE,
-                                   FALSE, TRUE, (unsigned long *) NULL);
+                                   TRUE, TRUE, FALSE, TRUE, FALSE, TRUE);
         DrainQueue();
     }
     if (app->timerQueue != NULL) {      /* check timeout queue */
@@ -1315,8 +1306,7 @@ XtAppNextEvent(XtAppContext app, XEvent *event)
             continue;
 
         d = _XtWaitForSomething(app,
-                                FALSE, FALSE, FALSE, FALSE,
-                                TRUE, TRUE, (unsigned long *) NULL);
+                                FALSE, FALSE, FALSE, FALSE, TRUE, TRUE);
 
         if (d != -1) {
  GotEvent:
@@ -1332,12 +1322,6 @@ XtAppNextEvent(XtAppContext app, XEvent *event)
 }
 
 void
-XtProcessEvent(XtInputMask mask)
-{
-    XtAppProcessEvent(_XtDefaultAppContext(), mask);
-}
-
-void
 XtAppProcessEvent(XtAppContext app, XtInputMask mask)
 {
     int i, d;
@@ -1345,14 +1329,10 @@ XtAppProcessEvent(XtAppContext app, XtInputMask mask)
     struct timeval cur_time;
 
     LOCK_APP(app);
-    if (mask == 0) {
-        UNLOCK_APP(app);
-        return;
-    }
 
     for (;;) {
 
-        if (mask & XtIMSignal && app->signalQueue != NULL) {
+        if (app->signalQueue != NULL) {
             SignalEventRec *se_ptr = app->signalQueue;
 
             while (se_ptr != NULL) {
@@ -1366,7 +1346,7 @@ XtAppProcessEvent(XtAppContext app, XtInputMask mask)
             }
         }
 
-        if (mask & XtIMTimer && app->timerQueue != NULL) {
+        if (app->timerQueue != NULL) {
             X_GETTIMEOFDAY(&cur_time);
             FIXUP_TIMEVAL(cur_time);
             if (IS_AT_OR_AFTER(app->timerQueue->te_timer_value, cur_time)) {
@@ -1385,35 +1365,30 @@ XtAppProcessEvent(XtAppContext app, XtInputMask mask)
             }
         }
 
-        if (mask & XtIMAlternateInput) {
-            if (app->input_count > 0 && app->outstandingQueue == NULL) {
-                /* Call _XtWaitForSomething to get input queued up */
-                (void) _XtWaitForSomething(app,
-                                           TRUE, TRUE, FALSE, TRUE,
-                                           FALSE, TRUE, (unsigned long *) NULL);
-            }
-            if (app->outstandingQueue != NULL) {
-                InputEvent *ie_ptr = app->outstandingQueue;
+        if (app->input_count > 0 && app->outstandingQueue == NULL) {
+            /* Call _XtWaitForSomething to get input queued up */
+            (void) _XtWaitForSomething(app,
+                                       TRUE, TRUE, FALSE, TRUE, FALSE, TRUE);
+        }
+        if (app->outstandingQueue != NULL) {
+            InputEvent *ie_ptr = app->outstandingQueue;
 
-                app->outstandingQueue = ie_ptr->ie_oq;
-                ie_ptr->ie_oq = NULL;
-                IeCallProc(ie_ptr);
-                UNLOCK_APP(app);
-                return;
-            }
+            app->outstandingQueue = ie_ptr->ie_oq;
+            ie_ptr->ie_oq = NULL;
+            IeCallProc(ie_ptr);
+            UNLOCK_APP(app);
+            return;
         }
 
-        if (mask & XtIMXEvent) {
-            for (i = 1; i <= app->count; i++) {
-                d = (i + app->last) % app->count;
-                if (XEventsQueued(app->list[d], QueuedAfterReading))
-                    goto GotEvent;
-            }
-            for (i = 1; i <= app->count; i++) {
-                d = (i + app->last) % app->count;
-                if (XEventsQueued(app->list[d], QueuedAfterFlush))
-                    goto GotEvent;
-            }
+        for (i = 1; i <= app->count; i++) {
+            d = (i + app->last) % app->count;
+            if (XEventsQueued(app->list[d], QueuedAfterReading))
+                goto GotEvent;
+        }
+        for (i = 1; i <= app->count; i++) {
+            d = (i + app->last) % app->count;
+            if (XEventsQueued(app->list[d], QueuedAfterFlush))
+                goto GotEvent;
         }
 
         /* Nothing to do...wait for something */
@@ -1421,14 +1396,9 @@ XtAppProcessEvent(XtAppContext app, XtInputMask mask)
         if (CallWorkProc(app))
             continue;
 
-        d = _XtWaitForSomething(app,
-                                ((mask & XtIMXEvent) ? FALSE : TRUE),
-                                ((mask & XtIMTimer) ? FALSE : TRUE),
-                                ((mask & XtIMAlternateInput) ? FALSE : TRUE),
-                                ((mask & XtIMSignal) ? FALSE : TRUE),
-                                TRUE, TRUE, (unsigned long *) NULL);
+        d = _XtWaitForSomething(app, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE);
 
-        if (mask & XtIMXEvent && d != -1) {
+        if (d != -1) {
  GotEvent:
             XNextEvent(app->list[d], &event);
             app->last = (short) d;
@@ -1505,8 +1475,7 @@ XtAppPending(XtAppContext app)
         /* This won't cause a wait, but will enqueue any input */
 
         if (_XtWaitForSomething(app,
-                                FALSE, TRUE, FALSE, TRUE,
-                                FALSE, TRUE, (unsigned long *) NULL) != -1)
+                                FALSE, TRUE, FALSE, TRUE, FALSE, TRUE) != -1)
             ret |= XtIMXEvent;
         if (app->outstandingQueue != NULL)
             ret |= XtIMAlternateInput;
@@ -1537,9 +1506,7 @@ PeekOtherSources(XtAppContext app)
 
     if (app->input_count > 0) {
         /* Call _XtWaitForSomething to get input queued up */
-        (void) _XtWaitForSomething(app,
-                                   TRUE, TRUE, FALSE, TRUE,
-                                   FALSE, TRUE, (unsigned long *) NULL);
+        (void) _XtWaitForSomething(app, TRUE, TRUE, FALSE, TRUE, FALSE, TRUE);
         if (app->outstandingQueue != NULL)
             return TRUE;
     }
@@ -1592,9 +1559,8 @@ XtAppPeekEvent(XtAppContext app, XEvent *event)
     }
 
     while (1) {
-        d = _XtWaitForSomething(app,
-                                FALSE, FALSE, FALSE, FALSE,
-                                TRUE, TRUE, (unsigned long *) NULL);
+        d = _XtWaitForSomething(app, FALSE, FALSE, FALSE, FALSE,
+                                TRUE, TRUE);
 
         if (d != -1) {          /* event */
  GotEvent:
