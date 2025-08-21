@@ -154,7 +154,7 @@ fprintf(stderr, "Leaving WaitForEvent 0\n"); fflush(stderr);
     }
 
   process:
-    XtAppProcessEvent(notifier.appContext, XtIMAll);
+    MyXtAppProcessEvent(notifier.appContext);
 fprintf(stderr, "Leaving WaitForEvent\n"); fflush(stderr);
     return 1;
 }
@@ -495,9 +495,9 @@ static int counter = 0;
     if (threaded) {
         ENTER_TCL
         while (!done) {
-fprintf(stderr, "Calling XtAppProcessEvent %d\n", counter); fflush(stderr);
-            XtAppProcessEvent(notifier.appContext, XtIMAll);
-fprintf(stderr, "After calling XtAppProcessEvent %d\n", counter++); fflush(stderr);
+fprintf(stderr, "Calling MyXtAppProcessEvent %d\n", counter); fflush(stderr);
+            MyXtAppProcessEvent(notifier.appContext);
+fprintf(stderr, "After calling MyXtAppProcessEvent %d\n", counter++); fflush(stderr);
         }
         LEAVE_TCL
     }

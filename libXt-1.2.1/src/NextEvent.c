@@ -1287,6 +1287,22 @@ _XtRefreshMapping(XEvent *event, _XtBoolean dispatch)
 }
 
 void
+My_XtRefreshMapping(XEvent *event)
+{
+    XtPerDisplay pd;
+
+    LOCK_PROCESS;
+    pd = _XtGetPerDisplay(event->xmapping.display);
+
+    if (event->xmapping.request != MappingPointer &&
+        pd && pd->keysyms && (event->xmapping.serial >= pd->keysyms_serial))
+        _XtBuildKeysymTables(event->xmapping.display, pd);
+
+    XRefreshKeyboardMapping(&event->xmapping);
+    UNLOCK_PROCESS;
+}
+
+void
 XtAppNextEvent(XtAppContext app, XEvent *event)
 {
     int i, d;
@@ -1434,6 +1450,104 @@ XtAppProcessEvent(XtAppContext app, XtInputMask mask)
             app->last = (short) d;
             if (event.xany.type == MappingNotify) {
                 _XtRefreshMapping(&event, False);
+            }
+            XtDispatchEvent(&event);
+            UNLOCK_APP(app);
+            return;
+        }
+
+    }
+}
+
+void
+MyXtAppProcessEvent(XtAppContext app)
+{
+    int i, d;
+    XEvent event;
+    struct timeval cur_time;
+
+    LOCK_APP(app);
+
+    for (;;) {
+
+        if (app->signalQueue != NULL) {
+            SignalEventRec *se_ptr = app->signalQueue;
+
+            while (se_ptr != NULL) {
+                if (se_ptr->se_notice) {
+                    se_ptr->se_notice = FALSE;
+                    SeCallProc(se_ptr);
+                    UNLOCK_APP(app);
+                    return;
+                }
+                se_ptr = se_ptr->se_next;
+            }
+        }
+
+        if (app->timerQueue != NULL) {
+            X_GETTIMEOFDAY(&cur_time);
+            FIXUP_TIMEVAL(cur_time);
+            if (IS_AT_OR_AFTER(app->timerQueue->te_timer_value, cur_time)) {
+                TimerEventRec *te_ptr = app->timerQueue;
+
+                app->timerQueue = app->timerQueue->te_next;
+                te_ptr->te_next = NULL;
+                if (te_ptr->te_proc != NULL)
+                    TeCallProc(te_ptr);
+                LOCK_PROCESS;
+                te_ptr->te_next = freeTimerRecs;
+                freeTimerRecs = te_ptr;
+                UNLOCK_PROCESS;
+                UNLOCK_APP(app);
+                return;
+            }
+        }
+
+        if (app->input_count > 0 && app->outstandingQueue == NULL) {
+            /* Call _XtWaitForSomething to get input queued up */
+            (void) _XtWaitForSomething(app,
+                                       TRUE, TRUE, FALSE, TRUE,
+                                       FALSE, TRUE, (unsigned long *) NULL);
+        }
+        if (app->outstandingQueue != NULL) {
+            InputEvent *ie_ptr = app->outstandingQueue;
+
+            app->outstandingQueue = ie_ptr->ie_oq;
+            ie_ptr->ie_oq = NULL;
+            IeCallProc(ie_ptr);
+            UNLOCK_APP(app);
+            return;
+        }
+
+        for (i = 1; i <= app->count; i++) {
+            d = (i + app->last) % app->count;
+            if (XEventsQueued(app->list[d], QueuedAfterReading))
+                goto GotEvent;
+        }
+        for (i = 1; i <= app->count; i++) {
+            d = (i + app->last) % app->count;
+            if (XEventsQueued(app->list[d], QueuedAfterFlush))
+                goto GotEvent;
+        }
+
+        /* Nothing to do...wait for something */
+
+        if (CallWorkProc(app))
+            continue;
+
+        d = _XtWaitForSomething(app,
+                                FALSE,
+                                FALSE,
+                                FALSE,
+                                FALSE,
+                                TRUE, TRUE, (unsigned long *) NULL);
+
+        if (d != -1) {
+ GotEvent:
+            XNextEvent(app->list[d], &event);
+            app->last = (short) d;
+            if (event.xany.type == MappingNotify) {
+                My_XtRefreshMapping(&event);
             }
             XtDispatchEvent(&event);
             UNLOCK_APP(app);
