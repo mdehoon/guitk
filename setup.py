@@ -72,7 +72,6 @@ else:
                            "libXt-1.2.1/src/ResConfig.c",
                            "libXt-1.2.1/src/Resources.c",
                            "libXt-1.2.1/src/Selection.c",
-                           "libXt-1.2.1/src/SetSens.c",
                            "libXt-1.2.1/src/SetValues.c",
                            "libXt-1.2.1/src/Shell.c",
                            "libXt-1.2.1/src/StringDefs.c",

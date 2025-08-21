@@ -188,7 +188,4 @@ XtCallbackPopdown(Widget widget _X_UNUSED,
     register XtPopdownID id = (XtPopdownID) closure;
 
     XtPopdown(id->shell_widget);
-    if (id->enable_widget != NULL) {
-        XtSetSensitive(id->enable_widget, TRUE);
-    }
 }                               /* XtCallbackPopdown */
