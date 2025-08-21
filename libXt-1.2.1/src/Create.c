@@ -116,6 +116,10 @@ XtInitializeWidgetClass(WidgetClass wc)
             LeaveIfClass(compositeWidgetClass, 0x01 |
                          RectObjClassFlag |
                          WidgetClassFlag | CompositeClassFlag);
+            LeaveIfClass(constraintWidgetClass, 0x01 |
+                         RectObjClassFlag |
+                         WidgetClassFlag |
+                         CompositeClassFlag | ConstraintClassFlag);
             LeaveIfClass(shellWidgetClass, 0x01 |
                          RectObjClassFlag |
                          WidgetClassFlag | CompositeClassFlag | ShellClassFlag);
@@ -233,6 +237,7 @@ CallConstraintInitialize(ConstraintWidgetClass class,
     LOCK_PROCESS;
     superclass = class->core_class.superclass;
     UNLOCK_PROCESS;
+    if (superclass != constraintWidgetClass)
         CallConstraintInitialize((ConstraintWidgetClass) superclass,
                                  req_widget, new_widget, args, num_args);
     LOCK_PROCESS;

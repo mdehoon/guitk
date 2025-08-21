@@ -141,4 +141,3 @@ VendorShellClassRec vendorShellClassRec = {
 externaldef(vendorshellwidgetclass)
 WidgetClass vendorShellWidgetClass = (WidgetClass) (&vendorShellClassRec);
 #endif
-

@@ -72,7 +72,6 @@ in this Software without prior written authorization from The Open Group.
 #include <config.h>
 #endif
 #include "IntrinsicI.h"
-#include <stdio.h>
 
 /*
  *      XtSetValues(), XtSetSubvalues()
@@ -151,6 +150,7 @@ CallConstraintSetValues(ConstraintWidgetClass class,
     Boolean redisplay = FALSE;
     XtSetValuesFunc set_values;
 
+    if ((WidgetClass) class != constraintWidgetClass) {
         ConstraintWidgetClass superclass;
 
         if (class == NULL) {
@@ -168,6 +168,7 @@ CallConstraintSetValues(ConstraintWidgetClass class,
                 CallConstraintSetValues(superclass,
                                         current, request, new, args, num_args);
         }
+    }
     LOCK_PROCESS;
     set_values = class ? class->constraint_class.set_values : NULL;
     UNLOCK_PROCESS;

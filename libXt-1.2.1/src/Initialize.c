@@ -292,6 +292,11 @@ XtToolkitInitialize(void)
     _XtEventInitialize();
     _XtTranslateInitialize();
 
+    /* Some apps rely on old (broken) XtAppPeekEvent behavior */
+    if (getenv("XTAPPPEEKEVENT_SKIPTIMER"))
+        XtAppPeekEvent_SkipTimer = True;
+    else
+        XtAppPeekEvent_SkipTimer = False;
 }
 
 String

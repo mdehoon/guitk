@@ -72,7 +72,6 @@ in this Software without prior written authorization from The Open Group.
 #include <config.h>
 #endif
 #include "IntrinsicI.h"
-#include <stdio.h>
 
 struct _DestroyRec {
     int dispatch_level;
@@ -151,6 +150,8 @@ Phase2Destroy(register Widget widget)
             UNLOCK_PROCESS;
             if (destroy)
                 (*destroy) (widget);
+            if (cwClass == (ConstraintWidgetClass) constraintWidgetClass)
+                break;
             LOCK_PROCESS;
             cwClass = (ConstraintWidgetClass) cwClass->core_class.superclass;
             UNLOCK_PROCESS;
@@ -354,7 +355,6 @@ XtDestroyWidget(Widget widget)
 {
     XtAppContext app;
     DestroyRec *dr;
-fprintf(stderr, "In XtDestroyWidget\n"); fflush(stderr);
 
     app = XtWidgetToApplicationContext(widget);
     LOCK_APP(app);

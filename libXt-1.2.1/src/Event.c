@@ -1598,6 +1598,34 @@ XtRemoveGrab(Widget widget)
 }
 
 void
+XtMainLoop(void)
+{
+    XtAppMainLoop(_XtDefaultAppContext());
+}
+
+void
+XtAppMainLoop(XtAppContext app)
+{
+    XtInputMask m = XtIMAll;
+    XtInputMask t;
+
+    LOCK_APP(app);
+    do {
+        if (m == 0) {
+            m = XtIMAll;
+            /* wait for any event, blocking */
+            XtAppProcessEvent(app, m);
+        }
+        else if (((t = XtAppPending(app)) & m)) {
+            /* wait for certain events, stepping through choices */
+            XtAppProcessEvent(app, t & m);
+        }
+        m >>= 1;
+    } while (app->exit_flag == FALSE);
+    UNLOCK_APP(app);
+}
+
+void
 _XtFreeEventTable(XtEventTable *event_table)
 {
     register XtEventTable event;

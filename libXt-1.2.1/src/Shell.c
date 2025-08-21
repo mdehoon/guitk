@@ -1990,11 +1990,317 @@ isMine(Display *dpy, register XEvent *event, char *arg)
     return FALSE;
 }
 
+static Boolean
+_wait_for_response(ShellWidget w, XEvent *event, unsigned long request_num)
+{
+    XtAppContext app = XtWidgetToApplicationContext((Widget) w);
+    QueryStruct q;
+    unsigned long timeout;
+
+    if (XtIsWMShell((Widget) w))
+        timeout = (unsigned long) ((WMShellWidget) w)->wm.wm_timeout;
+    else
+        timeout = DEFAULT_WM_TIMEOUT;
+
+    XFlush(XtDisplay(w));
+    q.w = (Widget) w;
+    q.request_num = request_num;
+    q.done = FALSE;
+
+    /*
+     * look for match event and discard all prior configures
+     */
+    while (XCheckIfEvent(XtDisplay(w), event, isMine, (char *) &q)) {
+        if (q.done)
+            return TRUE;
+    }
+
+    while (timeout > 0) {
+        if (_XtWaitForSomething(app, FALSE, TRUE, TRUE, TRUE, TRUE,
+#ifdef XTHREADS
+                                FALSE,
+#endif
+                                &timeout) != -1) {
+            while (XCheckIfEvent(XtDisplay(w), event, isMine, (char *) &q)) {
+                if (q.done)
+                    return TRUE;
+            }
+        }
+    }
+    return FALSE;
+}
+
 static XtGeometryResult
 RootGeometryManager(Widget gw,
                     XtWidgetGeometry *request,
                     XtWidgetGeometry *reply _X_UNUSED)
 {
+    register ShellWidget w = (ShellWidget) gw;
+    XWindowChanges values;
+    unsigned int mask = request->request_mode;
+    XEvent event;
+    Boolean wm;
+    register struct _OldXSizeHints *hintp = NULL;
+    int oldx, oldy, oldwidth, oldheight, oldborder_width;
+    unsigned long request_num;
+
+    CALLGEOTAT(_XtGeoTab(1));
+
+    if (XtIsWMShell(gw)) {
+        wm = True;
+        hintp = &((WMShellWidget) w)->wm.size_hints;
+        /* for draft-ICCCM wm's, need to make sure hints reflect
+           (current) reality so client can move and size separately. */
+        hintp->x = w->core.x;
+        hintp->y = w->core.y;
+        hintp->width = w->core.width;
+        hintp->height = w->core.height;
+    }
+    else
+        wm = False;
+
+    oldx = w->core.x;
+    oldy = w->core.y;
+    oldwidth = w->core.width;
+    oldheight = w->core.height;
+    oldborder_width = w->core.border_width;
+
+#define PutBackGeometry() \
+        { w->core.x = (Position) (oldx); \
+          w->core.y = (Position) (oldy); \
+          w->core.width = (Dimension) (oldwidth); \
+          w->core.height = (Dimension) (oldheight); \
+          w->core.border_width = (Dimension) (oldborder_width); }
+
+    memset(&values, 0, sizeof(values));
+    if (mask & CWX) {
+        if (w->core.x == request->x)
+            mask &= (unsigned int) (~CWX);
+        else {
+            w->core.x = (Position) (values.x = request->x);
+            if (wm) {
+                hintp->flags &= ~USPosition;
+                hintp->flags |= PPosition;
+                hintp->x = values.x;
+            }
+        }
+    }
+    if (mask & CWY) {
+        if (w->core.y == request->y)
+            mask &= (unsigned int) (~CWY);
+        else {
+            w->core.y = (Position) (values.y = request->y);
+            if (wm) {
+                hintp->flags &= ~USPosition;
+                hintp->flags |= PPosition;
+                hintp->y = values.y;
+            }
+        }
+    }
+    if (mask & CWBorderWidth) {
+        if (w->core.border_width == request->border_width) {
+            mask &= (unsigned int) (~CWBorderWidth);
+        }
+        else
+            w->core.border_width =
+                (Dimension) (values.border_width = request->border_width);
+    }
+    if (mask & CWWidth) {
+        if (w->core.width == request->width)
+            mask &= (unsigned int) (~CWWidth);
+        else {
+            w->core.width = (Dimension) (values.width = request->width);
+            if (wm) {
+                hintp->flags &= ~USSize;
+                hintp->flags |= PSize;
+                hintp->width = values.width;
+            }
+        }
+    }
+    if (mask & CWHeight) {
+        if (w->core.height == request->height)
+            mask &= (unsigned int) (~CWHeight);
+        else {
+            w->core.height = (Dimension) (values.height = request->height);
+            if (wm) {
+                hintp->flags &= ~USSize;
+                hintp->flags |= PSize;
+                hintp->height = values.height;
+            }
+        }
+    }
+    if (mask & CWStackMode) {
+        values.stack_mode = request->stack_mode;
+        if (mask & CWSibling)
+            values.sibling = XtWindow(request->sibling);
+    }
+
+    if (!XtIsRealized((Widget) w)) {
+        CALLGEOTAT(_XtGeoTrace((Widget) w,
+                               "Shell \"%s\" is not realized, return XtGeometryYes.\n",
+                               XtName((Widget) w)));
+        CALLGEOTAT(_XtGeoTab(-1));
+        return XtGeometryYes;
+    }
+
+    request_num = NextRequest(XtDisplay(w));
+
+    CALLGEOTAT(_XtGeoTrace((Widget) w, "XConfiguring the Shell X window :\n"));
+    CALLGEOTAT(_XtGeoTab(1));
+#ifdef XT_GEO_TATTLER
+    if (mask & CWX) {
+        CALLGEOTAT(_XtGeoTrace((Widget) w, "x = %d\n", values.x));
+    }
+    if (mask & CWY) {
+        CALLGEOTAT(_XtGeoTrace((Widget) w, "y = %d\n", values.y));
+    }
+    if (mask & CWWidth) {
+        CALLGEOTAT(_XtGeoTrace((Widget) w, "width = %d\n", values.width));
+    }
+    if (mask & CWHeight) {
+        CALLGEOTAT(_XtGeoTrace((Widget) w, "height = %d\n", values.height));
+    }
+    if (mask & CWBorderWidth) {
+        CALLGEOTAT(_XtGeoTrace((Widget) w,
+                               "border_width = %d\n", values.border_width));
+    }
+#endif
+    CALLGEOTAT(_XtGeoTab(-1));
+
+    XConfigureWindow(XtDisplay((Widget) w), XtWindow((Widget) w), mask,
+                     &values);
+
+    if (wm && !w->shell.override_redirect
+        && mask & (CWX | CWY | CWWidth | CWHeight | CWBorderWidth)) {
+        _SetWMSizeHints((WMShellWidget) w);
+    }
+
+    if (w->shell.override_redirect) {
+        CALLGEOTAT(_XtGeoTrace
+                   ((Widget) w,
+                    "Shell \"%s\" is override redirect, return XtGeometryYes.\n",
+                    XtName((Widget) w)));
+        CALLGEOTAT(_XtGeoTab(-1));
+        return XtGeometryYes;
+    }
+
+    /* If no non-stacking bits are set, there's no way to tell whether
+       or not this worked, so assume it did */
+
+    if (!(mask & (unsigned) (~(CWStackMode | CWSibling))))
+        return XtGeometryYes;
+
+    if (wm && ((WMShellWidget) w)->wm.wait_for_wm == FALSE) {
+        /* the window manager is sick
+         * so I will do the work and
+         * say no so if a new WM starts up,
+         * or the current one recovers
+         * my size requests will be visible
+         */
+        CALLGEOTAT(_XtGeoTrace
+                   ((Widget) w,
+                    "Shell \"%s\" has wait_for_wm == FALSE, return XtGeometryNo.\n",
+                    XtName((Widget) w)));
+        CALLGEOTAT(_XtGeoTab(-1));
+
+        PutBackGeometry();
+        return XtGeometryNo;
+    }
+
+    if (_wait_for_response(w, &event, request_num)) {
+        /* got an event */
+        if (event.type == ConfigureNotify) {
+
+#define NEQ(x, msk) ((mask & msk) && (values.x != event.xconfigure.x))
+            if (NEQ(x, CWX) ||
+                NEQ(y, CWY) ||
+                NEQ(width, CWWidth) ||
+                NEQ(height, CWHeight) || NEQ(border_width, CWBorderWidth)) {
+#ifdef XT_GEO_TATTLER
+                if (NEQ(x, CWX)) {
+                    CALLGEOTAT(_XtGeoTrace((Widget) w,
+                                           "received Configure X %d\n",
+                                           event.xconfigure.x));
+                }
+                if (NEQ(y, CWY)) {
+                    CALLGEOTAT(_XtGeoTrace((Widget) w,
+                                           "received Configure Y %d\n",
+                                           event.xconfigure.y));
+                }
+                if (NEQ(width, CWWidth)) {
+                    CALLGEOTAT(_XtGeoTrace((Widget) w,
+                                           "received Configure Width %d\n",
+                                           event.xconfigure.width));
+                }
+                if (NEQ(height, CWHeight)) {
+                    CALLGEOTAT(_XtGeoTrace((Widget) w,
+                                           "received Configure Height %d\n",
+                                           event.xconfigure.height));
+                }
+                if (NEQ(border_width, CWBorderWidth)) {
+                    CALLGEOTAT(_XtGeoTrace((Widget) w,
+                                           "received Configure BorderWidth %d\n",
+                                           event.xconfigure.border_width));
+                }
+#endif
+#undef NEQ
+                XPutBackEvent(XtDisplay(w), &event);
+                PutBackGeometry();
+                /*
+                 * We just potentially re-ordered the event queue
+                 * w.r.t. ConfigureNotifies with some trepidation.
+                 * But this is probably a Good Thing because we
+                 * will know the new true state of the world sooner
+                 * this way.
+                 */
+                CALLGEOTAT(_XtGeoTrace((Widget) w,
+                                       "ConfigureNotify failed, return XtGeometryNo.\n"));
+                CALLGEOTAT(_XtGeoTab(-1));
+
+                return XtGeometryNo;
+            }
+            else {
+                w->core.width = (Dimension) event.xconfigure.width;
+                w->core.height = (Dimension) event.xconfigure.height;
+                w->core.border_width =
+                    (Dimension) event.xconfigure.border_width;
+                if (event.xany.send_event ||    /* ICCCM compliant synth */
+                    w->shell.client_specified & _XtShellNotReparented) {
+
+                    w->core.x = (Position) event.xconfigure.x;
+                    w->core.y = (Position) event.xconfigure.y;
+                    w->shell.client_specified |= _XtShellPositionValid;
+                }
+                else
+                    w->shell.client_specified &= ~_XtShellPositionValid;
+                CALLGEOTAT(_XtGeoTrace((Widget) w,
+                                       "ConfigureNotify succeed, return XtGeometryYes.\n"));
+                CALLGEOTAT(_XtGeoTab(-1));
+                return XtGeometryYes;
+            }
+        }
+        else if (!wm) {
+            PutBackGeometry();
+            CALLGEOTAT(_XtGeoTrace((Widget) w,
+                                   "Not wm, return XtGeometryNo.\n"));
+            CALLGEOTAT(_XtGeoTab(-1));
+            return XtGeometryNo;
+        }
+        else
+            XtAppWarningMsg(XtWidgetToApplicationContext((Widget) w),
+                            "internalError", "shell", XtCXtToolkitError,
+                            "Shell's window manager interaction is broken",
+                            NULL, NULL);
+    }
+    else if (wm) {              /* no event */
+        ((WMShellWidget) w)->wm.wait_for_wm = FALSE;    /* timed out; must be broken */
+    }
+    PutBackGeometry();
+#undef PutBackGeometry
+    CALLGEOTAT(_XtGeoTrace((Widget) w,
+                           "Timeout passed?, return XtGeometryNo.\n"));
+    CALLGEOTAT(_XtGeoTab(-1));
+    return XtGeometryNo;
 }
 
 static Boolean
