@@ -741,6 +741,261 @@ FindInputs(XtAppContext app,
 #endif                          /* } */
 }
 
+static void
+MyFindInputs1(XtAppContext app,
+           wait_fds_ptr_t wf,
+           int nfds _X_UNUSED,
+           int *dpy_no,
+           int *found_input)
+{
+    InputEvent *ep;
+    int ii;
+
+#ifdef USE_POLL                 /* { check ready file descriptors block */
+    struct pollfd *fdlp;
+
+    *dpy_no = -1;
+    *found_input = False;
+
+    fdlp = &wf->fdlist[wf->num_dpys];
+    for (ii = wf->num_dpys; ii < wf->fdlistlen; ii++, fdlp++) {
+        XtInputMask condition = 0;
+
+        if (fdlp->revents) {
+            if (fdlp->revents & (XPOLL_READ | POLLHUP | POLLERR)
+#ifdef XTHREADS
+                && !(fdlp->revents & POLLNVAL)
+#endif
+                )
+                condition = XtInputReadMask;
+            if (fdlp->revents & XPOLL_WRITE)
+                condition |= XtInputWriteMask;
+            if (fdlp->revents & XPOLL_EXCEPT)
+                condition |= XtInputExceptMask;
+        }
+        if (condition) {
+            *found_input = True;
+            for (ep = app->input_list[fdlp->fd]; ep; ep = ep->ie_next)
+                if (condition & ep->ie_condition) {
+                    InputEvent *oq;
+
+                    /* make sure this input isn't already marked outstanding */
+                    for (oq = app->outstandingQueue; oq; oq = oq->ie_oq)
+                        if (oq == ep)
+                            break;
+                    if (!oq) {
+                        ep->ie_oq = app->outstandingQueue;
+                        app->outstandingQueue = ep;
+                    }
+                }
+            }
+        }
+#else                           /* }{ */
+#ifdef XTHREADS
+    fd_set rmask;
+#endif
+    int dd;
+
+    *dpy_no = -1;
+    *found_input = False;
+
+#ifdef XTHREADS
+    rmask = app->fds.rmask;
+    for (dd = app->count; dd-- > 0;)
+        FD_SET(ConnectionNumber(app->list[dd]), &rmask);
+#endif
+
+    for (ii = 0; ii < wf->nfds && nfds > 0; ii++) {
+        XtInputMask condition = 0;
+
+        if (FD_ISSET(ii, &wf->rmask)
+#ifdef XTHREADS
+            && FD_ISSET(ii, &rmask)
+#endif
+            ) {
+            nfds--;
+            condition = XtInputReadMask;
+        }
+        if (FD_ISSET(ii, &wf->wmask)
+#ifdef XTHREADS
+            && FD_ISSET(ii, &app->fds.wmask)
+#endif
+            ) {
+            condition |= XtInputWriteMask;
+            nfds--;
+        }
+        if (FD_ISSET(ii, &wf->emask)
+#ifdef XTHREADS
+            && FD_ISSET(ii, &app->fds.emask)
+#endif
+            ) {
+            condition |= XtInputExceptMask;
+            nfds--;
+        }
+        if (condition) {
+            for (ep = app->input_list[ii]; ep; ep = ep->ie_next)
+                if (condition & ep->ie_condition) {
+                    /* make sure this input isn't already marked outstanding */
+                    InputEvent *oq;
+
+                    for (oq = app->outstandingQueue; oq; oq = oq->ie_oq)
+                        if (oq == ep)
+                            break;
+                    if (!oq) {
+                        ep->ie_oq = app->outstandingQueue;
+                        app->outstandingQueue = ep;
+                    }
+                }
+            *found_input = True;
+        }
+ ENDILOOP:;
+    }                           /* endfor */
+#endif                          /* } */
+}
+
+static void
+MyFindInputs2(XtAppContext app,
+           wait_fds_ptr_t wf,
+           int nfds _X_UNUSED,
+           int *dpy_no,
+           int *found_input)
+{
+    InputEvent *ep;
+    int ii;
+
+#ifdef USE_POLL                 /* { check ready file descriptors block */
+    struct pollfd *fdlp;
+
+    *dpy_no = -1;
+    *found_input = False;
+
+    fdlp = wf->fdlist;
+    for (ii = 0; ii < wf->num_dpys; ii++, fdlp++) {
+        if (*dpy_no == -1 && fdlp->revents & (POLLIN | POLLHUP | POLLERR) &&
+#ifdef XTHREADS
+            !(fdlp->revents & POLLNVAL) &&
+#endif
+            XEventsQueued(app->list[ii], QueuedAfterReading)) {
+            *dpy_no = ii;
+            break;
+        }
+    }
+
+    fdlp = &wf->fdlist[wf->num_dpys];
+    for (ii = wf->num_dpys; ii < wf->fdlistlen; ii++, fdlp++) {
+        XtInputMask condition = 0;
+
+        if (fdlp->revents) {
+            if (fdlp->revents & (XPOLL_READ | POLLHUP | POLLERR)
+#ifdef XTHREADS
+                && !(fdlp->revents & POLLNVAL)
+#endif
+                )
+                condition = XtInputReadMask;
+            if (fdlp->revents & XPOLL_WRITE)
+                condition |= XtInputWriteMask;
+            if (fdlp->revents & XPOLL_EXCEPT)
+                condition |= XtInputExceptMask;
+        }
+        if (condition) {
+            *found_input = True;
+            for (ep = app->input_list[fdlp->fd]; ep; ep = ep->ie_next)
+                if (condition & ep->ie_condition) {
+                    InputEvent *oq;
+
+                    /* make sure this input isn't already marked outstanding */
+                    for (oq = app->outstandingQueue; oq; oq = oq->ie_oq)
+                        if (oq == ep)
+                            break;
+                    if (!oq) {
+                        ep->ie_oq = app->outstandingQueue;
+                        app->outstandingQueue = ep;
+                    }
+                }
+            }
+    }
+#else                           /* }{ */
+#ifdef XTHREADS
+    fd_set rmask;
+#endif
+    int dd;
+
+    *dpy_no = -1;
+    *found_input = False;
+
+#ifdef XTHREADS
+    rmask = app->fds.rmask;
+    for (dd = app->count; dd-- > 0;)
+        FD_SET(ConnectionNumber(app->list[dd]), &rmask);
+#endif
+
+    for (ii = 0; ii < wf->nfds && nfds > 0; ii++) {
+        XtInputMask condition = 0;
+
+        if (FD_ISSET(ii, &wf->rmask)
+#ifdef XTHREADS
+            && FD_ISSET(ii, &rmask)
+#endif
+            ) {
+            nfds--;
+            for (dd = 0; dd < app->count; dd++) {
+                if (ii == ConnectionNumber(app->list[dd])) {
+                    if (*dpy_no == -1) {
+                        if (XEventsQueued
+                            (app->list[dd], QueuedAfterReading))
+                            *dpy_no = dd;
+                        /*
+                         * An error event could have arrived
+                         * without any real events, or events
+                         * could have been swallowed by Xlib,
+                         * or the connection may be broken.
+                         * We can't tell the difference, so
+                         * assume Xlib will eventually discover
+                         * a broken connection.
+                         */
+                    }
+                    goto ENDILOOP;
+                }
+            }
+            condition = XtInputReadMask;
+        }
+        if (FD_ISSET(ii, &wf->wmask)
+#ifdef XTHREADS
+            && FD_ISSET(ii, &app->fds.wmask)
+#endif
+            ) {
+            condition |= XtInputWriteMask;
+            nfds--;
+        }
+        if (FD_ISSET(ii, &wf->emask)
+#ifdef XTHREADS
+            && FD_ISSET(ii, &app->fds.emask)
+#endif
+            ) {
+            condition |= XtInputExceptMask;
+            nfds--;
+        }
+        if (condition) {
+            for (ep = app->input_list[ii]; ep; ep = ep->ie_next)
+                if (condition & ep->ie_condition) {
+                    /* make sure this input isn't already marked outstanding */
+                    InputEvent *oq;
+
+                    for (oq = app->outstandingQueue; oq; oq = oq->ie_oq)
+                        if (oq == ep)
+                            break;
+                    if (!oq) {
+                        ep->ie_oq = app->outstandingQueue;
+                        app->outstandingQueue = ep;
+                    }
+                }
+            *found_input = True;
+        }
+ ENDILOOP:;
+    }                           /* endfor */
+#endif                          /* } */
+}
+
 /*
  * Routine to block in the toolkit.  This should be the only call to select.
  *
@@ -992,16 +1247,14 @@ static void _MyXtWaitForSomething1(XtAppContext app)
     int nfds, dpy_no, found_input;
     _XtBoolean drop_lock = TRUE;
 
-#ifdef XTHREADS
-    Boolean push_thread = TRUE;
-    Boolean pushed_thread = FALSE;
-    int level = 0;
-#endif
 #ifdef USE_POLL
     struct pollfd fdlist[XT_DEFAULT_FDLIST_SIZE];
 #endif
 
 #ifdef XTHREADS
+    Boolean push_thread = TRUE;
+    Boolean pushed_thread = FALSE;
+    int level = 0;
     /* If not multi-threaded, never drop lock */
     if (app->lock == (ThreadAppProc) NULL)
         drop_lock = FALSE;
@@ -1010,14 +1263,11 @@ static void _MyXtWaitForSomething1(XtAppContext app)
     wt.max_wait_time = zero_time;
 #ifdef USE_POLL
     wt.poll_wait = X_DONT_BLOCK;
-#else
-    wt.wait_time_ptr = &wt.max_wait_time;
-#endif
-
-#ifdef USE_POLL
     wf.fdlist = NULL;
     wf.stack = fdlist;
     wf.fdlistlen = wf.num_dpys = 0;
+#else
+    wt.wait_time_ptr = &wt.max_wait_time;
 #endif
 
     app->rebuild_fdlist = TRUE;
@@ -1038,12 +1288,10 @@ static void _MyXtWaitForSomething1(XtAppContext app)
             /*
              *  interrupt occured recalculate time value and wait again.
              */
-            if (errno == EINTR || errno == EAGAIN) {
-                if (errno == EAGAIN) {
-                    errno = 0;  /* errno is not self reseting */
-                    continue;
-                }
-                errno = 0;      /* errno is not self reseting */
+            if (errno == EINTR) errno = 0;
+            else if (errno == EAGAIN) {
+                errno = 0;
+                continue;
             }
             else {
                 char Errno[12];
@@ -1069,7 +1317,7 @@ static void _MyXtWaitForSomething1(XtAppContext app)
         return;
     }
 
-    FindInputs(app, &wf, nfds, TRUE, FALSE, &dpy_no, &found_input);
+    MyFindInputs1(app, &wf, nfds, &dpy_no, &found_input);
 
     if (dpy_no >= 0 || found_input) {
 #ifdef USE_POLL
@@ -1231,7 +1479,7 @@ static int _MyXtWaitForSomething2(XtAppContext app)
         return -1;
     }
 
-    FindInputs(app, &wf, nfds, FALSE, FALSE, &dpy_no, &found_input);
+    MyFindInputs2(app, &wf, nfds, &dpy_no, &found_input);
 
     if (dpy_no >= 0 || found_input) {
 #ifdef USE_POLL
@@ -1935,7 +2183,9 @@ MyXtAppProcessEvent(XtAppContext app)
     XEvent event;
     struct timeval cur_time;
 
-    LOCK_APP(app);
+#ifdef XTHREADS
+    if(app && app->lock)(*app->lock)(app);
+#endif
 
     for (;;) {
 
@@ -1946,7 +2196,9 @@ MyXtAppProcessEvent(XtAppContext app)
                 if (se_ptr->se_notice) {
                     se_ptr->se_notice = FALSE;
                     SeCallProc(se_ptr);
-                    UNLOCK_APP(app);
+#ifdef XTHREADS
+                    if(app && app->unlock)(*app->unlock)(app);
+#endif
                     return;
                 }
                 se_ptr = se_ptr->se_next;
@@ -1967,7 +2219,9 @@ MyXtAppProcessEvent(XtAppContext app)
                 te_ptr->te_next = freeTimerRecs;
                 freeTimerRecs = te_ptr;
                 UNLOCK_PROCESS;
-                UNLOCK_APP(app);
+#ifdef XTHREADS
+                if(app && app->unlock)(*app->unlock)(app);
+#endif
                 return;
             }
         }
@@ -1982,7 +2236,9 @@ MyXtAppProcessEvent(XtAppContext app)
             app->outstandingQueue = ie_ptr->ie_oq;
             ie_ptr->ie_oq = NULL;
             IeCallProc(ie_ptr);
-            UNLOCK_APP(app);
+#ifdef XTHREADS
+            if(app && app->unlock)(*app->unlock)(app);
+#endif
             return;
         }
 
@@ -2011,7 +2267,9 @@ MyXtAppProcessEvent(XtAppContext app)
                 _MyXtRefreshMapping(&event);
             }
             MyXtDispatchEvent(&event);
-            UNLOCK_APP(app);
+#ifdef XTHREADS
+            if(app && app->unlock)(*app->unlock)(app);
+#endif
             return;
         }
 
