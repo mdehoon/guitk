@@ -369,14 +369,17 @@ MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
             wf->fdlist = wf->stack;
         else {
             wf->fdlist = malloc(sizeof(struct pollfd) * (size_t) wf->fdlistlen);
-            if (!wf->fdlist) _XtAllocError("malloc");
+            if (wf->fdlist == NULL) _XtAllocError("malloc");
         }
     }
     else {
-        wf->fdlist = (struct pollfd *)
-            XtRealloc((char *) wf->fdlist,
-                      (Cardinal) (sizeof(struct pollfd) *
-                                  (size_t) wf->fdlistlen));
+       if (wf->fdlist == NULL) {
+           wf->fdlist = malloc(sizeof(struct pollfd) *(size_t) wf->fdlistlen);
+           if (wf->fdlist == NULL) _XtAllocError("malloc");
+       } else {
+           wf->fdlist = realloc(wf->fdlist, sizeof(struct pollfd) *(size_t) wf->fdlistlen);
+           if (wf->fdlist == NULL) _XtAllocError("realloc");
+       }
     }
 
     if (wf->fdlistlen) {
@@ -445,15 +448,20 @@ MyInitFds2(XtAppContext app, wait_fds_ptr_t wf)
 
     if (!wf->fdlist || wf->fdlist == wf->stack) {
         if ((sizeof(struct pollfd) * (size_t) wf->fdlistlen) <= sizeof(wf->stack))
-            wf->fdlist = (struct pollfd *)(wf->stack);
-        else
-            wf->fdlist = (struct pollfd *)XtMalloc((Cardinal)(sizeof(struct pollfd) * (size_t) wf->fdlistlen));
+            wf->fdlist = wf->stack;
+        else {
+            wf->fdlist = malloc(sizeof(struct pollfd) * (size_t) wf->fdlistlen);
+            if (wf->fdlist == NULL) _XtAllocError("malloc");
+        }
     }
     else {
-        wf->fdlist = (struct pollfd *)
-            XtRealloc((char *) wf->fdlist,
-                      (Cardinal) (sizeof(struct pollfd) *
-                                  (size_t) wf->fdlistlen));
+       if (wf->fdlist == NULL) {
+           wf->fdlist = malloc(sizeof(struct pollfd) *(size_t) wf->fdlistlen);
+           if (wf->fdlist == NULL) _XtAllocError("malloc");
+       } else {
+           wf->fdlist = realloc(wf->fdlist, sizeof(struct pollfd) *(size_t) wf->fdlistlen);
+           if (wf->fdlist == NULL) _XtAllocError("realloc");
+       }
     }
 
     if (wf->fdlistlen) {
