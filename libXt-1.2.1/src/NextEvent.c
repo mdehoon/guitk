@@ -366,9 +366,11 @@ MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
 
     if (!wf->fdlist || wf->fdlist == wf->stack) {
         if ((sizeof(struct pollfd) * (size_t) wf->fdlistlen) <= sizeof(wf->stack))
-            wf->fdlist = (struct pollfd *)(wf->stack);
-        else
-            wf->fdlist = (struct pollfd *)XtMalloc((Cardinal)(sizeof(struct pollfd) * (size_t) wf->fdlistlen));
+            wf->fdlist = wf->stack;
+        else {
+            wf->fdlist = malloc(sizeof(struct pollfd) * (size_t) wf->fdlistlen);
+            if (!wf->fdlist) _XtAllocError("malloc");
+        }
     }
     else {
         wf->fdlist = (struct pollfd *)
