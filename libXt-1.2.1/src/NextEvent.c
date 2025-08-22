@@ -71,6 +71,7 @@ in this Software without prior written authorization from The Open Group.
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
+
 #include "IntrinsicI.h"
 #include <stdio.h>
 #include <errno.h>
@@ -332,8 +333,6 @@ InitFds(XtAppContext app,
 static void
 MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
 {
-    int ii;
-
     app->rebuild_fdlist = FALSE;
 #ifdef USE_POLL
 #ifndef POLLRDNORM
@@ -565,6 +564,7 @@ MyAdjustTimes(XtAppContext app, wait_times_ptr_t wt)
     }
 }
 
+
 static int
 IoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
 {
@@ -573,6 +573,20 @@ IoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
 #else
     return Select (wf->nfds, &wf->rmask, &wf->wmask, &wf->emask,
                    wt->wait_time_ptr);
+#endif
+}
+
+static int
+MyIoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
+{
+#ifdef USE_POLL
+    return poll(wf->fdlist, (nfds_t) wf->fdlistlen, wt->poll_wait);
+#else
+#if !defined(WIN32) || defined(__CYGWIN__)
+    return select(wf->nfds, &wf->rmask, &wf->wmask, &wf->emask, wt->wait_time_ptr);
+#else
+    return select(0, &wf->rmask, &wf->wmask, &wf->emask, wt->wait_time_ptr);
+#endif
 #endif
 }
 
@@ -1014,12 +1028,12 @@ static void _MyXtWaitForSomething1(XtAppContext app)
 #ifdef XTHREADS                 /* { */
         if (drop_lock) {
             YIELD_APP_LOCK(app, &push_thread, &pushed_thread, &level);
-            nfds = IoWait(&wt, &wf);
+            nfds = MyIoWait(&wt, &wf);
             RESTORE_APP_LOCK(app, level, &pushed_thread);
         }
         else
 #endif                          /* } */
-            nfds = IoWait(&wt, &wf);
+            nfds = MyIoWait(&wt, &wf);
         if (nfds == -1) {
             /*
              *  interrupt occured recalculate time value and wait again.
@@ -1125,7 +1139,7 @@ static int _MyXtWaitForSomething2(XtAppContext app)
 
 #ifdef XTHREADS                 /* { */
         YIELD_APP_LOCK(app, &push_thread, &pushed_thread, &level);
-        nfds = IoWait(&wt, &wf);
+        nfds = MyIoWait(&wt, &wf);
         RESTORE_APP_LOCK(app, level, &pushed_thread);
 #endif                          /* } */
         if (nfds == -1) {
