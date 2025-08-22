@@ -880,7 +880,7 @@ _MyXtWaitForSomething1(XtAppContext app)
     if (nfds == 0) {
         /* Timed out */
 #ifdef USE_POLL
-        XtStackFree((XtPointer) wf.fdlist, fdlist);
+        if (wf.fdlist != fdlist) XtFree(wf.fdlist);
 #endif
         return -1;
     }
@@ -889,12 +889,12 @@ _MyXtWaitForSomething1(XtAppContext app)
 
     if (dpy_no >= 0 || found_input) {
 #ifdef USE_POLL
-        XtStackFree((XtPointer) wf.fdlist, fdlist);
+        if ((wf.fdlist) != fdlist) XtFree((XtPointer) wf.fdlist);
 #endif
         return dpy_no;
     }
 #ifdef USE_POLL
-    XtStackFree((XtPointer) wf.fdlist, fdlist);
+    if ((wf.fdlist) != fdlist) XtFree((XtPointer) wf.fdlist);
 #endif
     return -1;
 }
@@ -946,7 +946,7 @@ _MyXtWaitForSomething2(XtAppContext app)
             for (dd = 0; dd < app->count; dd++)
                 if (XEventsQueued(app->list[dd], QueuedAlready)) {
 #ifdef USE_POLL
-                    XtStackFree((XtPointer) wf.fdlist, fdlist);
+                    if ((wf.fdlist) != fdlist) XtFree((XtPointer) wf.fdlist);
 #endif
                     return dd;
                 }
@@ -978,7 +978,8 @@ _MyXtWaitForSomething2(XtAppContext app)
                     while (se_ptr != NULL) {
                         if (se_ptr->se_notice) {
 #ifdef USE_POLL
-                            XtStackFree((XtPointer) wf.fdlist, fdlist);
+                            if ((wf.fdlist) != fdlist)
+                                XtFree((XtPointer) wf.fdlist);
 #endif
                             return -1;
                         }
@@ -990,7 +991,8 @@ _MyXtWaitForSomething2(XtAppContext app)
                 for (dd = 0; dd < app->count; dd++)
                     if (XEventsQueued(app->list[dd], QueuedAfterReading)) {
 #ifdef USE_POLL
-                        XtStackFree((XtPointer) wf.fdlist, fdlist);
+                        if ((wf.fdlist) != fdlist)
+                                XtFree((XtPointer) wf.fdlist);
 #endif
                         return dd;
                     }
@@ -1044,7 +1046,7 @@ _MyXtWaitForSomething2(XtAppContext app)
     if (nfds == 0) {
         /* Timed out */
 #ifdef USE_POLL
-        XtStackFree((XtPointer) wf.fdlist, fdlist);
+        if ((wf.fdlist) != fdlist) XtFree((XtPointer) wf.fdlist);
 #endif
         return -1;
     }
@@ -1053,7 +1055,7 @@ _MyXtWaitForSomething2(XtAppContext app)
 
     if (dpy_no >= 0 || found_input) {
 #ifdef USE_POLL
-        XtStackFree((XtPointer) wf.fdlist, fdlist);
+        if ((wf.fdlist) != fdlist) XtFree((XtPointer) wf.fdlist);
 #endif
         return dpy_no;
     }
