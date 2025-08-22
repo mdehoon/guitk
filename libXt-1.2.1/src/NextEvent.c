@@ -410,8 +410,7 @@ MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
 #endif
 }
 
-static void
-MyInitFds2(XtAppContext app, wait_fds_ptr_t wf)
+void MyInitFds2(XtAppContext app, wait_fds_ptr_t wf)
 {
     int ii;
 
@@ -500,7 +499,7 @@ MyInitFds2(XtAppContext app, wait_fds_ptr_t wf)
 #endif
 }
 
-static void
+void
 AdjustTimes(XtAppContext app,
             Boolean block,
             unsigned long *howlong,
@@ -538,8 +537,7 @@ AdjustTimes(XtAppContext app,
     }
 }
 
-static void
-MyAdjustTimes(XtAppContext app, wait_times_ptr_t wt)
+void MyAdjustTimes(XtAppContext app, wait_times_ptr_t wt)
 {
     if (app->timerQueue != NULL) {
 #ifdef USE_POLL
@@ -576,8 +574,7 @@ IoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
 #endif
 }
 
-static int
-MyIoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
+int MyIoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
 {
 #ifdef USE_POLL
     return poll(wf->fdlist, (nfds_t) wf->fdlistlen, wt->poll_wait);
@@ -852,7 +849,7 @@ MyFindInputs1(XtAppContext app,
 #endif                          /* } */
 }
 
-static void
+void
 MyFindInputs2(XtAppContext app,
            wait_fds_ptr_t wf,
            int nfds _X_UNUSED,

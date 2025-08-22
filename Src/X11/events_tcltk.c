@@ -6,7 +6,7 @@
 #include <X11/Xatom.h>
 #include <X11/IntrinsicP.h>
 #include <X11/ConvertI.h>
-#include <X11/TranslateI.h>
+#include <X11/IntrinsicI.h>
 #include <X11/InitialI.h>
 
 
@@ -60,6 +60,16 @@ static WorkProcRec *freeWorkRecs;
 #else
 #define FIXUP_TIMEVAL(t)
 #endif                          /*NEEDS_NTPD_FIXUP */
+
+
+#define TIMEDELTA(dest, src1, src2) { \
+        if(((dest).tv_usec = (src1).tv_usec - (src2).tv_usec) < 0) {\
+              (dest).tv_usec += 1000000;\
+              (dest).tv_sec = (src1).tv_sec - (src2).tv_sec - 1;\
+        } else  (dest).tv_sec = (src1).tv_sec - (src2).tv_sec;  }
+
+#define IS_AFTER(t1, t2) (((t2).tv_sec > (t1).tv_sec) \
+        || (((t2).tv_sec == (t1).tv_sec)&& ((t2).tv_usec > (t1).tv_usec)))
 
 #define IS_AT_OR_AFTER(t1, t2) (((t2).tv_sec > (t1).tv_sec) \
         || (((t2).tv_sec == (t1).tv_sec)&& ((t2).tv_usec >= (t1).tv_usec)))
@@ -121,8 +131,199 @@ static struct NotifierState {
 				/* Pointer to head of file handler list. */
 } notifier = {NULL, 0, NULL};
 
+typedef struct {
+    struct timeval cur_time;
+    struct timeval start_time;
+    struct timeval wait_time;
+    struct timeval new_time;
+    struct timeval time_spent;
+    struct timeval max_wait_time;
+#ifdef USE_POLL
+    int poll_wait;
+#else
+    struct timeval *wait_time_ptr;
+#endif
+} wait_times_t, *wait_times_ptr_t;
+
+typedef struct {
+#ifdef USE_POLL
+    struct pollfd *fdlist;
+    struct pollfd *stack;
+    int fdlistlen, num_dpys;
+#else
+    fd_set rmask, wmask, emask;
+    int nfds;
+#endif
+} wait_fds_t, *wait_fds_ptr_t;
+
+
 void _MyXtWaitForSomething1(XtAppContext app);
-int _MyXtWaitForSomething2(XtAppContext app);
+void MyAdjustTimes(XtAppContext app, wait_times_ptr_t wt);
+void MyInitFds2(XtAppContext app, wait_fds_ptr_t wf);
+int MyIoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf);
+void MyFindInputs2(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSED, int *dpy_no, int *found_input);
+
+
+
+static int _MyXtWaitForSomething2(XtAppContext app)
+{
+    wait_times_t wt;
+    wait_fds_t wf;
+    int nfds, dpy_no, found_input, dd;
+
+#ifdef XTHREADS
+    Boolean push_thread = TRUE;
+    Boolean pushed_thread = FALSE;
+    int level = 0;
+#endif
+#ifdef USE_POLL
+    struct pollfd fdlist[XT_DEFAULT_FDLIST_SIZE];
+#endif
+
+    X_GETTIMEOFDAY(&wt.cur_time);
+    FIXUP_TIMEVAL(&wt.cur_time);
+    wt.start_time = wt.cur_time;
+#ifdef USE_POLL
+    wt.poll_wait = X_BLOCK;
+#else
+    wt.wait_time_ptr = NULL;
+#endif
+
+#ifdef USE_POLL
+    wf.fdlist = NULL;
+    wf.stack = fdlist;
+    wf.fdlistlen = wf.num_dpys = 0;
+#endif
+
+ WaitLoop:
+    app->rebuild_fdlist = TRUE;
+
+    while (1) {
+        MyAdjustTimes(app, &wt);
+
+        if (app->block_hook_list) {
+            BlockHook hook;
+
+            for (hook = app->block_hook_list; hook != NULL; hook = hook->next)
+                (*hook->proc) (hook->closure);
+
+            /* see if the hook(s) generated any protocol */
+            for (dd = 0; dd < app->count; dd++)
+                if (XEventsQueued(app->list[dd], QueuedAlready)) {
+#ifdef USE_POLL
+                    if ((wf.fdlist) != fdlist) free(wf.fdlist);
+#endif
+                    return dd;
+                }
+        }
+
+        if (app->rebuild_fdlist) MyInitFds2(app, &wf);
+
+#ifdef XTHREADS                 /* { */
+        YIELD_APP_LOCK(app, &push_thread, &pushed_thread, &level);
+        nfds = MyIoWait(&wt, &wf);
+        RESTORE_APP_LOCK(app, level, &pushed_thread);
+#endif                          /* } */
+        if (nfds == -1) {
+            /*
+             *  interrupt occured recalculate time value and wait again.
+             */
+            if (errno == EINTR || errno == EAGAIN) {
+                if (errno == EAGAIN) {
+                    errno = 0;  /* errno is not self reseting */
+                    continue;
+                }
+                errno = 0;      /* errno is not self reseting */
+
+                /* was it interrupted by a signal that we care about? */
+                if (app->signalQueue != NULL) {
+                    SignalEventRec *se_ptr = app->signalQueue;
+
+                    while (se_ptr != NULL) {
+                        if (se_ptr->se_notice) {
+#ifdef USE_POLL
+                            if ((wf.fdlist) != fdlist) free(wf.fdlist);
+#endif
+                            return -1;
+                        }
+                        se_ptr = se_ptr->se_next;
+                    }
+                }
+
+                /* get Xlib to detect a bad connection */
+                for (dd = 0; dd < app->count; dd++)
+                    if (XEventsQueued(app->list[dd], QueuedAfterReading)) {
+#ifdef USE_POLL
+                        if ((wf.fdlist) != fdlist) free(wf.fdlist);
+#endif
+                        return dd;
+                    }
+
+#ifdef USE_POLL
+                if (wt.poll_wait == X_BLOCK)
+#else
+                if (wt.wait_time_ptr == NULL)
+#endif
+                    continue;
+                X_GETTIMEOFDAY(&wt.new_time);
+                FIXUP_TIMEVAL(wt.new_time);
+                TIMEDELTA(wt.time_spent, wt.new_time, wt.cur_time);
+                wt.cur_time = wt.new_time;
+#ifdef USE_POLL
+                if ((wt.time_spent.tv_sec * 1000 +
+                     wt.time_spent.tv_usec / 1000) < wt.poll_wait) {
+                    wt.poll_wait -=
+                        (int) (wt.time_spent.tv_sec * 1000 +
+                               wt.time_spent.tv_usec / 1000);
+                    continue;
+                }
+                else
+#else
+                if (IS_AFTER(wt.time_spent, *wt.wait_time_ptr)) {
+                    TIMEDELTA(wt.wait_time, *wt.wait_time_ptr,
+                              wt.time_spent);
+                    wt.wait_time_ptr = &wt.wait_time;
+                    continue;
+                }
+                else
+#endif
+                    nfds = 0;
+            }
+            else {
+                char Errno[12];
+                String param = Errno;
+                Cardinal param_count = 1;
+
+                sprintf(Errno, "%d", errno);
+                XtAppWarningMsg(app, "communicationError", "select",
+                                XtCXtToolkitError,
+                                "Select failed; error code %s", &param,
+                                &param_count);
+                continue;
+            }
+        }                       /* timed out or input available */
+        break;
+    }
+
+    if (nfds == 0) {
+        /* Timed out */
+#ifdef USE_POLL
+        if ((wf.fdlist) != fdlist) free(wf.fdlist);
+#endif
+        return -1;
+    }
+
+    MyFindInputs2(app, &wf, nfds, &dpy_no, &found_input);
+
+    if (dpy_no >= 0 || found_input) {
+#ifdef USE_POLL
+        if ((wf.fdlist) != fdlist) free(wf.fdlist);
+#endif
+        return dpy_no;
+    }
+    goto WaitLoop;
+}
+
 
 
 static void
