@@ -971,8 +971,7 @@ _XtWaitForSomething(XtAppContext app,
     }
 }
 
-int
-_MyXtWaitForSomething1(XtAppContext app)
+static void _MyXtWaitForSomething1(XtAppContext app)
 {
     wait_times_t wt;
     wait_fds_t wf;
@@ -1053,7 +1052,7 @@ _MyXtWaitForSomething1(XtAppContext app)
 #ifdef USE_POLL
         if (wf.fdlist != fdlist) free(wf.fdlist);
 #endif
-        return -1;
+        return;
     }
 
     FindInputs(app, &wf, nfds, TRUE, FALSE, &dpy_no, &found_input);
@@ -1062,16 +1061,15 @@ _MyXtWaitForSomething1(XtAppContext app)
 #ifdef USE_POLL
         if ((wf.fdlist) != fdlist) free(wf.fdlist);
 #endif
-        return dpy_no;
+        return;
     }
 #ifdef USE_POLL
     if ((wf.fdlist) != fdlist) free(wf.fdlist);
 #endif
-    return -1;
+    return;
 }
 
-int
-_MyXtWaitForSomething2(XtAppContext app)
+static int _MyXtWaitForSomething2(XtAppContext app)
 {
     wait_times_t wt;
     wait_fds_t wf;
@@ -1962,7 +1960,7 @@ MyXtAppProcessEvent(XtAppContext app)
 
         if (app->input_count > 0 && app->outstandingQueue == NULL) {
             /* Call _XtWaitForSomething to get input queued up */
-            (void) _MyXtWaitForSomething1(app);
+            _MyXtWaitForSomething1(app);
         }
         if (app->outstandingQueue != NULL) {
             InputEvent *ie_ptr = app->outstandingQueue;
