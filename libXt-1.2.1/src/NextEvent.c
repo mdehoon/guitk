@@ -2215,11 +2215,13 @@ MyXtAppProcessEvent(XtAppContext app)
                 te_ptr->te_next = NULL;
                 if (te_ptr->te_proc != NULL)
                     TeCallProc(te_ptr);
-                LOCK_PROCESS;
+#ifdef XTHREADS
+                if(_XtProcessLock)(*_XtProcessLock)();
+#endif
                 te_ptr->te_next = freeTimerRecs;
                 freeTimerRecs = te_ptr;
-                UNLOCK_PROCESS;
 #ifdef XTHREADS
+                if(_XtProcessUnlock)(*_XtProcessUnlock)();
                 if(app && app->unlock)(*app->unlock)(app);
 #endif
                 return;
