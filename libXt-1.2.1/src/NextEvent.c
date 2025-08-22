@@ -1971,36 +1971,6 @@ CallWorkProc(XtAppContext app)
     return TRUE;
 }
 
-Boolean
-MyCallWorkProc(XtAppContext app)
-{
-    register WorkProcRec *w = app->workQueue;
-    Boolean delete;
-
-    if (w == NULL)
-        return FALSE;
-
-    app->workQueue = w->next;
-
-    delete = (*(w->proc)) (w->closure);
-
-    if (delete) {
-#ifdef XTHREADS
-        if(_XtProcessLock)(*_XtProcessLock)();
-#endif
-        w->next = freeWorkRecs;
-        freeWorkRecs = w;
-#ifdef XTHREADS
-        if(_XtProcessUnlock)(*_XtProcessUnlock)();
-#endif
-    }
-    else {
-        w->next = app->workQueue;
-        app->workQueue = w;
-    }
-    return TRUE;
-}
-
 /*
  * XtNextEvent()
  * return next event;

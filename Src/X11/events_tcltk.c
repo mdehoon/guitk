@@ -17,6 +17,8 @@
 #include "tk.h"
 
 static TimerEventRec *freeTimerRecs;
+static WorkProcRec *freeWorkRecs;
+
 
 #define IeCallProc(ptr) \
     (*ptr->ie_proc) (ptr->ie_closure, &ptr->ie_source, (XtInputId*)&ptr);
@@ -125,7 +127,35 @@ void _MyXtRefreshMapping(XEvent *event);
 Boolean MyXtDispatchEvent(XEvent *event);
 
 
-Boolean MyCallWorkProc(XtAppContext app);
+static Boolean
+MyCallWorkProc(XtAppContext app)
+{
+    register WorkProcRec *w = app->workQueue;
+    Boolean delete;
+
+    if (w == NULL)
+        return FALSE;
+
+    app->workQueue = w->next;
+
+    delete = (*(w->proc)) (w->closure);
+
+    if (delete) {
+#ifdef XTHREADS
+        if(_XtProcessLock)(*_XtProcessLock)();
+#endif
+        w->next = freeWorkRecs;
+        freeWorkRecs = w;
+#ifdef XTHREADS
+        if(_XtProcessUnlock)(*_XtProcessUnlock)();
+#endif
+    }
+    else {
+        w->next = app->workQueue;
+        app->workQueue = w;
+    }
+    return TRUE;
+}
 
 
 static void
