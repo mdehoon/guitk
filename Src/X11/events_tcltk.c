@@ -4,12 +4,63 @@
 #include <X11/StringDefs.h>
 #include <X11/Shell.h>
 #include <X11/Xatom.h>
+#include <X11/IntrinsicP.h>
+#include <X11/ConvertI.h>
+#include <X11/TranslateI.h>
+#include <X11/InitialI.h>
+
 
 
 #define TCL_THREADS
 
 #include "tcl.h"
 #include "tk.h"
+
+static TimerEventRec *freeTimerRecs;
+
+#define IeCallProc(ptr) \
+    (*ptr->ie_proc) (ptr->ie_closure, &ptr->ie_source, (XtInputId*)&ptr);
+
+#define SeCallProc(ptr) \
+    (*ptr->se_proc) (ptr->se_closure, (XtSignalId*)&ptr);
+
+#define TeCallProc(ptr) \
+    (*ptr->te_proc) (ptr->te_closure, (XtIntervalId*)&ptr);
+
+
+/* Some systems running NTP daemons are known to return strange usec
+ * values from gettimeofday.
+ */
+
+#ifndef NEEDS_NTPD_FIXUP
+#if defined(sun) || defined(MOTOROLA) || (defined(__osf__) && defined(__alpha))
+#define NEEDS_NTPD_FIXUP 1
+#else
+#define NEEDS_NTPD_FIXUP 0
+#endif
+#endif
+
+#if NEEDS_NTPD_FIXUP
+#define FIXUP_TIMEVAL(t) { \
+        while ((t).tv_usec >= 1000000) { \
+            (t).tv_usec -= 1000000; \
+            (t).tv_sec++; \
+        } \
+        while ((t).tv_usec < 0) { \
+            if ((t).tv_sec > 0) { \
+                (t).tv_usec += 1000000; \
+                (t).tv_sec--; \
+            } else { \
+                (t).tv_usec = 0; \
+                break; \
+            } \
+        }}
+#else
+#define FIXUP_TIMEVAL(t)
+#endif                          /*NEEDS_NTPD_FIXUP */
+
+#define IS_AT_OR_AFTER(t1, t2) (((t2).tv_sec > (t1).tv_sec) \
+        || (((t2).tv_sec == (t1).tv_sec)&& ((t2).tv_usec >= (t1).tv_usec)))
 
 
 static PyThread_type_lock tcl_lock = 0;
@@ -67,6 +118,117 @@ static struct NotifierState {
     FileHandler *firstFileHandlerPtr;
 				/* Pointer to head of file handler list. */
 } notifier = {NULL, 0, NULL};
+
+void _MyXtWaitForSomething1(XtAppContext app);
+int _MyXtWaitForSomething2(XtAppContext app);
+void _MyXtRefreshMapping(XEvent *event);
+Boolean MyXtDispatchEvent(XEvent *event);
+
+
+Boolean MyCallWorkProc(XtAppContext app);
+
+
+static void
+MyXtAppProcessEvent(XtAppContext app)
+{
+    int i, d;
+    XEvent event;
+    struct timeval cur_time;
+
+#ifdef XTHREADS
+    if(app && app->lock)(*app->lock)(app);
+#endif
+
+    for (;;) {
+
+        if (app->signalQueue != NULL) {
+            SignalEventRec *se_ptr = app->signalQueue;
+
+            while (se_ptr != NULL) {
+                if (se_ptr->se_notice) {
+                    se_ptr->se_notice = FALSE;
+                    SeCallProc(se_ptr);
+#ifdef XTHREADS
+                    if(app && app->unlock)(*app->unlock)(app);
+#endif
+                    return;
+                }
+                se_ptr = se_ptr->se_next;
+            }
+        }
+
+        if (app->timerQueue != NULL) {
+            X_GETTIMEOFDAY(&cur_time);
+            FIXUP_TIMEVAL(cur_time);
+            if (IS_AT_OR_AFTER(app->timerQueue->te_timer_value, cur_time)) {
+                TimerEventRec *te_ptr = app->timerQueue;
+
+                app->timerQueue = app->timerQueue->te_next;
+                te_ptr->te_next = NULL;
+                if (te_ptr->te_proc != NULL)
+                    TeCallProc(te_ptr);
+#ifdef XTHREADS
+                if(_XtProcessLock)(*_XtProcessLock)();
+#endif
+                te_ptr->te_next = freeTimerRecs;
+                freeTimerRecs = te_ptr;
+#ifdef XTHREADS
+                if(_XtProcessUnlock)(*_XtProcessUnlock)();
+                if(app && app->unlock)(*app->unlock)(app);
+#endif
+                return;
+            }
+        }
+
+        if (app->input_count > 0 && app->outstandingQueue == NULL) {
+            /* Call _XtWaitForSomething to get input queued up */
+            _MyXtWaitForSomething1(app);
+        }
+        if (app->outstandingQueue != NULL) {
+            InputEvent *ie_ptr = app->outstandingQueue;
+
+            app->outstandingQueue = ie_ptr->ie_oq;
+            ie_ptr->ie_oq = NULL;
+            IeCallProc(ie_ptr);
+#ifdef XTHREADS
+            if(app && app->unlock)(*app->unlock)(app);
+#endif
+            return;
+        }
+
+        for (i = 1; i <= app->count; i++) {
+            d = (i + app->last) % app->count;
+            if (XEventsQueued(app->list[d], QueuedAfterReading))
+                goto GotEvent;
+        }
+        for (i = 1; i <= app->count; i++) {
+            d = (i + app->last) % app->count;
+            if (XEventsQueued(app->list[d], QueuedAfterFlush))
+                goto GotEvent;
+        }
+
+        /* Nothing to do...wait for something */
+
+        if (MyCallWorkProc(app))
+            continue;
+
+        d = _MyXtWaitForSomething2(app);
+        if (d != -1) {
+ GotEvent:
+            XNextEvent(app->list[d], &event);
+            app->last = (short) d;
+            if (event.xany.type == MappingNotify) {
+                _MyXtRefreshMapping(&event);
+            }
+            MyXtDispatchEvent(&event);
+#ifdef XTHREADS
+            if(app && app->unlock)(*app->unlock)(app);
+#endif
+            return;
+        }
+
+    }
+}
 
 /*
  *----------------------------------------------------------------------

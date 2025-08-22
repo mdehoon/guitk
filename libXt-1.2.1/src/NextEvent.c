@@ -848,7 +848,6 @@ MyFindInputs1(XtAppContext app,
                 }
             *found_input = True;
         }
- ENDILOOP:;
     }                           /* endfor */
 #endif                          /* } */
 }
@@ -1240,7 +1239,7 @@ _XtWaitForSomething(XtAppContext app,
     }
 }
 
-static void _MyXtWaitForSomething1(XtAppContext app)
+void _MyXtWaitForSomething1(XtAppContext app)
 {
     wait_times_t wt;
     wait_fds_t wf;
@@ -1331,7 +1330,7 @@ static void _MyXtWaitForSomething1(XtAppContext app)
     return;
 }
 
-static int _MyXtWaitForSomething2(XtAppContext app)
+int _MyXtWaitForSomething2(XtAppContext app)
 {
     wait_times_t wt;
     wait_fds_t wf;
