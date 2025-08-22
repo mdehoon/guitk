@@ -124,8 +124,260 @@ static struct NotifierState {
 void _MyXtWaitForSomething1(XtAppContext app);
 int _MyXtWaitForSomething2(XtAppContext app);
 void _MyXtRefreshMapping(XEvent *event);
-Boolean MyXtDispatchEvent(XEvent *event);
 
+
+static Widget
+MyLookupSpringLoaded(XtGrabList grabList)
+{
+    XtGrabList gl;
+
+    for (gl = grabList; gl != NULL; gl = gl->next) {
+        if (gl->spring_loaded) {
+            if (XtIsSensitive(gl->widget))
+                return gl->widget;
+            else
+                return NULL;
+        }
+        if (gl->exclusive)
+            break;
+    }
+    return NULL;
+}
+
+
+static Boolean
+MyDispatchEvent(XEvent *event, Widget widget)
+{
+    if (event->type == EnterNotify &&
+        event->xcrossing.mode == NotifyNormal &&
+        widget->core.widget_class->core_class.compress_enterleave) {
+        if (XPending(event->xcrossing.display)) {
+            XEvent nextEvent;
+            XPeekEvent(event->xcrossing.display, &nextEvent);
+
+            if (nextEvent.type == LeaveNotify &&
+                event->xcrossing.window == nextEvent.xcrossing.window &&
+                nextEvent.xcrossing.mode == NotifyNormal &&
+                ((event->xcrossing.detail != NotifyInferior &&
+                  nextEvent.xcrossing.detail != NotifyInferior) ||
+                 (event->xcrossing.detail == NotifyInferior &&
+                  nextEvent.xcrossing.detail == NotifyInferior))) {
+                /* skip the enter/leave pair */
+                XNextEvent(event->xcrossing.display, &nextEvent);
+
+                return False;
+            }
+        }
+    }
+
+    if (event->type == MotionNotify &&
+        widget->core.widget_class->core_class.compress_motion) {
+        while (XPending(event->xmotion.display)) {
+            XEvent nextEvent;
+            XPeekEvent(event->xmotion.display, &nextEvent);
+
+            if (nextEvent.type == MotionNotify &&
+                event->xmotion.window == nextEvent.xmotion.window &&
+                event->xmotion.subwindow == nextEvent.xmotion.subwindow) {
+                /* replace the current event with the next one */
+                XNextEvent(event->xmotion.display, event);
+            }
+            else
+                break;
+        }
+    }
+
+    return XtDispatchEventToWidget(widget, event);
+}
+
+
+typedef enum _GrabType { pass, ignore, remap } GrabType;
+
+#if !defined(AIXV3) || !defined(AIXSHLIB)
+static                          /* AIX shared libraries are broken */
+#endif
+Boolean
+_MyXtDefaultDispatcher(XEvent *event)
+{
+    register Widget widget;
+    GrabType grabType;
+    XtPerDisplayInput pdi;
+    XtGrabList grabList;
+    Boolean was_dispatched = False;
+    DPY_TO_APPCON(event->xany.display);
+
+    /* the default dispatcher discards all extension events */
+    if (event->type >= LASTEvent)
+        return False;
+
+    LOCK_APP(app);
+
+    switch (event->type) {
+    case KeyPress:
+    case KeyRelease:
+    case ButtonPress:
+    case ButtonRelease:
+        grabType = remap;
+        break;
+    case MotionNotify:
+    case EnterNotify:
+        grabType = ignore;
+        break;
+    default:
+        grabType = pass;
+        break;
+    }
+
+    widget = XtWindowToWidget(event->xany.display, event->xany.window);
+    pdi = _XtGetPerDisplayInput(event->xany.display);
+
+    grabList = *_XtGetGrabList(pdi);
+
+    if (widget == NULL) {
+        if (grabType == remap
+            && (widget = MyLookupSpringLoaded(grabList)) != NULL) {
+            /* event occurred in a non-widget window, but we've promised also
+               to dispatch it to the nearest accessible spring_loaded widget */
+            was_dispatched = (XFilterEvent(event, XtWindow(widget))
+                              || XtDispatchEventToWidget(widget, event));
+        }
+        else
+            was_dispatched = (Boolean) XFilterEvent(event, None);
+    }
+    else if (grabType == pass) {
+        if (event->type == LeaveNotify ||
+            event->type == FocusIn || event->type == FocusOut) {
+            if (XtIsSensitive(widget))
+                was_dispatched = (XFilterEvent(event, XtWindow(widget)) ||
+                                  XtDispatchEventToWidget(widget, event));
+        }
+        else
+            was_dispatched = (XFilterEvent(event, XtWindow(widget)) ||
+                              XtDispatchEventToWidget(widget, event));
+    }
+    else if (grabType == ignore) {
+        if ((grabList == NULL || _XtOnGrabList(widget, grabList))
+            && XtIsSensitive(widget)) {
+            was_dispatched = (XFilterEvent(event, XtWindow(widget))
+                              || MyDispatchEvent(event, widget));
+        }
+    }
+    else if (grabType == remap) {
+        EventMask mask = _XtConvertTypeToMask(event->type);
+        Widget dspWidget;
+        Boolean was_filtered = False;
+
+        dspWidget = _XtFindRemapWidget(event, widget, mask, pdi);
+
+        if ((grabList == NULL || _XtOnGrabList(dspWidget, grabList))
+            && XtIsSensitive(dspWidget)) {
+            if ((was_filtered =
+                 (Boolean) XFilterEvent(event, XtWindow(dspWidget)))) {
+                /* If this event activated a device grab, release it. */
+                _XtUngrabBadGrabs(event, widget, mask, pdi);
+                was_dispatched = True;
+            }
+            else
+                was_dispatched = XtDispatchEventToWidget(dspWidget, event);
+        }
+        else
+            _XtUngrabBadGrabs(event, widget, mask, pdi);
+
+        if (!was_filtered) {
+            /* Also dispatch to nearest accessible spring_loaded. */
+            /* Fetch this afterward to reflect modal list changes */
+            grabList = *_XtGetGrabList(pdi);
+            widget = MyLookupSpringLoaded(grabList);
+            if (widget != NULL && widget != dspWidget) {
+                was_dispatched = (XFilterEvent(event, XtWindow(widget))
+                                  || XtDispatchEventToWidget(widget, event)
+                                  || was_dispatched);
+            }
+        }
+    }
+    UNLOCK_APP(app);
+    return was_dispatched;
+}
+
+static Boolean
+MyXtDispatchEvent(XEvent *event)
+{
+    Boolean was_dispatched, safe;
+    int dispatch_level;
+    int starting_count;
+    XtPerDisplay pd;
+    Time time = 0;
+    XtEventDispatchProc dispatch = _MyXtDefaultDispatcher;
+    XtAppContext app = XtDisplayToApplicationContext(event->xany.display);
+
+    LOCK_APP(app);
+    dispatch_level = ++app->dispatch_level;
+    starting_count = app->destroy_count;
+
+    switch (event->type) {
+    case KeyPress:
+    case KeyRelease:
+        time = event->xkey.time;
+        break;
+    case ButtonPress:
+    case ButtonRelease:
+        time = event->xbutton.time;
+        break;
+    case MotionNotify:
+        time = event->xmotion.time;
+        break;
+    case EnterNotify:
+    case LeaveNotify:
+        time = event->xcrossing.time;
+        break;
+    case PropertyNotify:
+        time = event->xproperty.time;
+        break;
+    case SelectionClear:
+        time = event->xselectionclear.time;
+        break;
+
+    case MappingNotify:
+        _XtRefreshMapping(event, True);
+        break;
+    }
+    pd = _XtGetPerDisplay(event->xany.display);
+
+    if (time)
+        pd->last_timestamp = time;
+    pd->last_event = *event;
+
+    if (pd->dispatcher_list) {
+        dispatch = pd->dispatcher_list[event->type];
+        if (dispatch == NULL)
+            dispatch = _MyXtDefaultDispatcher;
+    }
+    was_dispatched = (*dispatch) (event);
+
+    /*
+     * To make recursive XtDispatchEvent work, we need to do phase 2 destroys
+     * only on those widgets destroyed by this particular dispatch.
+     *
+     */
+
+    if (app->destroy_count > starting_count)
+        _XtDoPhase2Destroy(app, dispatch_level);
+
+    app->dispatch_level = dispatch_level - 1;
+
+    if ((safe = _XtSafeToDestroy(app))) {
+        if (app->dpy_destroy_count != 0)
+            _XtCloseDisplays(app);
+        if (app->free_bindings)
+            _XtDoFreeBindings(app);
+    }
+    UNLOCK_APP(app);
+    LOCK_PROCESS;
+    if (_XtAppDestroyCount != 0 && safe)
+        _XtDestroyAppContexts();
+    UNLOCK_PROCESS;
+    return was_dispatched;
+}
 
 static Boolean
 MyCallWorkProc(XtAppContext app)
