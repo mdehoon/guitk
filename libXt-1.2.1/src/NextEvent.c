@@ -2003,22 +2003,6 @@ _XtRefreshMapping(XEvent *event, _XtBoolean dispatch)
 }
 
 void
-_MyXtRefreshMapping(XEvent *event)
-{
-    XtPerDisplay pd;
-
-    LOCK_PROCESS;
-    pd = _XtGetPerDisplay(event->xmapping.display);
-
-    if (event->xmapping.request != MappingPointer &&
-        pd && pd->keysyms && (event->xmapping.serial >= pd->keysyms_serial))
-        _XtBuildKeysymTables(event->xmapping.display, pd);
-
-    XRefreshKeyboardMapping(&event->xmapping);
-    UNLOCK_PROCESS;
-}
-
-void
 XtAppNextEvent(XtAppContext app, XEvent *event)
 {
     int i, d;

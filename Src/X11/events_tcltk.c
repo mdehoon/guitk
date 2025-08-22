@@ -123,7 +123,23 @@ static struct NotifierState {
 
 void _MyXtWaitForSomething1(XtAppContext app);
 int _MyXtWaitForSomething2(XtAppContext app);
-void _MyXtRefreshMapping(XEvent *event);
+
+
+static void
+_MyXtRefreshMapping(XEvent *event)
+{
+    XtPerDisplay pd;
+
+    if(_XtProcessLock)(*_XtProcessLock)();
+    pd = _XtGetPerDisplay(event->xmapping.display);
+
+    if (event->xmapping.request != MappingPointer &&
+        pd && pd->keysyms && (event->xmapping.serial >= pd->keysyms_serial))
+        _XtBuildKeysymTables(event->xmapping.display, pd);
+
+    XRefreshKeyboardMapping(&event->xmapping);
+    if(_XtProcessUnlock)(*_XtProcessUnlock)();
+}
 
 
 static Widget
