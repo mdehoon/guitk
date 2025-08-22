@@ -774,7 +774,7 @@ _XtWaitForSomething(XtAppContext app,
 }
 
 int
-My_XtWaitForSomething1(XtAppContext app)
+_MyXtWaitForSomething1(XtAppContext app)
 {
     wait_times_t wt;
     wait_fds_t wf;
@@ -872,7 +872,7 @@ My_XtWaitForSomething1(XtAppContext app)
 }
 
 int
-My_XtWaitForSomething2(XtAppContext app)
+_MyXtWaitForSomething2(XtAppContext app)
 {
     wait_times_t wt;
     wait_fds_t wf;
@@ -1546,7 +1546,7 @@ _XtRefreshMapping(XEvent *event, _XtBoolean dispatch)
 }
 
 void
-My_XtRefreshMapping(XEvent *event)
+_MyXtRefreshMapping(XEvent *event)
 {
     XtPerDisplay pd;
 
@@ -1764,7 +1764,7 @@ MyXtAppProcessEvent(XtAppContext app)
 
         if (app->input_count > 0 && app->outstandingQueue == NULL) {
             /* Call _XtWaitForSomething to get input queued up */
-            (void) My_XtWaitForSomething1(app);
+            (void) _MyXtWaitForSomething1(app);
         }
         if (app->outstandingQueue != NULL) {
             InputEvent *ie_ptr = app->outstandingQueue;
@@ -1792,13 +1792,13 @@ MyXtAppProcessEvent(XtAppContext app)
         if (CallWorkProc(app))
             continue;
 
-        d = My_XtWaitForSomething2(app);
+        d = _MyXtWaitForSomething2(app);
         if (d != -1) {
  GotEvent:
             XNextEvent(app->list[d], &event);
             app->last = (short) d;
             if (event.xany.type == MappingNotify) {
-                My_XtRefreshMapping(&event);
+                _MyXtRefreshMapping(&event);
             }
             MyXtDispatchEvent(&event);
             UNLOCK_APP(app);
