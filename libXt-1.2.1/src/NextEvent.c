@@ -330,6 +330,168 @@ InitFds(XtAppContext app,
 }
 
 static void
+MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
+{
+    int ii;
+
+    app->rebuild_fdlist = FALSE;
+#ifdef USE_POLL
+#ifndef POLLRDNORM
+#define POLLRDNORM 0
+#endif
+
+#ifndef POLLRDBAND
+#define POLLRDBAND 0
+#endif
+
+#ifndef POLLWRNORM
+#define POLLWRNORM 0
+#endif
+
+#ifndef POLLWRBAND
+#define POLLWRBAND 0
+#endif
+
+#define XPOLL_READ (POLLIN|POLLRDNORM|POLLPRI|POLLRDBAND)
+#define XPOLL_WRITE (POLLOUT|POLLWRNORM|POLLWRBAND)
+#define XPOLL_EXCEPT 0
+
+    wf->fdlistlen = wf->num_dpys = 0;
+
+    if (app->input_list != NULL) {
+        for (ii = 0; ii < (int) app->input_max; ii++)
+            if (app->input_list[ii] != NULL)
+                wf->fdlistlen++;
+    }
+
+    if (!wf->fdlist || wf->fdlist == wf->stack) {
+        if ((sizeof(struct pollfd) * (size_t) wf->fdlistlen) <= sizeof(wf->stack))
+            wf->fdlist = (struct pollfd *)(wf->stack);
+        else
+            wf->fdlist = (struct pollfd *)XtMalloc((Cardinal)(sizeof(struct pollfd) * (size_t) wf->fdlistlen));
+    }
+    else {
+        wf->fdlist = (struct pollfd *)
+            XtRealloc((char *) wf->fdlist,
+                      (Cardinal) (sizeof(struct pollfd) *
+                                  (size_t) wf->fdlistlen));
+    }
+
+    if (wf->fdlistlen) {
+        struct pollfd *fdlp = wf->fdlist;
+        InputEvent *iep;
+
+        if (app->input_list != NULL)
+            for (ii = 0; ii < app->input_max; ii++)
+                if (app->input_list[ii] != NULL) {
+                    iep = app->input_list[ii];
+                    fdlp->fd = ii;
+                    fdlp->events = 0;
+                    for (; iep; iep = iep->ie_next) {
+                        if (iep->ie_condition & XtInputReadMask)
+                            fdlp->events |= XPOLL_READ;
+                        if (iep->ie_condition & XtInputWriteMask)
+                            fdlp->events |= XPOLL_WRITE;
+                        if (iep->ie_condition & XtInputExceptMask)
+                            fdlp->events |= XPOLL_EXCEPT;
+                    }
+                    fdlp++;
+                }
+    }
+#else
+    wf->nfds = app->fds.nfds;
+    wf->rmask = app->fds.rmask;
+    wf->wmask = app->fds.wmask;
+    wf->emask = app->fds.emask;
+#endif
+}
+
+static void
+MyInitFds2(XtAppContext app, wait_fds_ptr_t wf)
+{
+    int ii;
+
+    app->rebuild_fdlist = FALSE;
+#ifdef USE_POLL
+#ifndef POLLRDNORM
+#define POLLRDNORM 0
+#endif
+
+#ifndef POLLRDBAND
+#define POLLRDBAND 0
+#endif
+
+#ifndef POLLWRNORM
+#define POLLWRNORM 0
+#endif
+
+#ifndef POLLWRBAND
+#define POLLWRBAND 0
+#endif
+
+#define XPOLL_READ (POLLIN|POLLRDNORM|POLLPRI|POLLRDBAND)
+#define XPOLL_WRITE (POLLOUT|POLLWRNORM|POLLWRBAND)
+#define XPOLL_EXCEPT 0
+
+    wf->fdlistlen = wf->num_dpys = app->count;
+
+    if (app->input_list != NULL) {
+        for (ii = 0; ii < (int) app->input_max; ii++)
+            if (app->input_list[ii] != NULL)
+                wf->fdlistlen++;
+    }
+
+    if (!wf->fdlist || wf->fdlist == wf->stack) {
+        if ((sizeof(struct pollfd) * (size_t) wf->fdlistlen) <= sizeof(wf->stack))
+            wf->fdlist = (struct pollfd *)(wf->stack);
+        else
+            wf->fdlist = (struct pollfd *)XtMalloc((Cardinal)(sizeof(struct pollfd) * (size_t) wf->fdlistlen));
+    }
+    else {
+        wf->fdlist = (struct pollfd *)
+            XtRealloc((char *) wf->fdlist,
+                      (Cardinal) (sizeof(struct pollfd) *
+                                  (size_t) wf->fdlistlen));
+    }
+
+    if (wf->fdlistlen) {
+        struct pollfd *fdlp = wf->fdlist;
+        InputEvent *iep;
+
+        for (ii = 0; ii < wf->num_dpys; ii++, fdlp++) {
+            fdlp->fd = ConnectionNumber(app->list[ii]);
+            fdlp->events = POLLIN;
+        }
+        if (app->input_list != NULL)
+            for (ii = 0; ii < app->input_max; ii++)
+                if (app->input_list[ii] != NULL) {
+                    iep = app->input_list[ii];
+                    fdlp->fd = ii;
+                    fdlp->events = 0;
+                    for (; iep; iep = iep->ie_next) {
+                        if (iep->ie_condition & XtInputReadMask)
+                            fdlp->events |= XPOLL_READ;
+                        if (iep->ie_condition & XtInputWriteMask)
+                            fdlp->events |= XPOLL_WRITE;
+                        if (iep->ie_condition & XtInputExceptMask)
+                            fdlp->events |= XPOLL_EXCEPT;
+                    }
+                    fdlp++;
+                }
+    }
+#else
+    wf->nfds = app->fds.nfds;
+    wf->rmask = app->fds.rmask;
+    wf->wmask = app->fds.wmask;
+    wf->emask = app->fds.emask;
+
+    for (ii = 0; ii < app->count; ii++) {
+        FD_SET(ConnectionNumber(app->list[ii]), &wf->rmask);
+    }
+#endif
+}
+
+static void
 AdjustTimes(XtAppContext app,
             Boolean block,
             unsigned long *howlong,
@@ -838,8 +1000,7 @@ _MyXtWaitForSomething1(XtAppContext app)
     app->rebuild_fdlist = TRUE;
 
     while (1) {
-        if (app->rebuild_fdlist)
-            InitFds(app, TRUE, FALSE, &wf);
+        if (app->rebuild_fdlist) MyInitFds1(app, &wf);
 
 #ifdef XTHREADS                 /* { */
         if (drop_lock) {
@@ -952,8 +1113,7 @@ _MyXtWaitForSomething2(XtAppContext app)
                 }
         }
 
-        if (app->rebuild_fdlist)
-            InitFds(app, FALSE, FALSE, &wf);
+        if (app->rebuild_fdlist) MyInitFds2(app, &wf);
 
 #ifdef XTHREADS                 /* { */
         YIELD_APP_LOCK(app, &push_thread, &pushed_thread, &level);
