@@ -748,7 +748,6 @@ MyXtAppProcessEvent(XtAppContext app)
 static void
 TimerProc(XtPointer unused, XtIntervalId *id)
 {
-fprintf(stderr, "In TimerProc\n"); fflush(stderr);
     if (*id != notifier.currentTimeout) {
 	return;
     }
@@ -761,7 +760,6 @@ static void
 SetTimer(const Tcl_Time *timePtr)
 {
     unsigned long timeout;
-fprintf(stderr, "In SetTimer\n"); fflush(stderr);
     if (notifier.currentTimeout != 0) {
 	XtRemoveTimeOut(notifier.currentTimeout);
     }
@@ -799,14 +797,12 @@ WaitForEvent(
     const Tcl_Time *timePtr)	/* Maximum block time, or NULL. */
 {
     int timeout;
-fprintf(stderr, "Starting WaitForEvent\n"); fflush(stderr);
     if (timePtr) {
 	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
 	if (timeout == 0) {
 	    if (XtAppPending(notifier.appContext)) {
 		goto process;
 	    } else {
-fprintf(stderr, "Leaving WaitForEvent 0\n"); fflush(stderr);
 		return 0;
 	    }
 	} else {
@@ -816,7 +812,6 @@ fprintf(stderr, "Leaving WaitForEvent 0\n"); fflush(stderr);
 
   process:
     MyXtAppProcessEvent(notifier.appContext);
-fprintf(stderr, "Leaving WaitForEvent\n"); fflush(stderr);
     return 1;
 }
 
@@ -851,10 +846,8 @@ FileHandlerEventProc(
     FileHandler *filePtr;
     FileHandlerEvent *fileEvPtr = (FileHandlerEvent *) evPtr;
     int mask;
-fprintf(stderr, "Starting FileHandlerEventProc\n"); fflush(stderr);
 
     if (!(flags & TCL_FILE_EVENTS)) {
-fprintf(stderr, "Leaving FileHandlerEventProc 0\n"); fflush(stderr);
 	return 0;
     }
 
@@ -886,13 +879,10 @@ fprintf(stderr, "Leaving FileHandlerEventProc 0\n"); fflush(stderr);
 	mask = filePtr->readyMask & filePtr->mask;
 	filePtr->readyMask = 0;
 	if (mask != 0) {
-fprintf(stderr, "In FileHandlerEventProc, calling filePtr->proc\n"); fflush(stderr);
 	    filePtr->proc(filePtr->clientData, mask);
-fprintf(stderr, "In FileHandlerEventProc, after calling filePtr->proc\n"); fflush(stderr);
 	}
 	break;
     }
-fprintf(stderr, "Leaving FileHandlerEventProc\n"); fflush(stderr);
     return 1;
 }
 
@@ -918,7 +908,6 @@ DeleteFileHandler(
 				 * procedure. */
 {
     FileHandler *filePtr, *prevPtr;
-fprintf(stderr, "In DeleteFileHandler\n"); fflush(stderr);
     /*
      * Find the entry for the given file (and return if there isn't one).
      */
@@ -957,7 +946,6 @@ fprintf(stderr, "In DeleteFileHandler\n"); fflush(stderr);
 static void
 NotifierExitHandler(void *unused)
 {
-fprintf(stderr, "in NotifierExitHandler\n"); fflush(stderr);
     if (notifier.currentTimeout != 0) {
 	XtRemoveTimeOut(notifier.currentTimeout);
     }
@@ -996,7 +984,6 @@ FileProc(
     FileHandler *filePtr = (FileHandler *) clientData;
     FileHandlerEvent *fileEvPtr;
     int mask = 0;
-fprintf(stderr, "Starting FileProc\n"); fflush(stderr);
 
     /*
      * Determine which event happened.
@@ -1064,7 +1051,6 @@ CreateFileHandler(
     void *clientData)		/* Arbitrary data to pass to proc. */
 {
     FileHandler *filePtr;
-fprintf(stderr, "In CreateFileHandler\n"); fflush(stderr);
     for (filePtr = notifier.firstFileHandlerPtr; filePtr != NULL;
 	    filePtr = filePtr->nextPtr) {
 	if (filePtr->fd == fd) {
@@ -1156,9 +1142,7 @@ static int counter = 0;
     if (threaded) {
         ENTER_TCL
         while (!done) {
-fprintf(stderr, "Calling MyXtAppProcessEvent %d\n", counter); fflush(stderr);
             MyXtAppProcessEvent(notifier.appContext);
-fprintf(stderr, "After calling MyXtAppProcessEvent %d\n", counter++); fflush(stderr);
         }
         LEAVE_TCL
     }
@@ -1169,9 +1153,22 @@ fprintf(stderr, "After calling MyXtAppProcessEvent %d\n", counter++); fflush(std
 }
 
 /* Callback to handle mouse clicks */
-static void button_callback(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
+static void button_callback1(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
     if (event->type == ButtonPress) {
-        printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Xt Button clicked!\n");
+        printf("Xt button clicked\n");
+    }
+}
+
+static void timer_proc (XtPointer client_data, XtIntervalId *timer)
+{
+    static int counter = 0;
+    printf("Xt timer update %d\n", counter++);
+    XtAppAddTimeOut(notifier.appContext, 1500, timer_proc, NULL);
+}
+
+static void button_callback2(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
+    if (event->type == ButtonPress) {
+        XtAppAddTimeOut(notifier.appContext, 1500, timer_proc, NULL);
     }
 }
 
@@ -1182,27 +1179,61 @@ static void expose_callback(Widget w, XtPointer client_data, XEvent *event, Bool
         Window win = XtWindow(w);
         GC gc = XCreateGC(dpy, win, 0, NULL);
 
-        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-72-*-*-*-*-*-*-*");
-        if (font) {
-            XSetFont(dpy, gc, font->fid);
-        }
-
-
-        /* Draw rectangle */
-        XDrawRectangle(dpy, win, gc, 10, 10, 380, 80);
-
-        /* Draw centered text */
-        const char *msg = "Xt window";
+        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-48-*-*-*-*-*-*-*");
+        if (font) XSetFont(dpy, gc, font->fid);
+        const char *msg = "Xt";
         int len = strlen(msg);
         int dir, asc, desc;
         XCharStruct overall;
         XTextExtents(font, msg, len, &dir, &asc, &desc, &overall);
-
         int x = (400 - overall.width) / 2;
 	int y = (100 + asc - desc) / 2;
-
         XDrawString(dpy, win, gc, x, y, msg, len);
+        XFreeGC(dpy, gc);
+        if (font) XFreeFont(dpy, font);
+    }
+}
 
+/* Expose handler to draw the button rectangle + label */
+static void expose_callback1(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
+    if (event->type == Expose) {
+        Display *dpy = XtDisplay(w);
+        Window win = XtWindow(w);
+        GC gc = XCreateGC(dpy, win, 0, NULL);
+
+        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-48-*-*-*-*-*-*-*");
+        if (font) XSetFont(dpy, gc, font->fid);
+        XDrawRectangle(dpy, win, gc, 10, 10, 380, 80);
+        const char *msg = "Click me";
+        int len = strlen(msg);
+        int dir, asc, desc;
+        XCharStruct overall;
+        XTextExtents(font, msg, len, &dir, &asc, &desc, &overall);
+        int x = (400 - overall.width) / 2;
+	int y = (100 + asc - desc) / 2;
+        XDrawString(dpy, win, gc, x, y, msg, len);
+        XFreeGC(dpy, gc);
+        if (font) XFreeFont(dpy, font);
+    }
+}
+
+static void expose_callback2(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
+    if (event->type == Expose) {
+        Display *dpy = XtDisplay(w);
+        Window win = XtWindow(w);
+        GC gc = XCreateGC(dpy, win, 0, NULL);
+
+        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-48-*-*-*-*-*-*-*");
+        if (font) XSetFont(dpy, gc, font->fid);
+        XDrawRectangle(dpy, win, gc, 10, 10, 380, 80);
+        const char *msg = "Start timer";
+        int len = strlen(msg);
+        int dir, asc, desc;
+        XCharStruct overall;
+        XTextExtents(font, msg, len, &dir, &asc, &desc, &overall);
+        int x = (400 - overall.width) / 2;
+	int y = (100 + asc - desc) / 2;
+        XDrawString(dpy, win, gc, x, y, msg, len);
         XFreeGC(dpy, gc);
         if (font) XFreeFont(dpy, font);
     }
@@ -1223,14 +1254,12 @@ static void
 delete_window_handler(Widget w, XtPointer client_data, XtPointer call_data)
 {
     /* Perform cleanup here */
-fprintf(stderr, "in delete_window_handler\n"); fflush(stderr);
     XtDestroyApplicationContext(XtWidgetToApplicationContext(w));
-fprintf(stderr, "leaving delete_window_handler\n"); fflush(stderr);
     exit(0);
 }
 
 static PyObject* simple(PyObject* unused, PyObject* args) {
-    Widget top, button;
+    Widget top, container, label, button1, button2;
     int argc = 0;
     Display *dpy = NULL;
 
@@ -1238,16 +1267,49 @@ static PyObject* simple(PyObject* unused, PyObject* args) {
     XtDisplayInitialize(notifier.appContext, dpy, "hello", "Hello", NULL, 0, &argc, NULL);
     top = XtAppCreateShell("hello", "Hello", applicationShellWidgetClass, dpy, NULL, 0);
 
+    container = XtVaCreateManagedWidget("container",
+                                        compositeWidgetClass,
+                                        top,
+                                        XtNwidth, 400,
+                                        XtNheight, 300,
+                                        NULL);
+
     /* Create a simple widget (core) to act as our button */
-    button = XtVaCreateManagedWidget("button",
-                                     widgetClass, top,
+    label = XtVaCreateManagedWidget("label",
+                                    widgetClass, container,
+                                    XtNwidth, 400,
+                                    XtNheight, 100,
+                                    XtNx, 0,
+                                    XtNy, 0,
+                                    NULL);
+
+    XtAddEventHandler(label, ExposureMask, False, expose_callback, NULL);
+
+    /* Create a simple widget (core) to act as our button */
+    button1 = XtVaCreateManagedWidget("button",
+                                      widgetClass, container,
+                                      XtNwidth, 400,
+                                      XtNheight, 100,
+                                      XtNx, 0,
+                                      XtNy, 100,
+                                      NULL);
+
+    /* Add event handlers for drawing and clicking */
+    XtAddEventHandler(button1, ExposureMask, False, expose_callback1, NULL);
+    XtAddEventHandler(button1, ButtonPressMask, False, button_callback1, NULL);
+
+    /* Create a simple widget (core) to act as our button */
+    button2 = XtVaCreateManagedWidget("button",
+                                     widgetClass, container,
                                      XtNwidth, 400,
                                      XtNheight, 100,
+                                     XtNx, 0,
+                                     XtNy, 200,
                                      NULL);
 
     /* Add event handlers for drawing and clicking */
-    XtAddEventHandler(button, ExposureMask, False, expose_callback, NULL);
-    XtAddEventHandler(button, ButtonPressMask, False, button_callback, NULL);
+    XtAddEventHandler(button2, ExposureMask, False, expose_callback2, NULL);
+    XtAddEventHandler(button2, ButtonPressMask, False, button_callback2, NULL);
 
     XtRealizeWidget(top);
 
