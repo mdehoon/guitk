@@ -601,7 +601,7 @@ _XtWaitForSomething(XtAppContext app,
     if (app->lock == (ThreadAppProc) NULL)
         drop_lock = FALSE;
 #else
-    drop_lock = drop_lock;      /* avoid unsed warning */
+    drop_lock = drop_lock;      /* avoid unused warning */
 #endif
 
     InitTimes((Boolean) block, howlong, &wt);
@@ -778,7 +778,7 @@ _MyXtWaitForSomething1(XtAppContext app)
 {
     wait_times_t wt;
     wait_fds_t wf;
-    int nfds, dpy_no, found_input, dd;
+    int nfds, dpy_no, found_input;
     _XtBoolean drop_lock = TRUE;
 
 #ifdef XTHREADS
@@ -796,7 +796,12 @@ _MyXtWaitForSomething1(XtAppContext app)
         drop_lock = FALSE;
 #endif
 
-    InitTimes(FALSE, NULL, &wt);
+    wt.max_wait_time = zero_time;
+#ifdef USE_POLL
+    wt.poll_wait = X_DONT_BLOCK;
+#else
+    wt.wait_time_ptr = &wt.max_wait_time;
+#endif
 
 #ifdef USE_POLL
     wf.fdlist = NULL;
@@ -804,7 +809,6 @@ _MyXtWaitForSomething1(XtAppContext app)
     wf.fdlistlen = wf.num_dpys = 0;
 #endif
 
- WaitLoop:
     app->rebuild_fdlist = TRUE;
 
     while (1) {
@@ -877,7 +881,6 @@ _MyXtWaitForSomething2(XtAppContext app)
     wait_times_t wt;
     wait_fds_t wf;
     int nfds, dpy_no, found_input, dd;
-    _XtBoolean drop_lock = TRUE;      /* only needed with XTHREADS */
 
 #ifdef XTHREADS
     Boolean push_thread = TRUE;
@@ -888,13 +891,14 @@ _MyXtWaitForSomething2(XtAppContext app)
     struct pollfd fdlist[XT_DEFAULT_FDLIST_SIZE];
 #endif
 
-#ifdef XTHREADS
-    /* If not multi-threaded, never drop lock */
-    if (app->lock == (ThreadAppProc) NULL)
-        drop_lock = FALSE;
+    X_GETTIMEOFDAY(&wt.cur_time);
+    FIXUP_TIMEVAL(&wt.cur_time);
+    wt.start_time = wt.cur_time;
+#ifdef USE_POLL
+    wt.poll_wait = X_BLOCK;
+#else
+    wt.wait_time_ptr = NULL;
 #endif
-
-    InitTimes(TRUE, NULL, &wt);
 
 #ifdef USE_POLL
     wf.fdlist = NULL;
