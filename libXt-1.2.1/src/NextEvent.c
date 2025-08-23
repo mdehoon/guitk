@@ -368,32 +368,6 @@ AdjustTimes(XtAppContext app,
     }
 }
 
-void MyAdjustTimes(XtAppContext app, wait_times_ptr_t wt)
-{
-    if (app->timerQueue != NULL) {
-#ifdef USE_POLL
-        if (IS_AFTER(wt->cur_time, app->timerQueue->te_timer_value)) {
-            TIMEDELTA(wt->wait_time, app->timerQueue->te_timer_value,
-                      wt->cur_time);
-            wt->poll_wait =
-                (int) (wt->wait_time.tv_sec * 1000 +
-                       wt->wait_time.tv_usec / 1000);
-        }
-        else
-            wt->poll_wait = X_DONT_BLOCK;
-#else
-        if (IS_AFTER(wt->cur_time, app->timerQueue->te_timer_value)) {
-            TIMEDELTA(wt->wait_time, app->timerQueue->te_timer_value,
-                      wt->cur_time);
-            wt->wait_time_ptr = &wt->wait_time;
-        }
-        else
-            wt->wait_time_ptr = &zero_time;
-#endif
-    }
-}
-
-
 static int
 IoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
 {
