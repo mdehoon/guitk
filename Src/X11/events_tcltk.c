@@ -10,6 +10,8 @@
 #include <X11/InitialI.h>
 
 
+#include <unistd.h>  // for pipe()
+
 
 #define TCL_THREADS
 
@@ -1124,7 +1126,6 @@ static void InitNotifier(void)
 static PyObject*
 start(PyObject* unused, PyObject* args)
 {
-static int counter = 0;
     int *oldFramePtr;
     int done;
     int oldMode = Tcl_SetServiceMode(TCL_SERVICE_ALL);
@@ -1166,7 +1167,32 @@ static void timer_proc (XtPointer client_data, XtIntervalId *timer)
     XtAppAddTimeOut(notifier.appContext, 1500, timer_proc, NULL);
 }
 
+static int pipefds[2];
+
+static void pipe_proc (XtPointer client_data, int *source, XtInputId *id)
+{
+    char c;
+    int n;
+    printf("Xt file descriptor triggered\n");
+    n = read(pipefds[0], &c, 1);
+    if (n != 1) {
+        fprintf(stderr, "**** FAILED TO READ DATA\n");
+        fflush(stderr);
+    }
+}
+
 static void button_callback2(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
+    if (event->type == ButtonPress) {
+        char c = '\n';
+        int n = write(pipefds[1], &c, 1);
+        if (n != 1) {
+            fprintf(stderr, "**** FAILED TO READ DATA\n");
+            fflush(stderr);
+        }
+    }
+}
+
+static void button_callback3(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
     if (event->type == ButtonPress) {
         XtAppAddTimeOut(notifier.appContext, 1500, timer_proc, NULL);
     }
@@ -1201,7 +1227,7 @@ static void expose_callback1(Widget w, XtPointer client_data, XEvent *event, Boo
         Window win = XtWindow(w);
         GC gc = XCreateGC(dpy, win, 0, NULL);
 
-        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-48-*-*-*-*-*-*-*");
+        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-32-*-*-*-*-*-*-*");
         if (font) XSetFont(dpy, gc, font->fid);
         XDrawRectangle(dpy, win, gc, 10, 10, 380, 80);
         const char *msg = "Click me";
@@ -1223,7 +1249,29 @@ static void expose_callback2(Widget w, XtPointer client_data, XEvent *event, Boo
         Window win = XtWindow(w);
         GC gc = XCreateGC(dpy, win, 0, NULL);
 
-        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-48-*-*-*-*-*-*-*");
+        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-32-*-*-*-*-*-*-*");
+        if (font) XSetFont(dpy, gc, font->fid);
+        XDrawRectangle(dpy, win, gc, 10, 10, 380, 80);
+        const char *msg = "Trigger file descriptor";
+        int len = strlen(msg);
+        int dir, asc, desc;
+        XCharStruct overall;
+        XTextExtents(font, msg, len, &dir, &asc, &desc, &overall);
+        int x = (400 - overall.width) / 2;
+	int y = (100 + asc - desc) / 2;
+        XDrawString(dpy, win, gc, x, y, msg, len);
+        XFreeGC(dpy, gc);
+        if (font) XFreeFont(dpy, font);
+    }
+}
+
+static void expose_callback3(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
+    if (event->type == Expose) {
+        Display *dpy = XtDisplay(w);
+        Window win = XtWindow(w);
+        GC gc = XCreateGC(dpy, win, 0, NULL);
+
+        XFontStruct *font = XLoadQueryFont(dpy, "-*-helvetica-bold-r-*-*-32-*-*-*-*-*-*-*");
         if (font) XSetFont(dpy, gc, font->fid);
         XDrawRectangle(dpy, win, gc, 10, 10, 380, 80);
         const char *msg = "Start timer";
@@ -1259,9 +1307,16 @@ delete_window_handler(Widget w, XtPointer client_data, XtPointer call_data)
 }
 
 static PyObject* simple(PyObject* unused, PyObject* args) {
-    Widget top, container, label, button1, button2;
+    Widget top, container, label, button1, button2, button3;
     int argc = 0;
     Display *dpy = NULL;
+
+    int result = pipe(pipefds);
+    if (result == -1) {
+        PyErr_Format(PyExc_RuntimeError,
+                     "failed to create pipe (errno %d)", errno);
+        return NULL;
+    }
 
     dpy = XOpenDisplay(NULL);
     XtDisplayInitialize(notifier.appContext, dpy, "hello", "Hello", NULL, 0, &argc, NULL);
@@ -1271,7 +1326,7 @@ static PyObject* simple(PyObject* unused, PyObject* args) {
                                         compositeWidgetClass,
                                         top,
                                         XtNwidth, 400,
-                                        XtNheight, 300,
+                                        XtNheight, 400,
                                         NULL);
 
     /* Create a simple widget (core) to act as our button */
@@ -1310,6 +1365,20 @@ static PyObject* simple(PyObject* unused, PyObject* args) {
     /* Add event handlers for drawing and clicking */
     XtAddEventHandler(button2, ExposureMask, False, expose_callback2, NULL);
     XtAddEventHandler(button2, ButtonPressMask, False, button_callback2, NULL);
+    XtAppAddInput(notifier.appContext, pipefds[0], (XtPointer)XtInputReadMask, pipe_proc, NULL);
+
+    /* Create a simple widget (core) to act as our button */
+    button3 = XtVaCreateManagedWidget("button",
+                                     widgetClass, container,
+                                     XtNwidth, 400,
+                                     XtNheight, 100,
+                                     XtNx, 0,
+                                     XtNy, 300,
+                                     NULL);
+
+    /* Add event handlers for drawing and clicking */
+    XtAddEventHandler(button3, ExposureMask, False, expose_callback3, NULL);
+    XtAddEventHandler(button3, ButtonPressMask, False, button_callback3, NULL);
 
     XtRealizeWidget(top);
 
