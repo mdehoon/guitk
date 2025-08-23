@@ -330,8 +330,7 @@ InitFds(XtAppContext app,
 #endif
 }
 
-static void
-MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
+void MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
 {
     app->rebuild_fdlist = FALSE;
 #ifdef USE_POLL
@@ -738,12 +737,7 @@ FindInputs(XtAppContext app,
 #endif                          /* } */
 }
 
-static void
-MyFindInputs1(XtAppContext app,
-           wait_fds_ptr_t wf,
-           int nfds _X_UNUSED,
-           int *dpy_no,
-           int *found_input)
+void MyFindInputs1(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSED, int *dpy_no, int *found_input)
 {
     InputEvent *ep;
     int ii;
