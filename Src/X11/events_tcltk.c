@@ -159,7 +159,6 @@ typedef struct {
 } wait_fds_t, *wait_fds_ptr_t;
 
 
-void MyAdjustTimes(XtAppContext app, wait_times_ptr_t wt);
 void MyInitFds2(XtAppContext app, wait_fds_ptr_t wf);
 int MyIoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf);
 void MyFindInputs2(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSED, int *dpy_no, int *found_input);
@@ -169,6 +168,31 @@ void MyFindInputs1(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSED, int 
 
 
 static struct timeval zero_time = { 0, 0 };
+
+static void MyAdjustTimes(XtAppContext app, wait_times_ptr_t wt)
+{
+    if (app->timerQueue != NULL) {
+#ifdef USE_POLL
+        if (IS_AFTER(wt->cur_time, app->timerQueue->te_timer_value)) {
+            TIMEDELTA(wt->wait_time, app->timerQueue->te_timer_value,
+                      wt->cur_time);
+            wt->poll_wait =
+                (int) (wt->wait_time.tv_sec * 1000 +
+                       wt->wait_time.tv_usec / 1000);
+        }
+        else
+            wt->poll_wait = X_DONT_BLOCK;
+#else
+        if (IS_AFTER(wt->cur_time, app->timerQueue->te_timer_value)) {
+            TIMEDELTA(wt->wait_time, app->timerQueue->te_timer_value,
+                      wt->cur_time);
+            wt->wait_time_ptr = &wt->wait_time;
+        }
+        else
+            wt->wait_time_ptr = &zero_time;
+#endif
+    }
+}
 
 static void _MyXtWaitForSomething1(XtAppContext app)
 {
@@ -1526,4 +1550,4 @@ PyObject* PyInit_events_tcltk(void)
     InitNotifier();
     notifier.appContext = XtCreateApplicationContext();
     return PyModule_Create(&moduledef);
-}   
+}
