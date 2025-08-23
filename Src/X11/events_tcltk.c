@@ -161,6 +161,68 @@ typedef struct {
 
 static struct timeval zero_time = { 0, 0 };
 
+static XtInputId
+MyXtAppAddInput(XtAppContext app,
+              int source,
+              XtPointer Condition,
+              XtInputCallbackProc proc,
+              XtPointer closure)
+{
+    InputEvent *sptr;
+    XtInputMask condition = (XtInputMask) Condition;
+
+    LOCK_APP(app);
+    if (!condition ||
+        condition & (unsigned
+                     long) (~(XtInputReadMask | XtInputWriteMask |
+                              XtInputExceptMask)))
+        XtAppErrorMsg(app, "invalidParameter", "xtAddInput", XtCXtToolkitError,
+                      "invalid condition passed to XtAppAddInput", NULL, NULL);
+
+    if (app->input_max <= source) {
+        Cardinal n = (Cardinal) (source + 1);
+        int ii;
+
+        app->input_list = (InputEvent **) XtRealloc((char *) app->input_list,
+                                                    (Cardinal) ((size_t) n *
+                                                                sizeof
+                                                                (InputEvent
+                                                                 *)));
+        for (ii = app->input_max; ii < (int) n; ii++)
+            app->input_list[ii] = (InputEvent *) NULL;
+        app->input_max = (short) n;
+    }
+    sptr = XtNew(InputEvent);
+
+    sptr->ie_proc = proc;
+    sptr->ie_closure = closure;
+    sptr->app = app;
+    sptr->ie_oq = NULL;
+    sptr->ie_source = source;
+    sptr->ie_condition = condition;
+    sptr->ie_next = app->input_list[source];
+    app->input_list[source] = sptr;
+
+#ifdef USE_POLL
+    if (sptr->ie_next == NULL)
+        app->fds.nfds++;
+#else
+    if (condition & XtInputReadMask)
+        FD_SET(source, &app->fds.rmask);
+    if (condition & XtInputWriteMask)
+        FD_SET(source, &app->fds.wmask);
+    if (condition & XtInputExceptMask)
+        FD_SET(source, &app->fds.emask);
+
+    if (app->fds.nfds < (source + 1))
+        app->fds.nfds = source + 1;
+#endif
+    app->input_count++;
+    app->rebuild_fdlist = TRUE;
+    UNLOCK_APP(app);
+    return ((XtInputId) sptr);
+}
+
 static void MyFindInputs1(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSED, int *dpy_no, int *found_input)
 {
     InputEvent *ep;
@@ -405,8 +467,12 @@ static void MyFindInputs2(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSE
 #endif                          /* } */
 }
 
-static void MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
+static int MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
 {
+#ifdef USE_POLL
+    size_t n;
+    PyGILState_STATE gstate;
+#endif
     app->rebuild_fdlist = FALSE;
 #ifdef USE_POLL
 #ifndef POLLRDNORM
@@ -437,23 +503,28 @@ static void MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
                 wf->fdlistlen++;
     }
 
+    n = sizeof(struct pollfd) * (size_t) wf->fdlistlen;
+    gstate = PyGILState_Ensure();
     if (!wf->fdlist || wf->fdlist == wf->stack) {
-        if ((sizeof(struct pollfd) * (size_t) wf->fdlistlen) <= sizeof(wf->stack))
+        if (n <= sizeof(wf->stack))
             wf->fdlist = wf->stack;
         else {
-            wf->fdlist = malloc(sizeof(struct pollfd) * (size_t) wf->fdlistlen);
-            if (wf->fdlist == NULL) _XtAllocError("malloc");
+            wf->fdlist = PyMem_Malloc(n);
         }
     }
     else {
        if (wf->fdlist == NULL) {
-           wf->fdlist = malloc(sizeof(struct pollfd) *(size_t) wf->fdlistlen);
-           if (wf->fdlist == NULL) _XtAllocError("malloc");
+           wf->fdlist = PyMem_Malloc(n);
        } else {
-           wf->fdlist = realloc(wf->fdlist, sizeof(struct pollfd) *(size_t) wf->fdlistlen);
-           if (wf->fdlist == NULL) _XtAllocError("realloc");
+           wf->fdlist = PyMem_Realloc(n);
        }
     }
+    if (wf->fdlist == NULL) {
+        PyErr_Print();
+        PyGILState_Release(gstate);
+        return -1;
+    }
+    PyGILState_Release(gstate);
 
     if (wf->fdlistlen) {
         struct pollfd *fdlp = wf->fdlist;
@@ -482,6 +553,7 @@ static void MyInitFds1(XtAppContext app, wait_fds_ptr_t wf)
     wf->wmask = app->fds.wmask;
     wf->emask = app->fds.emask;
 #endif
+    return 0;
 }
 
 static void MyInitFds2(XtAppContext app, wait_fds_ptr_t wf)
@@ -1171,6 +1243,7 @@ MyXtAppProcessEvent(XtAppContext app)
     XEvent event;
     struct timeval cur_time;
 
+
 #ifdef XTHREADS
     if(app && app->lock)(*app->lock)(app);
 #endif
@@ -1614,7 +1687,7 @@ CreateFileHandler(
 
     if (mask & TCL_READABLE) {
 	if (!(filePtr->mask & TCL_READABLE)) {
-	    filePtr->read = XtAppAddInput(notifier.appContext, fd,
+	    filePtr->read = MyXtAppAddInput(notifier.appContext, fd,
 		    (void *)(intptr_t)XtInputReadMask, FileProc, filePtr);
 	}
     } else {
@@ -1624,7 +1697,7 @@ CreateFileHandler(
     }
     if (mask & TCL_WRITABLE) {
 	if (!(filePtr->mask & TCL_WRITABLE)) {
-	    filePtr->write = XtAppAddInput(notifier.appContext, fd,
+	    filePtr->write = MyXtAppAddInput(notifier.appContext, fd,
 		    (void *)(intptr_t)XtInputWriteMask, FileProc, filePtr);
 	}
     } else {
@@ -1634,7 +1707,7 @@ CreateFileHandler(
     }
     if (mask & TCL_EXCEPTION) {
 	if (!(filePtr->mask & TCL_EXCEPTION)) {
-	    filePtr->except = XtAppAddInput(notifier.appContext, fd,
+	    filePtr->except = MyXtAppAddInput(notifier.appContext, fd,
 		    (void *)(intptr_t)XtInputExceptMask, FileProc, filePtr);
 	}
     } else {
@@ -1900,7 +1973,7 @@ static PyObject* simple(PyObject* unused, PyObject* args) {
     /* Add event handlers for drawing and clicking */
     XtAddEventHandler(button2, ExposureMask, False, expose_callback2, NULL);
     XtAddEventHandler(button2, ButtonPressMask, False, button_callback2, NULL);
-    XtAppAddInput(notifier.appContext, pipefds[0], (XtPointer)XtInputReadMask, pipe_proc, NULL);
+    MyXtAppAddInput(notifier.appContext, pipefds[0], (XtPointer)XtInputReadMask, pipe_proc, NULL);
 
     /* Create a simple widget (core) to act as our button */
     button3 = XtVaCreateManagedWidget("button",
