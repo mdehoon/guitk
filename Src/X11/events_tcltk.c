@@ -159,15 +159,27 @@ typedef struct {
 } wait_fds_t, *wait_fds_ptr_t;
 
 
-void MyInitFds2(XtAppContext app, wait_fds_ptr_t wf);
-int MyIoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf);
-void MyFindInputs2(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSED, int *dpy_no, int *found_input);
 void MyInitFds1(XtAppContext app, wait_fds_ptr_t wf);
+void MyInitFds2(XtAppContext app, wait_fds_ptr_t wf);
 void MyFindInputs1(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSED, int *dpy_no, int *found_input);
+void MyFindInputs2(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSED, int *dpy_no, int *found_input);
 
 
 
 static struct timeval zero_time = { 0, 0 };
+
+static int MyIoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
+{
+#ifdef USE_POLL
+    return poll(wf->fdlist, (nfds_t) wf->fdlistlen, wt->poll_wait);
+#else
+#if !defined(WIN32) || defined(__CYGWIN__)
+    return select(wf->nfds, &wf->rmask, &wf->wmask, &wf->emask, wt->wait_time_ptr);
+#else
+    return select(0, &wf->rmask, &wf->wmask, &wf->emask, wt->wait_time_ptr);
+#endif
+#endif
+}
 
 static void MyAdjustTimes(XtAppContext app, wait_times_ptr_t wt)
 {

@@ -573,19 +573,6 @@ IoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
 #endif
 }
 
-int MyIoWait(wait_times_ptr_t wt, wait_fds_ptr_t wf)
-{
-#ifdef USE_POLL
-    return poll(wf->fdlist, (nfds_t) wf->fdlistlen, wt->poll_wait);
-#else
-#if !defined(WIN32) || defined(__CYGWIN__)
-    return select(wf->nfds, &wf->rmask, &wf->wmask, &wf->emask, wt->wait_time_ptr);
-#else
-    return select(0, &wf->rmask, &wf->wmask, &wf->emask, wt->wait_time_ptr);
-#endif
-#endif
-}
-
 static void
 FindInputs(XtAppContext app,
            wait_fds_ptr_t wf,
