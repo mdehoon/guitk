@@ -76,6 +76,14 @@ static WorkProcRec *freeWorkRecs;
 #define IS_AT_OR_AFTER(t1, t2) (((t2).tv_sec > (t1).tv_sec) \
         || (((t2).tv_sec == (t1).tv_sec)&& ((t2).tv_usec >= (t1).tv_usec)))
 
+#define ADD_TIME(dest, src1, src2) { \
+        if(((dest).tv_usec = (src1).tv_usec + (src2).tv_usec) >= 1000000) {\
+              (dest).tv_usec -= 1000000;\
+              (dest).tv_sec = (src1).tv_sec + (src2).tv_sec + 1 ; \
+        } else { (dest).tv_sec = (src1).tv_sec + (src2).tv_sec ; \
+           if(((dest).tv_sec >= 1) && (((dest).tv_usec <0))) { \
+            (dest).tv_sec --;(dest).tv_usec += 1000000; } } }
+
 
 static PyThread_type_lock tcl_lock = 0;
 
@@ -222,6 +230,80 @@ MyXtAppAddInput(XtAppContext app,
     UNLOCK_APP(app);
     return ((XtInputId) sptr);
 }
+
+static void 
+MyQueueTimerEvent(XtAppContext app, TimerEventRec *ptr)
+{
+    TimerEventRec *t, **tt;
+
+    tt = &app->timerQueue;
+    t = *tt;
+    while (t != NULL && IS_AFTER(t->te_timer_value, ptr->te_timer_value)) {
+        tt = &t->te_next;
+        t = *tt;
+    }
+    ptr->te_next = t;
+    *tt = ptr;
+}
+
+static XtIntervalId MyXtAppAddTimeOut(XtAppContext app, unsigned long interval, XtTimerCallbackProc proc, XtPointer closure)
+{
+    TimerEventRec *tptr;
+    struct timeval current_time;
+
+    LOCK_APP(app);
+    LOCK_PROCESS;
+    if (freeTimerRecs) {
+        tptr = freeTimerRecs;
+        freeTimerRecs = tptr->te_next;
+    }
+    else
+        tptr = XtNew(TimerEventRec);
+
+    UNLOCK_PROCESS;
+    tptr->te_next = NULL;
+    tptr->te_closure = closure;
+    tptr->te_proc = proc;
+    tptr->app = app;
+    tptr->te_timer_value.tv_sec = (time_t) (interval / 1000);
+    tptr->te_timer_value.tv_usec = (suseconds_t) ((interval % 1000) * 1000);
+    X_GETTIMEOFDAY(&current_time);
+    FIXUP_TIMEVAL(current_time);
+    ADD_TIME(tptr->te_timer_value, tptr->te_timer_value, current_time);
+    MyQueueTimerEvent(app, tptr);
+    UNLOCK_APP(app);
+
+    return ((XtIntervalId) tptr);
+}
+
+static void MyXtRemoveTimeOut(XtIntervalId id)
+{
+    TimerEventRec *t, *last, *tid = (TimerEventRec *) id;
+    XtAppContext app = tid->app;
+
+    /* find it */
+    LOCK_APP(app);
+    for (t = app->timerQueue, last = NULL;
+         t != NULL && t != tid; t = t->te_next)
+        last = t;
+
+    if (t == NULL) {
+        UNLOCK_APP(app);
+        return;                 /* couldn't find it */
+    }
+    if (last == NULL) {         /* first one on the list */
+        app->timerQueue = t->te_next;
+    }
+    else
+        last->te_next = t->te_next;
+
+    LOCK_PROCESS;
+    t->te_next = freeTimerRecs;
+    freeTimerRecs = t;
+    UNLOCK_PROCESS;
+    UNLOCK_APP(app);
+}
+
 
 static void MyFindInputs1(XtAppContext app, wait_fds_ptr_t wf, int nfds _X_UNUSED, int *dpy_no, int *found_input)
 {
@@ -1371,11 +1453,11 @@ SetTimer(const Tcl_Time *timePtr)
 {
     unsigned long timeout;
     if (notifier.currentTimeout != 0) {
-	XtRemoveTimeOut(notifier.currentTimeout);
+	MyXtRemoveTimeOut(notifier.currentTimeout);
     }
     if (timePtr) {
 	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
-	notifier.currentTimeout = XtAppAddTimeOut(notifier.appContext,
+	notifier.currentTimeout = MyXtAppAddTimeOut(notifier.appContext,
 		timeout, TimerProc, NULL);
     } else {
 	notifier.currentTimeout = 0;
@@ -1557,7 +1639,7 @@ static void
 NotifierExitHandler(void *unused)
 {
     if (notifier.currentTimeout != 0) {
-	XtRemoveTimeOut(notifier.currentTimeout);
+	MyXtRemoveTimeOut(notifier.currentTimeout);
     }
     for (; notifier.firstFileHandlerPtr != NULL; ) {
 	Tcl_DeleteFileHandler(notifier.firstFileHandlerPtr->fd);
@@ -1772,7 +1854,7 @@ static void timer_proc (XtPointer client_data, XtIntervalId *timer)
 {
     static int counter = 0;
     printf("Xt timer update %d\n", counter++);
-    XtAppAddTimeOut(notifier.appContext, 1500, timer_proc, NULL);
+    MyXtAppAddTimeOut(notifier.appContext, 1500, timer_proc, NULL);
 }
 
 static int pipefds[2];
@@ -1802,7 +1884,7 @@ static void button_callback2(Widget w, XtPointer client_data, XEvent *event, Boo
 
 static void button_callback3(Widget w, XtPointer client_data, XEvent *event, Boolean *cont) {
     if (event->type == ButtonPress) {
-        XtAppAddTimeOut(notifier.appContext, 1500, timer_proc, NULL);
+        MyXtAppAddTimeOut(notifier.appContext, 1500, timer_proc, NULL);
     }
 }
 
