@@ -1192,6 +1192,62 @@ MyDispatchEvent(XEvent *event, Widget widget)
     return XtDispatchEventToWidget(widget, event);
 }
 
+#define NonMaskableMask ((EventMask)0x80000000L)
+
+static EventMask const masks[] = {
+    0,                          /* Error, should never see  */
+    0,                          /* Reply, should never see  */
+    KeyPressMask,               /* KeyPress                 */
+    KeyReleaseMask,             /* KeyRelease               */
+    ButtonPressMask,            /* ButtonPress              */
+    ButtonReleaseMask,          /* ButtonRelease            */
+    PointerMotionMask           /* MotionNotify             */
+        | ButtonMotionMask,
+    EnterWindowMask,            /* EnterNotify              */
+    LeaveWindowMask,            /* LeaveNotify              */
+    FocusChangeMask,            /* FocusIn                  */
+    FocusChangeMask,            /* FocusOut                 */
+    KeymapStateMask,            /* KeymapNotify             */
+    ExposureMask,               /* Expose                   */
+    NonMaskableMask,            /* GraphicsExpose, in GC    */
+    NonMaskableMask,            /* NoExpose, in GC          */
+    VisibilityChangeMask,       /* VisibilityNotify         */
+    SubstructureNotifyMask,     /* CreateNotify             */
+    StructureNotifyMask         /* DestroyNotify            */
+        | SubstructureNotifyMask,
+    StructureNotifyMask         /* UnmapNotify              */
+        | SubstructureNotifyMask,
+    StructureNotifyMask         /* MapNotify                */
+        | SubstructureNotifyMask,
+    SubstructureRedirectMask,   /* MapRequest               */
+    StructureNotifyMask         /* ReparentNotify           */
+        | SubstructureNotifyMask,
+    StructureNotifyMask         /* ConfigureNotify          */
+        | SubstructureNotifyMask,
+    SubstructureRedirectMask,   /* ConfigureRequest         */
+    StructureNotifyMask         /* GravityNotify            */
+        | SubstructureNotifyMask,
+    ResizeRedirectMask,         /* ResizeRequest            */
+    StructureNotifyMask         /* CirculateNotify          */
+        | SubstructureNotifyMask,
+    SubstructureRedirectMask,   /* CirculateRequest         */
+    PropertyChangeMask,         /* PropertyNotify           */
+    NonMaskableMask,            /* SelectionClear           */
+    NonMaskableMask,            /* SelectionRequest         */
+    NonMaskableMask,            /* SelectionNotify          */
+    ColormapChangeMask,         /* ColormapNotify           */
+    NonMaskableMask,            /* ClientMessage            */
+    NonMaskableMask             /* MappingNotify            */
+};
+
+static EventMask
+_MyXtConvertTypeToMask(int eventType)
+{
+    if ((Cardinal) eventType < XtNumber(masks))
+        return masks[eventType];
+    else
+        return NoEventMask;
+}
 
 typedef enum _GrabType { pass, ignore, remap } GrabType;
 
@@ -1265,7 +1321,7 @@ _MyXtDefaultDispatcher(XEvent *event)
         }
     }
     else if (grabType == remap) {
-        EventMask mask = _XtConvertTypeToMask(event->type);
+        EventMask mask = _MyXtConvertTypeToMask(event->type);
         Widget dspWidget;
         Boolean was_filtered = False;
 
