@@ -1606,6 +1606,27 @@ _MyXtConvertTypeToMask(int eventType)
     else
         return NoEventMask;
 }
+static Widget
+_MyXtFindRemapWidget(XEvent *event,
+                   Widget widget,
+                   EventMask mask,
+                   XtPerDisplayInput pdi)
+{
+    Widget dspWidget = widget;
+
+    if (!pdi->traceDepth || !(widget == pdi->trace[0])) {
+        _XtFillAncestorList(&pdi->trace, &pdi->traceMax,
+                            &pdi->traceDepth, widget, NULL);
+        pdi->focusWidget = NULL;        /* invalidate the focus
+                                           cache */
+    }
+    if (mask & (KeyPressMask | KeyReleaseMask))
+        dspWidget = _XtProcessKeyboardEvent((XKeyEvent *) event, widget, pdi);
+    else if (mask & (ButtonPressMask | ButtonReleaseMask))
+        dspWidget = _XtProcessPointerEvent((XButtonEvent *) event, widget, pdi);
+
+    return dspWidget;
+}
 
 typedef enum _GrabType { pass, ignore, remap } GrabType;
 
@@ -1683,7 +1704,7 @@ _MyXtDefaultDispatcher(XEvent *event)
         Widget dspWidget;
         Boolean was_filtered = False;
 
-        dspWidget = _XtFindRemapWidget(event, widget, mask, pdi);
+        dspWidget = _MyXtFindRemapWidget(event, widget, mask, pdi);
 
         if ((grabList == NULL || _XtOnGrabList(dspWidget, grabList))
             && XtIsSensitive(dspWidget)) {
