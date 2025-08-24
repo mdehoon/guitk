@@ -231,7 +231,7 @@ MyXtAppAddInput(XtAppContext app,
     return ((XtInputId) sptr);
 }
 
-static void 
+static void
 MyQueueTimerEvent(XtAppContext app, TimerEventRec *ptr)
 {
     TimerEventRec *t, **tt;
@@ -1464,6 +1464,71 @@ SetTimer(const Tcl_Time *timePtr)
     }
 }
 
+static XtInputMask MyXtAppPending(XtAppContext app)
+{
+    struct timeval cur_time;
+    int d;
+    XtInputMask ret = 0;
+
+/*
+ * Check for pending X events
+ */
+    LOCK_APP(app);
+    for (d = 0; d < app->count; d++) {
+        if (XEventsQueued(app->list[d], QueuedAfterReading)) {
+            ret = XtIMXEvent;
+            break;
+        }
+    }
+    if (ret == 0) {
+        for (d = 0; d < app->count; d++) {
+            if (XEventsQueued(app->list[d], QueuedAfterFlush)) {
+                ret = XtIMXEvent;
+                break;
+            }
+        }
+    }
+
+    if (app->signalQueue != NULL) {
+        SignalEventRec *se_ptr = app->signalQueue;
+
+        while (se_ptr != NULL) {
+            if (se_ptr->se_notice) {
+                ret |= XtIMSignal;
+                break;
+            }
+            se_ptr = se_ptr->se_next;
+        }
+    }
+
+/*
+ * Check for pending alternate input
+ */
+    if (app->timerQueue != NULL) {      /* check timeout queue */
+        X_GETTIMEOFDAY(&cur_time);
+        FIXUP_TIMEVAL(cur_time);
+        if ((IS_AT_OR_AFTER(app->timerQueue->te_timer_value, cur_time)) &&
+            (app->timerQueue->te_proc != NULL)) {
+            ret |= XtIMTimer;
+        }
+    }
+
+    if (app->outstandingQueue != NULL)
+        ret |= XtIMAlternateInput;
+    else {
+        /* This won't cause a wait, but will enqueue any input */
+
+        if (_XtWaitForSomething(app,
+                                FALSE, TRUE, FALSE, TRUE,
+                                FALSE, TRUE, (unsigned long *) NULL) != -1)
+            ret |= XtIMXEvent;
+        if (app->outstandingQueue != NULL)
+            ret |= XtIMAlternateInput;
+    }
+    UNLOCK_APP(app);
+    return ret;
+}
+
 /*
  *----------------------------------------------------------------------
  *
@@ -1492,7 +1557,7 @@ WaitForEvent(
     if (timePtr) {
 	timeout = timePtr->sec * 1000 + timePtr->usec / 1000;
 	if (timeout == 0) {
-	    if (XtAppPending(notifier.appContext)) {
+	    if (MyXtAppPending(notifier.appContext)) {
 		goto process;
 	    } else {
 		return 0;
