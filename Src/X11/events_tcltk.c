@@ -1146,6 +1146,364 @@ MyLookupSpringLoaded(XtGrabList grabList)
     return NULL;
 }
 
+/* keep this SMALL to avoid blowing stack cache! */
+/* because some compilers allocate all local locals on procedure entry */
+#define EHSIZE 4
+
+#define KnownButtons (Button1MotionMask|Button2MotionMask|Button3MotionMask|\
+                      Button4MotionMask|Button5MotionMask)
+
+#define COMP_EXPOSE   (widget->core.widget_class->core_class.compress_exposure)
+#define COMP_EXPOSE_TYPE (COMP_EXPOSE & 0x0f)
+#define GRAPHICS_EXPOSE  ((XtExposeGraphicsExpose & COMP_EXPOSE) || \
+                          (XtExposeGraphicsExposeMerged & COMP_EXPOSE))
+#define NO_EXPOSE        (XtExposeNoExpose & COMP_EXPOSE)
+
+#define GetCount(ev) (((XExposeEvent *)(ev))->count)
+
+
+#ifndef MAX
+#define MAX(a,b) (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef MIN
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
+#endif
+
+
+
+typedef struct _CheckExposeInfo {
+    int type1, type2;           /* Types of events to check for. */
+    Boolean maximal;            /* Ignore non-exposure events? */
+    Boolean non_matching;       /* Was there an event that did not
+                                   match either type? */
+    Window window;              /* Window to match. */
+} CheckExposeInfo;
+
+static void
+MyAddExposureToRectangularRegion(XEvent *event,   /* when called internally, type is always appropriate */
+                               Region region)
+{
+    XRectangle rect;
+    XExposeEvent *ev = (XExposeEvent *) event;
+
+    /* These Expose and GraphicsExpose fields are at identical offsets */
+
+    rect.x = (Position) ev->x;
+    rect.y = (Position) ev->y;
+    rect.width = (Dimension) ev->width;
+    rect.height = (Dimension) ev->height;
+
+    if (XEmptyRegion(region)) {
+        XUnionRectWithRegion(&rect, region, region);
+    }
+    else {
+        XRectangle merged, bbox;
+
+        XClipBox(region, &bbox);
+        merged.x = MIN(rect.x, bbox.x);
+        merged.y = MIN(rect.y, bbox.y);
+        merged.width = (unsigned short) (MAX(rect.x + rect.width,
+                                             bbox.x + bbox.width) - merged.x);
+        merged.height = (unsigned short) (MAX(rect.y + rect.height,
+                                              bbox.y + bbox.height) - merged.y);
+        XUnionRectWithRegion(&merged, region, region);
+    }
+}
+
+static Region nullRegion;
+
+static void
+MySendExposureEvent(XEvent *event, Widget widget, XtPerDisplay pd)
+{   
+    XtExposeProc expose;
+    XRectangle rect;
+    XtEnum comp_expose;
+    XExposeEvent *ev = (XExposeEvent *) event;
+        
+    XClipBox(pd->region, &rect);
+    ev->x = rect.x;
+    ev->y = rect.y;
+    ev->width = rect.width;
+    ev->height = rect.height;
+
+    LOCK_PROCESS;
+    comp_expose = COMP_EXPOSE;
+    expose = widget->core.widget_class->core_class.expose;
+    UNLOCK_PROCESS;
+    if (comp_expose & XtExposeNoRegion)
+        (*expose) (widget, event, NULL);
+    else
+        (*expose) (widget, event, pd->region);
+    (void) XIntersectRegion(nullRegion, pd->region, pd->region);
+}
+
+static Bool     
+MyCheckExposureEvent(Display *disp _X_UNUSED, XEvent *event, char *arg)
+{
+    CheckExposeInfo *info = ((CheckExposeInfo *) arg);
+
+    if ((info->type1 == event->type) || (info->type2 == event->type)) {
+        if (!info->maximal && info->non_matching)
+            return FALSE;
+        if (event->type == GraphicsExpose)
+            return (event->xgraphicsexpose.drawable == info->window);
+        return (event->xexpose.window == info->window);
+    }
+    info->non_matching = TRUE;
+    return (FALSE);
+}
+
+static void
+MyCompressExposures(XEvent *event, Widget widget)
+{
+    CheckExposeInfo info;
+    int count;
+    Display *dpy = XtDisplay(widget);
+    XtPerDisplay pd = _XtGetPerDisplay(dpy);
+    XtEnum comp_expose;
+    XtEnum comp_expose_type;
+    Boolean no_region;
+
+    LOCK_PROCESS;
+    comp_expose = COMP_EXPOSE;
+    UNLOCK_PROCESS;
+    comp_expose_type = comp_expose & 0x0f;
+    no_region = ((comp_expose & XtExposeNoRegion) ? True : False);
+
+    if (no_region)
+        MyAddExposureToRectangularRegion(event, pd->region);
+    else
+        XtAddExposureToRegion(event, pd->region);
+
+    if (GetCount(event) != 0)
+        return;
+
+    if ((comp_expose_type == XtExposeCompressSeries) ||
+        (XEventsQueued(dpy, QueuedAfterReading) == 0)) {
+        MySendExposureEvent(event, widget, pd);
+        return;
+    }
+
+    if (comp_expose & XtExposeGraphicsExposeMerged) {
+        info.type1 = Expose;
+        info.type2 = GraphicsExpose;
+    }
+    else {
+        info.type1 = event->type;
+        info.type2 = 0;
+    }
+    info.maximal = (comp_expose_type == XtExposeCompressMaximal);
+    info.non_matching = FALSE;
+    info.window = XtWindow(widget);
+
+    /*
+     * We have to be very careful here not to hose down the processor
+     * when blocking until count gets to zero.
+     *
+     * First, check to see if there are any events in the queue for this
+     * widget, and of the correct type.
+     *
+     * Once we cannot find any more events, check to see that count is zero.
+     * If it is not then block until we get another exposure event.
+     *
+     * If we find no more events, and count on the last one we saw was zero we
+     * we can be sure that all events have been processed.
+     *
+     * Unfortunately, we wind up having to look at the entire queue
+     * event if we're not doing Maximal compression, due to the
+     * semantics of XCheckIfEvent (we can't abort without re-ordering
+     * the event queue as a side-effect).
+     */
+
+    count = 0;
+    while (TRUE) {
+        XEvent event_return;
+
+        if (XCheckIfEvent(dpy, &event_return,
+                          MyCheckExposureEvent, (char *) &info)) {
+
+            count = GetCount(&event_return);
+            if (no_region)
+                MyAddExposureToRectangularRegion(&event_return, pd->region);
+            else
+                XtAddExposureToRegion(&event_return, pd->region);
+        }
+        else if (count != 0) {
+            XIfEvent(dpy, &event_return, MyCheckExposureEvent, (char *) &info);
+            count = GetCount(&event_return);
+            if (no_region)
+                MyAddExposureToRectangularRegion(&event_return, pd->region);
+            else
+                XtAddExposureToRegion(&event_return, pd->region);
+        }
+        else                    /* count == 0 && XCheckIfEvent Failed. */
+            break;
+    }
+
+    MySendExposureEvent(event, widget, pd);
+}
+
+#define EXT_TYPE(p) (((XtEventRecExt*) ((p)+1))->type)
+
+typedef struct _XtEventRecExt {
+    int type;
+    XtPointer select_data[1];   /* actual dimension is [mask] */
+} XtEventRecExt;
+
+static Boolean
+MyCallEventHandlers(Widget widget, XEvent *event, EventMask mask)
+{
+    register XtEventRec *p;
+    XtEventHandler *proc;
+    XtPointer *closure;
+    Boolean cont_to_disp = True;
+    int i, numprocs;
+
+    /* Have to copy the procs into an array, because one of them might
+     * call XtRemoveEventHandler, which would break our linked list. */
+
+    numprocs = 0;
+    for (p = widget->core.event_table; p; p = p->next) {
+        if ((!p->has_type_specifier && (mask & p->mask)) ||
+            (p->has_type_specifier && event->type == EXT_TYPE(p)))
+            numprocs++;
+    }
+    proc = (XtEventHandler *)
+        __XtMalloc((Cardinal)
+                   ((size_t) numprocs *
+                    (sizeof(XtEventHandler) + sizeof(XtPointer))));
+    closure = (XtPointer *) (proc + numprocs);
+
+    numprocs = 0;
+    for (p = widget->core.event_table; p; p = p->next) {
+        if ((!p->has_type_specifier && (mask & p->mask)) ||
+            (p->has_type_specifier && event->type == EXT_TYPE(p))) {
+            proc[numprocs] = p->proc;
+            closure[numprocs] = p->closure;
+            numprocs++;
+        }
+    }
+    for (i = 0; i < numprocs && cont_to_disp; i++)
+        (*(proc[i])) (widget, closure[i], event, &cont_to_disp);
+    XtFree((char *) proc);
+    return cont_to_disp;
+}
+
+
+static Boolean
+MyXtDispatchEventToWidget(Widget widget, XEvent *event)
+{
+    register XtEventRec *p;
+    Boolean was_dispatched = False;
+    Boolean call_tm = False;
+    Boolean cont_to_disp;
+    EventMask mask;
+
+    WIDGET_TO_APPCON(widget);
+
+    LOCK_APP(app);
+
+    mask = _XtConvertTypeToMask(event->type);
+    if (event->type == MotionNotify)
+        mask |= (event->xmotion.state & KnownButtons);
+
+    LOCK_PROCESS;
+    if ((mask == ExposureMask) ||
+        ((event->type == NoExpose) && NO_EXPOSE) ||
+        ((event->type == GraphicsExpose) && GRAPHICS_EXPOSE)) {
+
+        if (widget->core.widget_class->core_class.expose != NULL) {
+
+            /* We need to mask off the bits that could contain the information
+             * about whether or not we desire Graphics and NoExpose events.  */
+
+            if ((COMP_EXPOSE_TYPE == XtExposeNoCompress) ||
+                (event->type == NoExpose))
+
+                (*widget->core.widget_class->core_class.expose)
+                    (widget, event, (Region) NULL);
+            else {
+                MyCompressExposures(event, widget);
+            }
+            was_dispatched = True;
+        }
+    }
+
+    if ((mask == VisibilityChangeMask) &&
+        XtClass(widget)->core_class.visible_interest) {
+        was_dispatched = True;
+        /* our visibility just changed... */
+        switch (((XVisibilityEvent *) event)->state) {
+        case VisibilityUnobscured:
+            widget->core.visible = TRUE;
+            break;
+
+        case VisibilityPartiallyObscured:
+            /* what do we want to say here? */
+            /* well... some of us is visible */
+            widget->core.visible = TRUE;
+            break;
+
+        case VisibilityFullyObscured:
+            widget->core.visible = FALSE;
+            /* do we want to mark our children obscured? */
+            break;
+        }
+    }
+    UNLOCK_PROCESS;
+
+    /* to maintain "copy" semantics we check TM now but call later */
+    if (widget->core.tm.translations &&
+        (mask & widget->core.tm.translations->eventMask))
+        call_tm = True;
+
+    cont_to_disp = True;
+    p = widget->core.event_table;
+    if (p) {
+        if (p->next) {
+            XtEventHandler proc[EHSIZE];
+            XtPointer closure[EHSIZE];
+            int numprocs = 0;
+
+            /* Have to copy the procs into an array, because one of them might
+             * call XtRemoveEventHandler, which would break our linked list. */
+
+            for (; p; p = p->next) {
+                if ((!p->has_type_specifier && (mask & p->mask)) ||
+                    (p->has_type_specifier && event->type == EXT_TYPE(p))) {
+                    if (numprocs >= EHSIZE)
+                        break;
+                    proc[numprocs] = p->proc;
+                    closure[numprocs] = p->closure;
+                    numprocs++;
+                }
+            }
+            if (numprocs) {
+                if (p) {
+                    cont_to_disp = MyCallEventHandlers(widget, event, mask);
+                }
+                else {
+                    int i;
+
+                    for (i = 0; i < numprocs && cont_to_disp; i++)
+                        (*(proc[i])) (widget, closure[i], event, &cont_to_disp);
+                }
+                was_dispatched = True;
+            }
+        }
+        else if ((!p->has_type_specifier && (mask & p->mask)) ||
+                 (p->has_type_specifier && event->type == EXT_TYPE(p))) {
+            (*p->proc) (widget, p->closure, event, &cont_to_disp);
+            was_dispatched = True;
+        }
+    }
+    if (call_tm && cont_to_disp)
+        _XtTranslateEvent(widget, event);
+    UNLOCK_APP(app);
+    return (was_dispatched | call_tm);
+}
+
 
 static Boolean
 MyDispatchEvent(XEvent *event, Widget widget)
@@ -1189,7 +1547,7 @@ MyDispatchEvent(XEvent *event, Widget widget)
         }
     }
 
-    return XtDispatchEventToWidget(widget, event);
+    return MyXtDispatchEventToWidget(widget, event);
 }
 
 #define NonMaskableMask ((EventMask)0x80000000L)
@@ -1297,7 +1655,7 @@ _MyXtDefaultDispatcher(XEvent *event)
             /* event occurred in a non-widget window, but we've promised also
                to dispatch it to the nearest accessible spring_loaded widget */
             was_dispatched = (XFilterEvent(event, XtWindow(widget))
-                              || XtDispatchEventToWidget(widget, event));
+                              || MyXtDispatchEventToWidget(widget, event));
         }
         else
             was_dispatched = (Boolean) XFilterEvent(event, None);
@@ -1307,11 +1665,11 @@ _MyXtDefaultDispatcher(XEvent *event)
             event->type == FocusIn || event->type == FocusOut) {
             if (XtIsSensitive(widget))
                 was_dispatched = (XFilterEvent(event, XtWindow(widget)) ||
-                                  XtDispatchEventToWidget(widget, event));
+                                  MyXtDispatchEventToWidget(widget, event));
         }
         else
             was_dispatched = (XFilterEvent(event, XtWindow(widget)) ||
-                              XtDispatchEventToWidget(widget, event));
+                              MyXtDispatchEventToWidget(widget, event));
     }
     else if (grabType == ignore) {
         if ((grabList == NULL || _XtOnGrabList(widget, grabList))
@@ -1336,7 +1694,7 @@ _MyXtDefaultDispatcher(XEvent *event)
                 was_dispatched = True;
             }
             else
-                was_dispatched = XtDispatchEventToWidget(dspWidget, event);
+                was_dispatched = MyXtDispatchEventToWidget(dspWidget, event);
         }
         else
             _XtUngrabBadGrabs(event, widget, mask, pdi);
@@ -1348,7 +1706,7 @@ _MyXtDefaultDispatcher(XEvent *event)
             widget = MyLookupSpringLoaded(grabList);
             if (widget != NULL && widget != dspWidget) {
                 was_dispatched = (XFilterEvent(event, XtWindow(widget))
-                                  || XtDispatchEventToWidget(widget, event)
+                                  || MyXtDispatchEventToWidget(widget, event)
                                   || was_dispatched);
             }
         }
@@ -2336,5 +2694,8 @@ PyObject* PyInit_events_tcltk(void)
     XtToolkitInitialize();
     InitNotifier();
     notifier.appContext = XtCreateApplicationContext();
+#ifndef __lock_lint
+    nullRegion = XCreateRegion();
+#endif
     return PyModule_Create(&moduledef);
 }
