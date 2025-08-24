@@ -1016,6 +1016,100 @@ static int _MyXtWaitForSomething2(XtAppContext app)
 }
 
 
+static void
+_MyXtBuildKeysymTables(Display *dpy, register XtPerDisplay pd)
+{
+    ModToKeysymTable *table;
+    int maxCount, i, j, k, tempCount, idx;
+    KeySym keysym, tempKeysym;
+    XModifierKeymap *modKeymap;
+    KeyCode keycode;
+
+#define KeysymTableSize 16
+#define FLUSHKEYCACHE(ctx) \
+        memset((void *)&ctx->keycache, 0, sizeof(TMKeyCache))
+
+    FLUSHKEYCACHE(pd->tm_context);
+
+    XFree((char *) pd->keysyms);
+    pd->keysyms_serial = NextRequest(dpy);
+    pd->keysyms = XGetKeyboardMapping(dpy, (KeyCode) pd->min_keycode,
+                                      pd->max_keycode - pd->min_keycode + 1,
+                                      &pd->keysyms_per_keycode);
+    XtFree((char *) pd->modKeysyms);
+
+    pd->modKeysyms =
+        (KeySym *) __XtMalloc((Cardinal) KeysymTableSize * sizeof(KeySym));
+    maxCount = KeysymTableSize;
+    tempCount = 0;
+
+    XtFree((char *) pd->modsToKeysyms);
+    table =
+        (ModToKeysymTable *) __XtMalloc((Cardinal) 8 *
+                                        sizeof(ModToKeysymTable));
+    pd->modsToKeysyms = table;
+
+    table[0].mask = ShiftMask;
+    table[1].mask = LockMask;
+    table[2].mask = ControlMask;
+    table[3].mask = Mod1Mask;
+    table[4].mask = Mod2Mask;
+    table[5].mask = Mod3Mask;
+    table[6].mask = Mod4Mask;
+    table[7].mask = Mod5Mask;
+    tempKeysym = 0;
+
+    modKeymap = XGetModifierMapping(dpy);
+    for (i = 0; i < 32; i++)
+        pd->isModifier[i] = 0;
+    pd->mode_switch = 0;
+    pd->num_lock = 0;
+    for (i = 0; i < 8; i++) {
+        table[i].idx = tempCount;
+        table[i].count = 0;
+        for (j = 0; j < modKeymap->max_keypermod; j++) {
+            keycode = modKeymap->modifiermap[i * modKeymap->max_keypermod + j];
+            if (keycode != 0) {
+                pd->isModifier[keycode >> 3] |=
+                    (unsigned char) (1 << (keycode & 7));
+                for (k = 0; k < pd->keysyms_per_keycode; k++) {
+                    idx = ((keycode - pd->min_keycode) *
+                           pd->keysyms_per_keycode) + k;
+                    keysym = pd->keysyms[idx];
+                    if ((keysym == XK_Mode_switch) && (i > 2))
+                        pd->mode_switch =
+                            (pd->mode_switch | (Modifiers) (1 << i));
+                    if ((keysym == XK_Num_Lock) && (i > 2))
+                        pd->num_lock = (pd->num_lock | (Modifiers) (1 << i));
+                    if (keysym != 0 && keysym != tempKeysym) {
+                        if (tempCount == maxCount) {
+                            maxCount += KeysymTableSize;
+                            pd->modKeysyms = (KeySym *) XtRealloc((char *) pd->
+                                                                  modKeysyms,
+                                                                  (unsigned) ((size_t) maxCount * sizeof(KeySym)));
+                        }
+                        pd->modKeysyms[tempCount++] = keysym;
+                        table[i].count++;
+                        tempKeysym = keysym;
+                    }
+                }
+            }
+        }
+    }
+    pd->lock_meaning = NoSymbol;
+    for (i = 0; i < table[1].count; i++) {
+        keysym = pd->modKeysyms[table[1].idx + i];
+        if (keysym == XK_Caps_Lock) {
+            pd->lock_meaning = XK_Caps_Lock;
+            break;
+        }
+        else if (keysym == XK_Shift_Lock) {
+            pd->lock_meaning = XK_Shift_Lock;
+        }
+    }
+    XFreeModifiermap(modKeymap);
+}
+
 
 static void
 _MyXtRefreshMapping(XEvent *event)
@@ -1027,7 +1121,7 @@ _MyXtRefreshMapping(XEvent *event)
 
     if (event->xmapping.request != MappingPointer &&
         pd && pd->keysyms && (event->xmapping.serial >= pd->keysyms_serial))
-        _XtBuildKeysymTables(event->xmapping.display, pd);
+        _MyXtBuildKeysymTables(event->xmapping.display, pd);
 
     XRefreshKeyboardMapping(&event->xmapping);
     if(_XtProcessUnlock)(*_XtProcessUnlock)();
