@@ -1715,6 +1715,38 @@ _MyXtDefaultDispatcher(XEvent *event)
     return was_dispatched;
 }
 
+typedef struct _TMBindCacheStatusRec {
+    unsigned int boundInClass:1;
+    unsigned int boundInHierarchy:1;
+    unsigned int boundInContext:1;
+    unsigned int notFullyBound:1;
+    unsigned int refCount:28;
+} TMBindCacheStatusRec, *TMBindCacheStatus;
+
+typedef struct _TMBindCacheRec {
+    struct _TMBindCacheRec *next;
+    TMBindCacheStatusRec status;
+    TMStateTree stateTree;
+#ifdef TRACE_TM
+    WidgetClass widgetClass;
+#endif                          /* TRACE_TM */
+    XtActionProc procs[1];      /* variable length */
+} TMBindCacheRec, *TMBindCache;
+
+
+
+static void
+_MyXtDoFreeBindings(XtAppContext app)
+{
+    TMBindCache bcp;
+
+    while (app->free_bindings) {
+        bcp = app->free_bindings->next;
+        XtFree((char *) app->free_bindings);
+        app->free_bindings = bcp;
+    }
+}
+
 static Boolean
 MyXtDispatchEvent(XEvent *event)
 {
@@ -1785,7 +1817,7 @@ MyXtDispatchEvent(XEvent *event)
         if (app->dpy_destroy_count != 0)
             _XtCloseDisplays(app);
         if (app->free_bindings)
-            _XtDoFreeBindings(app);
+            _MyXtDoFreeBindings(app);
     }
     UNLOCK_APP(app);
     LOCK_PROCESS;
